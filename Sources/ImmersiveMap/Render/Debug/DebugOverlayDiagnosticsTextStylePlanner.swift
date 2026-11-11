@@ -20,6 +20,10 @@ package struct DebugOverlayDiagnosticsTextStyleRun: Equatable {
 
 #if canImport(Darwin)
 extension DebugOverlayDiagnosticsTextStyleRun {
+    package init(range: NSRange, style: DebugOverlayDiagnosticsTextStyle) {
+        self.init(location: range.location, length: range.length, style: style)
+    }
+
     package var range: NSRange {
         NSRange(location: location, length: length)
     }
