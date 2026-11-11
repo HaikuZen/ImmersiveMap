@@ -170,7 +170,8 @@ jobs:
   # The same package for WebAssembly, its tests run by the toolchain's own
   # runtime (WasmKit, an interpreter, so the flattener's tests take minutes).
   # The test binary is given the checkout, for the Earcut fixtures, and /tmp,
-  # where the file tests write.
+  # where the file tests write. It is named by its absolute path: started by
+  # a relative one, it traps before the first test, with no message.
   wasm-test:
     name: Build & Test (WebAssembly)
     runs-on: ubuntu-latest
@@ -192,10 +193,10 @@ jobs:
         run: swift build --swift-sdk "$WASM_SDK" --build-tests --build-system native
 
       - name: Test (XCTest)
-        run: wasmkit run --dir "$PWD" --dir /tmp .build/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest
+        run: wasmkit run --dir "$PWD" --dir /tmp "$PWD/.build/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest"
 
       - name: Test (Swift Testing)
-        run: wasmkit run --dir "$PWD" --dir /tmp .build/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest --testing-library swift-testing
+        run: wasmkit run --dir "$PWD" --dir /tmp "$PWD/.build/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest" --testing-library swift-testing
 
       - name: Build the slim build
         env:
@@ -203,4 +204,4 @@ jobs:
         run: swift build --swift-sdk "$WASM_SDK" --build-tests --build-system native --scratch-path .build-slim
 
       - name: Test the slim build
-        run: wasmkit run --dir "$PWD" --dir /tmp .build-slim/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest --testing-library swift-testing
+        run: wasmkit run --dir "$PWD" --dir /tmp "$PWD/.build-slim/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest" --testing-library swift-testing
