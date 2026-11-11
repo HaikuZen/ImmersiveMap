@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 
 /// Process-wide immutable GPU resources shared by every renderer instance.
@@ -491,9 +493,8 @@ final class SharedRenderResources {
             { fxaaPipeline = FXAAPipeline(metalDevice: device,
                                           pixelFormat: pixelFormat,
                                           library: library) },
-            { starfieldPipeline = StarfieldPipeline(metalDevice: device,
-                                                    pixelFormat: pixelFormat,
-                                                    library: library,
+            { starfieldPipeline = StarfieldPipeline(device: MetalDevice(device: device, library: library),
+                                                    pixelFormat: GPUPixelFormat(metal: pixelFormat)!,
                                                     sampleCount: sampleCount) },
             { horizonPipeline = HorizonPipeline(metalDevice: device,
                                                 pixelFormat: pixelFormat,

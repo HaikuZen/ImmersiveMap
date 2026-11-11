@@ -280,12 +280,13 @@ package final class MetalCommandQueue: GPUCommandQueue {
 }
 
 /// The GPU interface over a Metal device and the shader library its
-/// pipelines' functions come from.
+/// pipelines' functions come from. A device made without a library makes
+/// buffers, textures and states, and refuses pipelines.
 package final class MetalDevice: GPUDevice {
     package let device: MTLDevice
-    package let library: MTLLibrary
+    package let library: MTLLibrary?
 
-    package init(device: MTLDevice, library: MTLLibrary) {
+    package init(device: MTLDevice, library: MTLLibrary?) {
         self.device = device
         self.library = library
     }
@@ -424,6 +425,9 @@ package final class MetalDevice: GPUDevice {
     }
 
     private func function(_ shader: GPUShaderFunction) throws -> MTLFunction {
+        guard let library else {
+            throw GPUError.missingFunction("\(shader.name): the device was made without a shader library")
+        }
         guard shader.constants.isEmpty == false else {
             guard let function = library.makeFunction(name: shader.name) else {
                 throw GPUError.missingFunction(shader.name)

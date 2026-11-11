@@ -48,6 +48,12 @@ var targets: [Target] = [
     .target(
         name: "ImmersiveMapGPU"
     ),
+    // A GPU that draws nothing and logs the calls, for the tests of the
+    // features' drawing on any platform.
+    .target(
+        name: "ImmersiveMapGPUTestSupport",
+        dependencies: ["ImmersiveMapGPU"]
+    ),
     // The ear-clipping triangulator, a port of mapbox/earcut. Its own
     // module so the algorithm depends on nothing in the engine and the
     // engine reaches it through one entry point at `package` access,
@@ -115,7 +121,7 @@ var targets: [Target] = [
     // there is a Foundation to ask (not in a slim build).
     .testTarget(
         name: "ImmersiveMapGPUTests",
-        dependencies: ["ImmersiveMapGPU"]
+        dependencies: ["ImmersiveMapGPU", "ImmersiveMapGPUTestSupport"]
     ),
     .testTarget(
         name: "PortableImageTests",
@@ -171,7 +177,7 @@ if portable {
         ),
         .target(
             name: "ImmersiveMap",
-            dependencies: ["Earcut", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening"],
+            dependencies: ["Earcut", "ImmersiveMapGPU", "ImmersiveMapMetal", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening"],
             // The shaders and their headers: not resources, so no build
             // system makes a library of its own from them. `MetalLibraryPlugin`
             // compiles every .metal file of the target into the one
@@ -224,7 +230,7 @@ if portable {
         ),
         .testTarget(
             name: "ImmersiveMapTests",
-            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "Mvt", "MvtTestSupport", "PMTilesTestSupport"]
+            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "Mvt", "MvtTestSupport", "PMTilesTestSupport"]
         )
     ]
 }

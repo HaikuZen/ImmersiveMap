@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import Metal
 import MetalKit
 import QuartzCore
@@ -175,7 +176,7 @@ final class RenderPersistentContext {
         self.fxaaPipeline = shared.fxaaPipeline
         // The starfield renderer bakes the star-generation settings, so it
         // stays per renderer; only its pipeline is shared.
-        self.starfieldRenderer = StarfieldRenderer(metalDevice: metal.device,
+        self.starfieldRenderer = StarfieldRenderer(device: MetalDevice(device: metal.device, library: nil),
                                                    pipeline: shared.starfieldPipeline,
                                                    config: config.scene.starfield)
 

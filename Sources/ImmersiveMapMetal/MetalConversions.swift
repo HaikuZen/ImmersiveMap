@@ -30,6 +30,25 @@ extension GPUPixelFormat {
     }
 
     var hasStencil: Bool { self == .depth32FloatStencil8 }
+
+    /// The interface's name for a Metal format the engine uses, nil for any
+    /// other.
+    package init?(metal: MTLPixelFormat) {
+        switch metal {
+        case .bgra8Unorm: self = .bgra8Unorm
+        case .rgba8Unorm: self = .rgba8Unorm
+        case .r8Unorm: self = .r8Unorm
+        case .r16Float: self = .r16Float
+        case .depth32Float_stencil8: self = .depth32FloatStencil8
+        case .astc_4x4_ldr: self = .astc(blockWidth: 4, blockHeight: 4)
+        case .astc_5x5_ldr: self = .astc(blockWidth: 5, blockHeight: 5)
+        case .astc_6x6_ldr: self = .astc(blockWidth: 6, blockHeight: 6)
+        case .astc_8x8_ldr: self = .astc(blockWidth: 8, blockHeight: 8)
+        case .astc_10x10_ldr: self = .astc(blockWidth: 10, blockHeight: 10)
+        case .astc_12x12_ldr: self = .astc(blockWidth: 12, blockHeight: 12)
+        default: return nil
+        }
+    }
 }
 
 extension GPUTextureType {
