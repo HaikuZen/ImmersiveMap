@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 /// Stateless layout math shared by the UIKit and AppKit attribution badges.
 /// All coordinates are top-left origin: valid as-is on iOS, and on macOS

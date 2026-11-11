@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
+import PortableFoundation
 import simd
 
 /// One drawn model's hit volume: the model matrix the GPU drew it with, and the

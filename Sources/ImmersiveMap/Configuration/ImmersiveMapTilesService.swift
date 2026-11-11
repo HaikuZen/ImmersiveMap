@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The hosted ImmersiveMap archives: one PMTiles file of vector tiles built
 /// from OpenStreetMap data, under ODbL, and one of building models, both

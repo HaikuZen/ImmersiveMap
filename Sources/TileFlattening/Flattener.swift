@@ -1,7 +1,10 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+// WebAssembly has no Dispatch: there the strips are worked one after another.
+#if canImport(Dispatch)
 import Dispatch
+#endif
 
 public struct FlattenOptions: Sendable {
     /// The area to produce, in the units of the input. Everything outside is clipped away.
@@ -177,11 +180,13 @@ public enum Flattener {
     }
 
     private static func forEachStrip(_ count: Int, parallel: Bool, _ body: @Sendable (Int) -> Void) {
+        #if canImport(Dispatch)
         if parallel && count > 1 {
             DispatchQueue.concurrentPerform(iterations: count, execute: body)
-        } else {
-            for t in IndexRange(0, count) { body(t) }
+            return
         }
+        #endif
+        for t in IndexRange(0, count) { body(t) }
     }
 
     private static func mergeAscending(_ a: [Double], _ b: [Double]) -> [Double] {

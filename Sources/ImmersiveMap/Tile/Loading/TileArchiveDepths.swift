@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How deep each tile archive goes: the deepest zoom its header names
 /// (`PMTilesHeader.maxZoom`), by the archive's source revision

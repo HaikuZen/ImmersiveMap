@@ -1,9 +1,10 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
+#if canImport(QuartzCore)
 import QuartzCore
+#endif
 
 /// Owns time-based camera animations for a single map view.
 /// Coordinates camera flights and globe pan inertia, then synchronizes render-loop activity.

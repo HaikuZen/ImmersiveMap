@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 final class FrameDiagnostics: FrameDiagnosticsService {
     enum Counter: String, CaseIterable {

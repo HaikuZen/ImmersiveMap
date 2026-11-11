@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 struct BaseLabelSourceEntry {
     let ownerKey: VisibleTile

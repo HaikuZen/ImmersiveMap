@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A point label as the parser read it from a feature: its text, its
 /// anchor in tile units, the identity that keeps it stable across parses,

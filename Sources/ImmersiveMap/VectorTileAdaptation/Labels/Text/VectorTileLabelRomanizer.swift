@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Writes a local name in Latin letters for a map whose language is written
 /// in them, so a street that has no spelling in the map's language reads

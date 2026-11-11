@@ -6,8 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 public struct ImmersiveMapSelection: Equatable {
     public enum Kind: String {

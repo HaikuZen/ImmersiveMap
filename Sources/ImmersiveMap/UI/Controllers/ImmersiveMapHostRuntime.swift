@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import CoreGraphics
-import Foundation
-import OSLog
+import PortableFoundation
+import os
 import QuartzCore
 
 /// Logic shared by the UIKit/AppKit host views for owning the runtime graph and `RenderFrameEngine`:

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A request to fly a model along a path, collected by the public controller
 /// and started by the presentation store on the frame that applies it.

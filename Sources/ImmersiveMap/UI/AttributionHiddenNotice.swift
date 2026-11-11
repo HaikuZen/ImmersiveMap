@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// One hidden-attribution warning per process: every map view constructed
 /// with a hidden badge carries the same news, and the license obligation

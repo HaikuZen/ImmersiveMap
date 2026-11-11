@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The Protomaps basemap's readings of one feature's tags into the facts.
 /// What the tags are called is the basemap's contract; the facts they

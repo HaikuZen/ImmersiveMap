@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What a line feature is as a road, beyond how it draws: where it sits
 /// (in a tunnel, on the ground, on a bridge, and on which `layer`) and

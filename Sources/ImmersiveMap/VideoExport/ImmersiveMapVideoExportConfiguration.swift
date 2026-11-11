@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 // The `VideoExport` folder: the AVFoundation side of offline tour video
 // export, the public configuration, progress and error types and the

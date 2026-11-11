@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Decides how a prepared tile's geometry blob is stored next to its
 /// metadata. The Metal-aware implementation lives on the render side (the

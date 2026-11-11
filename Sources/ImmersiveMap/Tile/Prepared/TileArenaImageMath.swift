@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Element width of an index span inside a tile's arena image. Mirrors
 /// `MTLIndexType` without importing Metal, so the value can travel through

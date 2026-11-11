@@ -1,7 +1,10 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import PortableFoundation
+#if canImport(QuartzCore)
 import QuartzCore
+#endif
 import simd
 
 struct GlobeCullingMetrics {

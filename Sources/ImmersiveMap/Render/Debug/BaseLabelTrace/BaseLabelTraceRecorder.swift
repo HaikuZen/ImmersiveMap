@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 package struct BaseLabelTraceRecorderSnapshot: Equatable {
     package let isRecording: Bool

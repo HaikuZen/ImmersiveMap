@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 import simd
 
 /// The frame's tile coverage seen from above, for the debug panel's

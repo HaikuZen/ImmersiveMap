@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The engine's resource bundle, `ImmersiveMap_ImmersiveMap.bundle`: the
 /// shader library (`default.metallib`), the text atlases, the avatar marker,

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What the reading stage accumulates as it walks a tile's layers, and what
 /// the unification stage packs into the tile's streams. The feature readers

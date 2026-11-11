@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 public struct ImmersiveMapCameraPosition: Equatable, Sendable {
     public static let `default` = ImmersiveMapCameraPosition(latitudeDegrees: 0,

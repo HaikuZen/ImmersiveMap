@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What the tessellator bakes for a line: its width and the shape of its
 /// ends, joins and dashes, all in tile units.

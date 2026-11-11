@@ -2,68 +2,139 @@
 
 import PackageDescription
 
-let package = Package(
-    name: "ImmersiveMap",
-    platforms: [
-        .iOS(.v18),
-        .macOS(.v15)
-    ],
-    products: [
-        .library(
-            name: "ImmersiveMap",
-            targets: ["ImmersiveMap"]
+// The engine draws with Metal and its views are SwiftUI, so the products
+// exist on Apple's platforms only. The targets under them that know nothing
+// of either (the tile formats, the geometry tools) build everywhere, and off
+// Apple's platforms the package is those targets and their tests, with two
+// more that stand in for modules only Apple's SDKs have: `simd` and `os`.
+//
+// A manifest cannot ask which platform it is built for, only which one it is
+// read on, so a Linux machine gets the portable package by itself and a Mac
+// building for another platform (WebAssembly, say) asks for it with
+// IMMERSIVE_MAP_PORTABLE=1.
+#if canImport(Darwin)
+let readOnApplePlatform = true
+#else
+let readOnApplePlatform = false
+#endif
+let portable = !readOnApplePlatform || Context.environment["IMMERSIVE_MAP_PORTABLE"] == "1"
+
+// A build that ships to a browser must not link the platform's Foundation
+// (the reason and the cost are in PortableFoundation.swift). It is asked for
+// with IMMERSIVE_MAP_SLIM=1, and the XCTest targets, which cannot be built
+// without Foundation, are left out of it. `PortableFoundationTests` stays:
+// it is what tests the slim build's own geometry types.
+let slim = portable && Context.environment["IMMERSIVE_MAP_SLIM"] == "1"
+
+// The targets every platform builds.
+var targets: [Target] = [
+    // What a portable target imports in place of Foundation: Foundation on
+    // Apple's platforms, FoundationEssentials and the C library elsewhere
+    // (the reason is in the file).
+    .target(
+        name: "PortableFoundation",
+        swiftSettings: slim ? [.define("PORTABLE_FOUNDATION_OWN_GEOMETRY")] : []
+    ),
+    // The ear-clipping triangulator, a port of mapbox/earcut. Its own
+    // module so the algorithm depends on nothing in the engine and the
+    // engine reaches it through one entry point at `package` access,
+    // so nothing of it leaks to an app that links the product.
+    .target(
+        name: "Earcut"
+    ),
+    // The Mapbox Vector Tile decoder: the wire format, the decoded model
+    // and the tile-space geometry it produces. Its own module for the same
+    // reason, everything at `package` access. `TestSupport` is the
+    // test-side encoder and fixture tiles both test targets share; it is
+    // a regular target because test targets cannot share sources.
+    .target(
+        name: "Mvt",
+        dependencies: ["PortableFoundation"]
+    ),
+    .target(
+        name: "MvtTestSupport",
+        dependencies: ["Mvt", "PortableFoundation"]
+    ),
+    // The PMTiles v3 reader: the format (the header, the directories,
+    // the Hilbert tile id and the gzip step, pure functions over bytes)
+    // and the HTTP range client that reads an archive with them. Its own
+    // module for the same reason as `Earcut`: a tool that knows nothing
+    // of the engine, reached at `package` access. The test support target
+    // is the independent archive writer both test targets share.
+    .target(
+        name: "PMTiles",
+        dependencies: ["PortableFoundation"]
+    ),
+    .target(
+        name: "PMTilesTestSupport",
+        dependencies: ["PMTiles", "PortableFoundation"]
+    ),
+    // The ground flattener: stacked painted rings in, one layer of
+    // triangles that do not overlap out, cut to a grid for a heightmap.
+    // Its own module for the same reason as `Earcut`: pure geometry that
+    // knows nothing of the engine, reached at `package` access.
+    .target(
+        name: "TileFlattening",
+        dependencies: ["PortableFoundation"]
+    ),
+    .testTarget(
+        name: "EarcutTests",
+        dependencies: ["Earcut"],
+        resources: [.copy("Fixtures")]
+    ),
+    .testTarget(
+        name: "MvtTests",
+        dependencies: ["Mvt", "MvtTestSupport"]
+    ),
+    .testTarget(
+        name: "TileFlatteningTests",
+        dependencies: ["TileFlattening"]
+    ),
+    .testTarget(
+        name: "PMTilesTests",
+        dependencies: ["PMTiles", "PMTilesTestSupport"]
+    ),
+    .testTarget(
+        name: "PortableFoundationTests",
+        dependencies: ["PortableFoundation"]
+    ),
+    // The vector, matrix and quaternion functions the engine takes from
+    // `simd`, by known answers. On Apple's platforms the tests run against
+    // Apple's module and off them against the stand-in, so the two are held
+    // to the same answers.
+    .testTarget(
+        name: "SimdTests",
+        dependencies: portable ? ["simd"] : []
+    ),
+    // The same for `os`: the lock, the logger and the signposter.
+    .testTarget(
+        name: "OSTests",
+        dependencies: portable ? ["os"] : []
+    )
+]
+
+if slim {
+    targets.removeAll { $0.isTest && $0.name != "PortableFoundationTests" }
+}
+
+if portable {
+    targets += [
+        // The stand-in for Apple's `simd` module, under its name, so the
+        // sources that write `import simd` compile unchanged.
+        .target(
+            name: "simd"
         ),
-        // The debug panel, apart from the engine: linked by a development
-        // app and the tests, never by a shipping app, which carries nothing
-        // of it.
-        .library(
-            name: "ImmersiveMapDebug",
-            targets: ["ImmersiveMapDebug"]
+        // The same for Apple's `os` module: the logger, the signposter and
+        // the unfair lock.
+        .target(
+            name: "os"
         )
-    ],
-    targets: [
-        // The ear-clipping triangulator, a port of mapbox/earcut. Its own
-        // module so the algorithm depends on nothing in the engine and the
-        // engine reaches it through one entry point at `package` access,
-        // so nothing of it leaks to an app that links the product.
-        .target(
-            name: "Earcut"
-        ),
-        // The Mapbox Vector Tile decoder: the wire format, the decoded model
-        // and the tile-space geometry it produces. Its own module for the same
-        // reason, everything at `package` access. `TestSupport` is the
-        // test-side encoder and fixture tiles both test targets share; it is
-        // a regular target because test targets cannot share sources.
-        .target(
-            name: "Mvt"
-        ),
-        .target(
-            name: "MvtTestSupport",
-            dependencies: ["Mvt"]
-        ),
-        // The PMTiles v3 reader: the format (the header, the directories,
-        // the Hilbert tile id and the gzip step, pure functions over bytes)
-        // and the HTTP range client that reads an archive with them. Its own
-        // module for the same reason as `Earcut`: a tool that knows nothing
-        // of the engine, reached at `package` access. The test support target
-        // is the independent archive writer both test targets share.
-        .target(
-            name: "PMTiles"
-        ),
-        .target(
-            name: "PMTilesTestSupport",
-            dependencies: ["PMTiles"]
-        ),
-        // The ground flattener: stacked painted rings in, one layer of
-        // triangles that do not overlap out, cut to a grid for a heightmap.
-        // Its own module for the same reason as `Earcut`: pure geometry that
-        // knows nothing of the engine, reached at `package` access.
-        .target(
-            name: "TileFlattening"
-        ),
+    ]
+} else {
+    targets += [
         .target(
             name: "ImmersiveMap",
-            dependencies: ["Earcut", "Mvt", "PMTiles", "TileFlattening"],
+            dependencies: ["Earcut", "Mvt", "PMTiles", "PortableFoundation", "TileFlattening"],
             // The shaders and their headers: not resources, so no build
             // system makes a library of its own from them. `MetalLibraryPlugin`
             // compiles every .metal file of the target into the one
@@ -115,26 +186,31 @@ let package = Package(
             dependencies: ["ImmersiveMap"]
         ),
         .testTarget(
-            name: "EarcutTests",
-            dependencies: ["Earcut"],
-            resources: [.copy("Fixtures")]
-        ),
-        .testTarget(
-            name: "MvtTests",
-            dependencies: ["Mvt", "MvtTestSupport"]
-        ),
-        .testTarget(
-            name: "TileFlatteningTests",
-            dependencies: ["TileFlattening"]
-        ),
-        .testTarget(
-            name: "PMTilesTests",
-            dependencies: ["PMTiles", "PMTilesTestSupport"]
-        ),
-        .testTarget(
             name: "ImmersiveMapTests",
             dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "Mvt", "MvtTestSupport", "PMTilesTestSupport"]
         )
+    ]
+}
+
+let package = Package(
+    name: "ImmersiveMap",
+    platforms: [
+        .iOS(.v18),
+        .macOS(.v15)
     ],
+    products: portable ? [] : [
+        .library(
+            name: "ImmersiveMap",
+            targets: ["ImmersiveMap"]
+        ),
+        // The debug panel, apart from the engine: linked by a development
+        // app and the tests, never by a shipping app, which carries nothing
+        // of it.
+        .library(
+            name: "ImmersiveMapDebug",
+            targets: ["ImmersiveMapDebug"]
+        )
+    ],
+    targets: targets,
     swiftLanguageModes: [.v6]
 )

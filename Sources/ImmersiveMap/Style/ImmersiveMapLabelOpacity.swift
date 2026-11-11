@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How opaque the map's names and its POIs are, by the zoom: a factor over
 /// each label's own opacity (`LabelTextStyle.opacity`), 0 to 1, so a name

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The alphabets the label text logic tells apart: Latin, and the ones the
 /// romanizer handles (`VectorTileLabelRomanizer`). A letter of any other

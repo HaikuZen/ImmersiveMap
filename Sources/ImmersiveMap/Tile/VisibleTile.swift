@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A tile in a specific copy of the world. The flat map repeats the world
 /// along the x axis so the antimeridian is never an edge, and `worldWrap`

@@ -7,7 +7,7 @@
 //
 
 import CoreGraphics
-import Foundation
+import PortableFoundation
 import simd
 
 /// Marker projection onto the screen before collision resolution.

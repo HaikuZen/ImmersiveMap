@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// One point of a path resolved for rendering or for placing a model: where it
 /// is, how high, how far along, and which way the trajectory points there.

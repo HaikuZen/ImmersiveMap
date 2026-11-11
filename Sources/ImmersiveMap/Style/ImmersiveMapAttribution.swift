@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Map data source attribution: what a product using third-party data is
 /// obligated to display. It belongs to the data, not the engine: the tile

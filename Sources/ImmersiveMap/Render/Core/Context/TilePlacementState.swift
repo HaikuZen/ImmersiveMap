@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 struct TilePlacementState {
     static let empty = TilePlacementState(placeTilesContext: .empty,

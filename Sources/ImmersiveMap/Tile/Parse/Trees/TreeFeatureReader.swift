@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The trees of a tile: the fills whose style grows them and the roads
 /// they keep off are gathered as the layers are read, and the trees are

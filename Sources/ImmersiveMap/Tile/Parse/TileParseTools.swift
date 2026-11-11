@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The tessellators and the clipper one parse works with. `ParsePolygon`
 /// keeps scratch buffers between polygons, so a set is made per tile and

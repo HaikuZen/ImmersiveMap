@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What the parser is told about the map it parses for: the settings it
 /// reads, and nothing else. `TileMvtParser` takes this value instead of the

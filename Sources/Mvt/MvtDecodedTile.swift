@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A `repeated uint32` protobuf field, kept as a byte range into the tile
 /// payload when it arrived as one contiguous packed run (the overwhelmingly

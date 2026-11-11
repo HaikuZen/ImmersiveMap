@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Stateless math for time-normalized smoothing of camera pitch toward a target value.
 /// The gap between the current and target pitch decays exponentially by half-life, so the

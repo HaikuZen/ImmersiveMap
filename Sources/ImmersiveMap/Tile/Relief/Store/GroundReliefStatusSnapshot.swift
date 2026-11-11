@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What the terrain store holds and does at a moment
 /// (`GroundReliefFrame.statusSnapshot()`), for the debug panel's relief tab:

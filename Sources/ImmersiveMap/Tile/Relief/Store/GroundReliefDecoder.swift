@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 import ImageIO
 
 /// A terrain tile decoded: its heights in metres, row by row from the

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Awaits a callback-style operation with a deadline: `start` is handed the
 /// completion to call, and the await ends with the first of the callback's

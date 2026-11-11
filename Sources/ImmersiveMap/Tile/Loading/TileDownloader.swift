@@ -1,7 +1,11 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
+// Outside Apple's platforms `URLSession` is in a module of its own.
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import PMTiles
 import os
 

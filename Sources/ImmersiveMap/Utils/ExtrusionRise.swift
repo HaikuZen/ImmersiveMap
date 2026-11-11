@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How far the parts of a layer of standing things (the extruded buildings
 /// by the cell of the map they stand in, the models by their tile) have

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How the camera frames the point it is following along a path.
 public struct ImmersiveMapCameraFollowOptions: Equatable, Sendable {

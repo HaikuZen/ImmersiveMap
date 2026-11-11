@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Stateless math for time-normalized smoothing of camera bearing toward a target value.
 /// Unlike pitch, bearing is cyclic: the settle follows the shortest angular path (through 180°)

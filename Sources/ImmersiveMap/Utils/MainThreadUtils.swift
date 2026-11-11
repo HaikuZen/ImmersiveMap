@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The `Utils` folder: small cross-cutting helpers with several callers and no
 /// better domain owner, such as deterministic math, main-thread checks,

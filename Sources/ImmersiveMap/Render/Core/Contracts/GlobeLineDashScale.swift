@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The dash pattern scale of a coarse tile on the globe. At z0 a tile is a
 /// whole hemisphere and its point-locked lines are stubs; a dash pattern

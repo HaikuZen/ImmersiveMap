@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The archive addresses tiles by one integer: every tile of every zoom
 /// below comes first, then the tiles of the zoom on a Hilbert curve, so

@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
+import PortableFoundation
 import simd
 
 enum AvatarSelectionTarget: Equatable {

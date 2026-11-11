@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A road name as the parser read it: the text and the path in tile
 /// units it is laid along, with the identity that keeps it stable across

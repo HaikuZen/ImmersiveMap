@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What a polygon feature is as a building, as the schema reading states
 /// it (`ImmersiveMapTileSchema`): how tall, on which base, which building

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The built-in style: draws the Protomaps basemap tiles of the hosted
 /// archive. The default for a bare `ImmersiveMapView()`, and

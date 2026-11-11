@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 // The `SceneModels` folder: the engine-side model and CPU presentation of 3D
 // models anchored at coordinates, from the public descriptor to the per-frame

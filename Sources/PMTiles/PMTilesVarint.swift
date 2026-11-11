@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A cursor over a directory's bytes reading unsigned LEB128 integers, the
 /// only encoding the directory uses. Bounds are checked on every byte so a
