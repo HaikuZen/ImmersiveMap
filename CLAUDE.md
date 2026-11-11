@@ -19,7 +19,7 @@ xcodebuild test -workspace .swiftpm/xcode/package.xcworkspace -scheme ImmersiveM
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'   # full suite, iOS (runs UIKit-gated tests)
 ```
 
-CI (`.github/workflows/ci.yml`) runs on the `macos-26` image, whose default Xcode is the one the code is developed with (Xcode 26.6, Swift 6.3). Keep the two the same: strict concurrency diagnostics differ between Swift versions, and a mismatch shows up as a CI build that fails on code the local build accepts. When the local Xcode moves, move the image (or select the Xcode with `DEVELOPER_DIR`) in the same change.
+CI (`.github/workflows/ci.yml`) runs on the `macos-26` image, whose default Xcode is the one the code is developed with (Xcode 26.6, Swift 6.3). Keep the two the same: strict concurrency diagnostics differ between Swift versions, and a mismatch shows up as a CI build that fails on code the local build accepts. When the local Xcode moves, move the image (or select the Xcode with `DEVELOPER_DIR`) in the same change. Two more jobs build the portable package (see Portable targets) on Linux, `linux-test` and `wasm-test`, in the `swift:6.4.2-noble` container, the release that package was brought up with: they are what fails when a change brings an Apple-only API into it, since the macOS jobs never build it.
 
 `.githooks/pre-push` runs `swift test` before every push and refuses the push when it fails. It is installed once per clone with `git config core.hooksPath .githooks`, and `git push --no-verify` skips it when that is wanted.
 
