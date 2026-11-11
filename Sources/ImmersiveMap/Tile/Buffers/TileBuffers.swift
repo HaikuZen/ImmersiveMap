@@ -30,11 +30,6 @@ struct RouteShieldRunBuffer {
     }
 }
 
-struct TextLabelPlacementInput {
-    let pointInput: TilePointInput
-    let placementMeta: LabelPlacementMeta
-}
-
 struct TileBuffers {
     // Views are nil for empty layers (a tile without bridges/tunnels has
     // mostly those); every non-empty view points into the one backing
@@ -207,7 +202,3 @@ struct SurfaceLabels {
     static var empty: SurfaceLabels { SurfaceLabels(labels: [], vertices: nil) }
 }
 
-struct LabelGlyphRange {
-    let start: Int
-    let count: Int
-}

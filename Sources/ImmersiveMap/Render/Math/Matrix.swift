@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import PortableFoundation
+import simd
 
 class Matrix {
     /// Orthographic projection with Metal depth convention: view-space

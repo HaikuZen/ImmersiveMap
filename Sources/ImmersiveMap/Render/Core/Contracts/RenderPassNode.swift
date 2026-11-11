@@ -4,15 +4,6 @@
 import Metal
 import QuartzCore
 
-enum RenderPassName: String, CaseIterable {
-    case shadowMap
-    case farShadowMap
-    case groundShadowMask
-    case world
-    case postProcessing
-    case overlay
-}
-
 protocol RenderPassDescriptorProvider: AnyObject {
     func makeRenderPassDescriptor(frameContext: FrameContext,
                                   attachments: FrameAttachmentStore,

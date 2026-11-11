@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import PortableFoundation
+import simd
 
 struct CameraUniform {
     let matrix: matrix_float4x4
