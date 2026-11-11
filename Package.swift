@@ -35,6 +35,12 @@ var targets: [Target] = [
         name: "PortableFoundation",
         swiftSettings: slim ? [.define("PORTABLE_FOUNDATION_OWN_GEOMETRY")] : []
     ),
+    // A PNG decoder for the platforms without ImageIO (terrain tiles off
+    // Apple's platforms), over PMTiles' inflate.
+    .target(
+        name: "PortableImage",
+        dependencies: ["PMTiles", "PortableFoundation"]
+    ),
     // The ear-clipping triangulator, a port of mapbox/earcut. Its own
     // module so the algorithm depends on nothing in the engine and the
     // engine reaches it through one entry point at `package` access,
@@ -101,6 +107,10 @@ var targets: [Target] = [
     // PortableFoundation's stand-ins against Foundation's own answers, where
     // there is a Foundation to ask (not in a slim build).
     .testTarget(
+        name: "PortableImageTests",
+        dependencies: ["PortableImage"]
+    ),
+    .testTarget(
         name: "PortableFoundationParityTests",
         dependencies: ["PortableFoundation"]
     ),
@@ -120,7 +130,7 @@ var targets: [Target] = [
 ]
 
 if slim {
-    targets.removeAll { $0.isTest && $0.name != "PortableFoundationTests" }
+    targets.removeAll { $0.isTest && $0.name != "PortableFoundationTests" && $0.name != "PortableImageTests" }
 }
 
 if portable {
@@ -140,7 +150,7 @@ if portable {
     targets += [
         .target(
             name: "ImmersiveMap",
-            dependencies: ["Earcut", "Mvt", "PMTiles", "PortableFoundation", "TileFlattening"],
+            dependencies: ["Earcut", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening"],
             // The shaders and their headers: not resources, so no build
             // system makes a library of its own from them. `MetalLibraryPlugin`
             // compiles every .metal file of the target into the one

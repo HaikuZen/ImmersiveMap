@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 import PortableFoundation
-// Outside Apple's platforms `URLSession` is in a module of its own.
+// Outside Apple's platforms `URLSession` and its errors are in Foundation's
+// networking module, apart from FoundationEssentials.
 #if canImport(FoundationNetworking)
+import Foundation
 import FoundationNetworking
 #endif
 import os
@@ -87,6 +89,7 @@ struct GroundReliefURLTerrainSource: GroundReliefTerrainSource {
             .replacing("{y}", with: String(tile.y)))
     }
 
+    #if canImport(Darwin) || canImport(FoundationNetworking)
     /// The terrain at a URL: an HTTP 404, or a file that is not there for a
     /// terrain directory on disk, is a tile the source does not have.
     static func fetchOverHTTP(_ url: URL) async throws -> Fetched {
@@ -109,4 +112,14 @@ struct GroundReliefURLTerrainSource: GroundReliefTerrainSource {
             throw URLError(.badServerResponse)
         }
     }
+    #else
+    /// Where there is no `URLSession` (WebAssembly) the host fetches the
+    /// terrain and hands the source a `fetch` of its own: this one, the
+    /// default, has nothing to fetch with.
+    struct NoNetwork: Error {}
+
+    static func fetchOverHTTP(_ url: URL) async throws -> Fetched {
+        throw NoNetwork()
+    }
+    #endif
 }
