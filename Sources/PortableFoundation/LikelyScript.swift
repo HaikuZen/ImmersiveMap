@@ -10,7 +10,8 @@
 /// Armenian and Georgian.
 ///
 /// The tables are the answers of `Locale.Language(identifier:).script` from
-/// the ICU data of Swift 6.4.2's Foundation on Linux, cut down: every two
+/// the ICU data of Swift 6.4.2's Foundation on Linux, with the three codes
+/// Apple's newer data adds (`pi`, `grc`, `abq`), cut down: every two
 /// letter code written in one of the five scripts, the three letter codes
 /// written in the four that are not Latin, and the regions that move a
 /// language to another script (`sr-ME` is Latin, `az-IR` Arabic). A three
@@ -53,19 +54,19 @@ public enum LikelyScript {
         ("Latn",
         "aa af ak an ay az bi bm br bs ca ch co cs cy da de ee en eo es et eu ff fi fj fo fr fy " +
         "ga gd gl gn gv ha ho hr ht hu hz ia id ie ig ik in io is it jv jw kg ki kj kl kr ku kw " +
-        "la lb lg li ln lt lu lv mg mh mi mo ms mt na nb nd ng nl nn no nr nv ny oc om pl pt qu " +
-        "rm rn ro rw sc se sg sk sl sm sn so sq ss st su sv sw tk tl tn to tr ts ty uz ve vi vo " +
-        "wa wo xh yo za zu "),
+        "la lb lg li ln lt lu lv mg mh mi mo ms mt na nb nd ng nl nn no nr nv ny oc om pi pl pt " +
+        "qu rm rn ro rw sc se sg sk sl sm sn so sq ss st su sv sw tk tl tn to tr ts ty uz ve vi " +
+        "vo wa wo xh yo za zu "),
         ("Cyrl",
-        "ab abk ady agx akv alr alt ani aqc atv av ava ba bak be bel bg bhh bph bua bul bxm ce " +
-        "che chm chu chv cji ckt clw crh cu cv dar ddo dlg dng enf enh eve evn gdo gin gld huz " +
+        "ab abk abq ady agx akv alr alt ani aqc atv av ava ba bak be bel bg bhh bph bua bul bxm " +
+        "ce che chm chu chv cji ckt clw crh cu cv dar ddo dlg dng enf enh eve evn gdo gin gld huz " +
         "inh itl jct jdt kaa kap kaz kbd kca ket khv kim kir kjh kk koi kom kpt kpy krc krk kum " +
         "kv kva ky lbe lez mdf mk mkd mn mns mon mrj mtm mud myv ndf neg nio niv nog oaa oac omk " +
         "orv os oss paq rsk ru rue rus rut sah sel sgh sia sjd sjt sr srp sty tab tat tg tgk tin " +
         "tt tyv ude udi udm ugh uk ukr ulc xal xas xdq xpm xrm xrn xwo yai ykg ykh ynk yrk ysr " +
         "yug yux zko zkz "),
         ("Grek",
-        "aat bgx cpg ecr el ell pnt scx tsd uum xpg yej "),
+        "aat bgx cpg ecr el ell grc pnt scx tsd uum xpg yej "),
         ("Armn",
         "axm hy hye hyw rmi "),
         ("Geor",

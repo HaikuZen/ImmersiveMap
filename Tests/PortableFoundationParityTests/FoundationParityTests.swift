@@ -102,6 +102,11 @@ final class FoundationParityTests: XCTestCase {
             let locale = Locale.Language(identifier: code).script?.identifier
             let expected = locale.flatMap { scripts.contains($0) ? $0 : nil }
             let portable = LikelyScript.of(languageIdentifier: code)
+            if Self.newerDataCodes[code] == portable, expected == nil {
+                // Known to the newer data the table follows, not to this
+                // platform's.
+                continue
+            }
             if code.count == 3, expected == "Latn" {
                 // Three letter codes written in Latin are left out of the table.
                 XCTAssertNil(portable, code)
@@ -116,6 +121,10 @@ final class FoundationParityTests: XCTestCase {
             XCTAssertEqual(LikelyScript.of(languageIdentifier: identifier), expected, identifier)
         }
     }
+
+    /// The codes the table has from Apple's language data, newer than the
+    /// ICU data of Swift 6.4.2 on Linux, which knows no script for them.
+    private static let newerDataCodes: [String: String] = ["pi": "Latn", "grc": "Grek", "abq": "Cyrl"]
 
     /// What `JSONSerialization` read, as a `JSONValue`.
     private static func value(of object: Any) -> JSONValue {
