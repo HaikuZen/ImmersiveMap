@@ -23,7 +23,7 @@ struct VectorTileLabelGlyphCoverage {
 
     func canRender(_ text: String) -> Bool {
         text.unicodeScalars.allSatisfy {
-            supportedScalars.contains($0.value) || CharacterSet.whitespacesAndNewlines.contains($0)
+            supportedScalars.contains($0.value) || $0.isFoundationWhitespaceOrNewline
         }
     }
 }

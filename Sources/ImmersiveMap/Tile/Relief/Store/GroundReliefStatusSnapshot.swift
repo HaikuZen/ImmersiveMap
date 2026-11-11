@@ -75,8 +75,8 @@ package struct GroundReliefStatusSnapshot: Equatable {
     /// and the datum: the panel's Relief group, one value a line.
     package var stateLines: [String] {
         ["relief: \(isActive ? "on the terrain" : "off the terrain")",
-         "standing \(String(format: "%.2f", standingShare))",
-         "datum \(String(format: "%.0f", datumMetres)) m"]
+         "standing \(String(fixed: standingShare, fractionDigits: 2))",
+         "datum \(String(fixed: datumMetres, fractionDigits: 0)) m"]
     }
 
     /// What the frame wants and how the loads go: the panel's Terrain
@@ -92,7 +92,7 @@ package struct GroundReliefStatusSnapshot: Equatable {
     /// What the store keeps and which maps it reads: the panel's Terrain
     /// memory group.
     package var memoryLines: [String] {
-        let megabytes = { (bytes: Int) in String(format: "%.1f", Double(bytes) / 1_048_576) }
+        let megabytes = { (bytes: Int) in String(fixed: Double(bytes) / 1_048_576, fractionDigits: 1) }
         return ["in memory \(residentCount) tiles, \(megabytes(residentBytes)) MB",
                 "released \(releasedCount) tiles, \(megabytes(releasedBytes)) of \(megabytes(releasedCacheBytes)) MB",
                 "camera map z\(cameraTerrainZoom)",
@@ -102,7 +102,7 @@ package struct GroundReliefStatusSnapshot: Equatable {
     /// The occlusion of the sky as computed: the panel's AO tab.
     package var occlusionLines: [String] {
         ["computed \(occlusionComputedCount) of \(residentCount) tiles",
-         "last tile \(String(format: "%.1f", occlusionMillisecondsLast)) ms"]
+         "last tile \(String(fixed: occlusionMillisecondsLast, fractionDigits: 1)) ms"]
     }
 
     /// The country around the camera as read: the panel's Surroundings
@@ -113,9 +113,9 @@ package struct GroundReliefStatusSnapshot: Equatable {
             return ["around: \(isActive ? "waiting for terrain" : "off the terrain")"]
         }
         return ["around: \(surroundings.kind.rawValue)",
-                "span \(String(format: "%.0f", surroundings.heightSpanMetres)) m",
-                "mountainousness \(String(format: "%.2f", surroundings.mountainousness))",
-                "ground \(String(format: "%.0f", surroundings.groundMetres)) m"]
+                "span \(String(fixed: surroundings.heightSpanMetres, fractionDigits: 0)) m",
+                "mountainousness \(String(fixed: surroundings.mountainousness, fractionDigits: 2))",
+                "ground \(String(fixed: surroundings.groundMetres, fractionDigits: 0)) m"]
     }
 
     /// The panel's summary where it is one text (the iOS panel): every

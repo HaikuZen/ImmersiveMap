@@ -82,9 +82,9 @@ struct GroundReliefURLTerrainSource: GroundReliefTerrainSource {
     /// The URL of a terrain tile.
     func url(for tile: Tile) -> URL? {
         URL(string: tileURLTemplate
-            .replacingOccurrences(of: "{z}", with: String(tile.z))
-            .replacingOccurrences(of: "{x}", with: String(tile.x))
-            .replacingOccurrences(of: "{y}", with: String(tile.y)))
+            .replacing("{z}", with: String(tile.z))
+            .replacing("{x}", with: String(tile.x))
+            .replacing("{y}", with: String(tile.y)))
     }
 
     /// The terrain at a URL: an HTTP 404, or a file that is not there for a

@@ -45,7 +45,7 @@ final class TileArchiveDepths: @unchecked Sendable {
             return depth
         }
         guard let text = try? String(contentsOf: fileURL(sourceRevision), encoding: .utf8),
-              let depth = Int(text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+              let depth = Int(text.trimmingWhitespaceAndNewlines()) else {
             return nil
         }
         depths[sourceRevision] = depth

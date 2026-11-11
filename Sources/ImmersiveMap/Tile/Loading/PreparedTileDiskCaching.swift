@@ -375,27 +375,11 @@ final class PreparedTileDiskIOCoordinator: @unchecked Sendable {
     private func rebuildRootIndex() {
         resetIndex()
 
-        let resourceKeys: [URLResourceKey] = [
-            .isRegularFileKey,
-            .fileSizeKey,
-            .contentModificationDateKey
-        ]
-        let resourceKeySet = Set(resourceKeys)
-        guard let enumerator = fileManager.enumerator(at: rootDirectory,
-                                                      includingPropertiesForKeys: resourceKeys,
-                                                      options: [],
-                                                      errorHandler: { _, _ in true }) else {
-            return
-        }
-
         let now = Date()
         var emptiedParentDirectories: Set<URL> = []
-        for case let url as URL in enumerator {
-            guard let values = try? url.resourceValues(forKeys: resourceKeySet),
-                  values.isRegularFile == true else {
-                continue
-            }
-            let modificationDate = values.contentModificationDate ?? .distantPast
+        for file in fileManager.regularFiles(in: rootDirectory, recursive: true) {
+            let url = file.url
+            let modificationDate = file.modificationDate ?? .distantPast
             if isExpired(lastAccessDate: modificationDate, timeToLive: policy.timeToLive, now: now) {
                 if removeBestEffort(url, cleanEmptyParents: false) {
                     emptiedParentDirectories.insert(url.deletingLastPathComponent())
@@ -403,7 +387,7 @@ final class PreparedTileDiskIOCoordinator: @unchecked Sendable {
                 continue
             }
             upsert(IndexedFile(url: url,
-                               byteCount: Int64(max(0, values.fileSize ?? 0)),
+                               byteCount: max(0, file.byteCount),
                                lastAccessDate: modificationDate))
         }
         for directory in emptiedParentDirectories {
@@ -534,8 +518,8 @@ final class PreparedTileDiskIOCoordinator: @unchecked Sendable {
     }
 
     private func fileByteCount(attributes: [FileAttributeKey: Any]?, fallback: Int) -> Int64 {
-        if let number = attributes?[.size] as? NSNumber {
-            return max(0, number.int64Value)
+        if let byteCount = FileManager.byteCount(fromAttributes: attributes) {
+            return max(0, byteCount)
         }
         return Int64(max(0, fallback))
     }

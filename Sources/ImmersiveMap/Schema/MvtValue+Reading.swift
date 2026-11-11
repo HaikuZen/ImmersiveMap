@@ -38,7 +38,7 @@ extension MvtValue {
         case .bool, .absent:
             return nil
         case .string(let text):
-            let raw = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let raw = text.trimmingWhitespaceAndNewlines().lowercased()
             let token = raw.split(whereSeparator: { $0 == ";" || $0 == "," || $0 == " " }).first
             guard let token else { return nil }
             var numeric = ""

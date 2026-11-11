@@ -64,8 +64,7 @@ class TileDownloader: @unchecked Sendable {
     /// wording is frozen the day they release; the service is a config reload
     /// away. The fallback covers an endpoint that sends nothing useful.
     static func rateLimitMessage(responseBody: Data) -> String {
-        if let object = try? JSONSerialization.jsonObject(with: responseBody) as? [String: Any],
-           let message = object["message"] as? String,
+        if let message = (try? JSONValue(parsing: responseBody))?["message"]?.stringValue,
            message.isEmpty == false {
             return "ImmersiveMap: tile requests are being rate limited. \(message)"
         }
@@ -88,8 +87,7 @@ class TileDownloader: @unchecked Sendable {
             message += " Check the credential the tile source sends: a key in the archive URL's query, or an Authorization header in tileArchive(_:headers:)."
         }
         message += " Tiles will be missing until the credential is fixed."
-        if let object = try? JSONSerialization.jsonObject(with: responseBody) as? [String: Any],
-           let serverMessage = object["message"] as? String,
+        if let serverMessage = (try? JSONValue(parsing: responseBody))?["message"]?.stringValue,
            serverMessage.isEmpty == false {
             message += " The server says: \(serverMessage)"
         }

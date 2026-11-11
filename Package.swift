@@ -98,6 +98,12 @@ var targets: [Target] = [
         name: "PortableFoundationTests",
         dependencies: ["PortableFoundation"]
     ),
+    // PortableFoundation's stand-ins against Foundation's own answers, where
+    // there is a Foundation to ask (not in a slim build).
+    .testTarget(
+        name: "PortableFoundationParityTests",
+        dependencies: ["PortableFoundation"]
+    ),
     // The vector, matrix and quaternion functions the engine takes from
     // `simd`, by known answers. On Apple's platforms the tests run against
     // Apple's module and off them against the stand-in, so the two are held

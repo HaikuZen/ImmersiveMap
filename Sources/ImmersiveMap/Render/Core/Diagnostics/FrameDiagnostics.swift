@@ -130,15 +130,15 @@ final class FrameDiagnostics: FrameDiagnosticsService {
         let presentMs = (stageDurations[.presentFrame] ?? 0) * 1000.0
         let tileSummary = "tiles v:\(counterValue(.visibleTiles)) r:\(counterValue(.readyTiles)) q:\(counterValue(.requestedTiles))"
         let labelSummary = "labels b:\(counterValue(.baseLabelActiveCount))/\(counterValue(.baseLabelCount)) rg:\(counterValue(.roadLabelGlyphCount)) rc:\(counterValue(.roadLabelNearCameraCulledPathCount))/\(counterValue(.roadLabelNearCameraCulledAnchorCount))"
-        let globeSummary = "globeCull ms:\(String(format: "%.2f", measurementValue(.globeCullingDurationMs))) n:\(counterValue(.globeCullingVisitedNodes)) f:\(counterValue(.globeCullingFrustumRejects)) h:\(counterValue(.globeCullingHorizonRejects)) l:\(counterValue(.globeCullingPlacedTiles)) a:\(counterValue(.globeCullingAcceptedWholeSubtrees))"
+        let globeSummary = "globeCull ms:\(String(fixed: measurementValue(.globeCullingDurationMs), fractionDigits: 2)) n:\(counterValue(.globeCullingVisitedNodes)) f:\(counterValue(.globeCullingFrustumRejects)) h:\(counterValue(.globeCullingHorizonRejects)) l:\(counterValue(.globeCullingPlacedTiles)) a:\(counterValue(.globeCullingAcceptedWholeSubtrees))"
         let metalPassSummary = metalPassDurations
             .sorted { $0.key.rawValue < $1.key.rawValue }
-            .map { "\($0.key.rawValue):\(String(format: "%.2f", $0.value * 1000.0))" }
+            .map { "\($0.key.rawValue):\(String(fixed: $0.value * 1000.0, fractionDigits: 2))" }
             .joined(separator: ",")
         let layerSummary = layerDurations
             .sorted { $0.key.rawValue < $1.key.rawValue }
-            .map { "\($0.key.rawValue):\(String(format: "%.2f", $0.value * 1000.0))" }
+            .map { "\($0.key.rawValue):\(String(fixed: $0.value * 1000.0, fractionDigits: 2))" }
             .joined(separator: ",")
-        return "frame=\(frameIndex) \(tileSummary) \(labelSummary) \(globeSummary) stageMs[u:\(String(format: "%.2f", updateMs)) p:\(String(format: "%.2f", prepareMs)) e:\(String(format: "%.2f", encodeMs)) pr:\(String(format: "%.2f", presentMs))] metalPassMs[\(metalPassSummary)] layerMs[\(layerSummary)]"
+        return "frame=\(frameIndex) \(tileSummary) \(labelSummary) \(globeSummary) stageMs[u:\(String(fixed: updateMs, fractionDigits: 2)) p:\(String(fixed: prepareMs, fractionDigits: 2)) e:\(String(fixed: encodeMs, fractionDigits: 2)) pr:\(String(fixed: presentMs, fractionDigits: 2))] metalPassMs[\(metalPassSummary)] layerMs[\(layerSummary)]"
     }
 }

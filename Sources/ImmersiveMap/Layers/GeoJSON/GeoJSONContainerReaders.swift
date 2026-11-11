@@ -1,17 +1,17 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A FeatureCollection: every object of its `features`, in order.
 struct GeoJSONFeatureCollectionReader: GeoJSONObjectReader {
     let type = "FeatureCollection"
 
-    func read(_ object: [String: Any],
+    func read(_ object: [String: JSONValue],
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
-        guard let features = object["features"] as? [Any] else {
+        guard let features = object["features"]?.arrayValue else {
             throw ImmersiveMapGeoJSONError.invalidCoordinates("\(path)features")
         }
         for (index, feature) in features.enumerated() {
@@ -25,13 +25,13 @@ struct GeoJSONFeatureCollectionReader: GeoJSONObjectReader {
 struct GeoJSONFeatureReader: GeoJSONObjectReader {
     let type = "Feature"
 
-    func read(_ object: [String: Any],
+    func read(_ object: [String: JSONValue],
               style _: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
-        let properties = object["properties"] as? [String: Any] ?? [:]
+        let properties = object["properties"]?.objectValue ?? [:]
         let featureStyle = ImmersiveMapGeoJSON.simpleStyle(of: properties)
-        guard let geometry = object["geometry"], (geometry is NSNull) == false else { return }
+        guard let geometry = object["geometry"], geometry.isNull == false else { return }
         try context.read(object: geometry, style: featureStyle, path: "\(path)geometry.")
     }
 }
@@ -40,11 +40,11 @@ struct GeoJSONFeatureReader: GeoJSONObjectReader {
 struct GeoJSONGeometryCollectionReader: GeoJSONObjectReader {
     let type = "GeometryCollection"
 
-    func read(_ object: [String: Any],
+    func read(_ object: [String: JSONValue],
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
-        guard let geometries = object["geometries"] as? [Any] else {
+        guard let geometries = object["geometries"]?.arrayValue else {
             throw ImmersiveMapGeoJSONError.invalidCoordinates("\(path)geometries")
         }
         for (index, geometry) in geometries.enumerated() {

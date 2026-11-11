@@ -23,8 +23,8 @@ public struct ImmersiveMapSettings: Equatable, Sendable {
 
         public init(_ code: String) {
             let normalized = code
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .replacingOccurrences(of: "_", with: "-")
+                .trimmingWhitespaceAndNewlines()
+                .replacing("_", with: "-")
                 .lowercased()
             self.code = normalized.isEmpty ? Self.english.code : normalized
         }
