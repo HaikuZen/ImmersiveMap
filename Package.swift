@@ -41,6 +41,13 @@ var targets: [Target] = [
         name: "PortableImage",
         dependencies: ["PMTiles", "PortableFoundation"]
     ),
+    // The GPU the engine draws with, as protocols and values a backend
+    // conforms to (Metal on Apple's platforms, WebGPU elsewhere), shaped
+    // after what the engine does with Metal. Nothing uses it yet: the
+    // features move onto it one folder at a time.
+    .target(
+        name: "ImmersiveMapGPU"
+    ),
     // The ear-clipping triangulator, a port of mapbox/earcut. Its own
     // module so the algorithm depends on nothing in the engine and the
     // engine reaches it through one entry point at `package` access,
@@ -107,6 +114,10 @@ var targets: [Target] = [
     // PortableFoundation's stand-ins against Foundation's own answers, where
     // there is a Foundation to ask (not in a slim build).
     .testTarget(
+        name: "ImmersiveMapGPUTests",
+        dependencies: ["ImmersiveMapGPU"]
+    ),
+    .testTarget(
         name: "PortableImageTests",
         dependencies: ["PortableImage"]
     ),
@@ -130,7 +141,7 @@ var targets: [Target] = [
 ]
 
 if slim {
-    targets.removeAll { $0.isTest && $0.name != "PortableFoundationTests" && $0.name != "PortableImageTests" }
+    targets.removeAll { $0.isTest && ["PortableFoundationTests", "PortableImageTests", "ImmersiveMapGPUTests"].contains($0.name) == false }
 }
 
 if portable {
