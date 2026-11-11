@@ -1,0 +1,12 @@
+---
+paths:
+  - "Sources/ImmersiveMap/SceneModels/**"
+  - "Sources/ImmersiveMap/Tile/Drawers/**"
+---
+
+# Scene models
+
+The code shows how the pieces are wired. These are the decisions behind it, which the code cannot show.
+
+- A model that stands in for a building is swapped in the frame, never in the parse. A map tile keeps every building and a table of where each one sits in its extruded indices, by feature id (`TileBuildingRange`), and the buildings' drawer leaves out the ids a drawn model names (`SceneModelFrameState.replacedBuildings`), drawing such a tile from a working copy of its indices without them, in one call (`HiddenBuildingIndexBuffers`). A model lists every feature it stands in for, the outline and each part, and lists them zoom by zoom: an id names a building only within a zoom, since the tiles above the deepest merge buildings into groups that go by the id of one member, so a map tile hides only the ids listed for its own zoom (`ReplacedBuildings`). The tile does no geometry to find which part belongs to which outline, and the parse costs what it did before. So a building stands until its model is loaded, the tiles are prepared once for every set of models, and nothing about the models is prepared-tile cache identity.
+- The models of a city come from a model archive (`.modelArchive(_:headers:)`), apart from the map's tiles: a second PMTiles file whose zoom 14 tiles each hold every model whose origin lies in them, baked for the GPU outside this repository, by the baker of the project the models are made in: the models of a tile are merged into one mesh in the tile's own space (the space of the map's buildings) with one ASTC texture array, so a tile is one draw call under the tile's matrix, on the flat map only, as the buildings are. `SceneModels/ModelTiles` requests, caches and releases the tiles by the tiles in view. The disk keeps a tile as the GPU takes it, so a tile seen before is loaded from its file straight into the buffers and the texture by the device's IO queue (`MetalIOCommandQueues`, one queue per device, shared with the map's tiles), and its geometry is checked in those buffers. A model is never cut at a tile's edge: it belongs whole to the tile of its origin, and the ring of tiles around the view is loaded with it. The tile format is a contract with archives already published, so a change to it is a new version number in `ModelTileContents`, whose comment is the format's reference, and in that baker. Neither the baker nor the script that lists the replaced buildings belongs in this repository.
