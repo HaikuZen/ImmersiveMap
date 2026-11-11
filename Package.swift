@@ -159,6 +159,16 @@ if portable {
     ]
 } else {
     targets += [
+        // The GPU interface (`ImmersiveMapGPU`) over Metal: thin wrappers that
+        // forward each call to the Metal object they hold.
+        .target(
+            name: "ImmersiveMapMetal",
+            dependencies: ["ImmersiveMapGPU"]
+        ),
+        .testTarget(
+            name: "ImmersiveMapMetalTests",
+            dependencies: ["ImmersiveMapGPU", "ImmersiveMapMetal"]
+        ),
         .target(
             name: "ImmersiveMap",
             dependencies: ["Earcut", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening"],
