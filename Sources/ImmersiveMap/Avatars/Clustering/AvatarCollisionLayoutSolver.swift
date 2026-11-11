@@ -6,7 +6,6 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
 import PortableFoundation
 import simd
 

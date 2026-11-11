@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Holds the layers of the app's own data a map draws (`ImmersiveMapLayer`),
 /// and is the app's handle to change them. Attach it with

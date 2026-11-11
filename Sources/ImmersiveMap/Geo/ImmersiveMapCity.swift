@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Well-known cities and where they are, for a map that opens over one or
 /// flies to one without the app keeping the coordinates:
