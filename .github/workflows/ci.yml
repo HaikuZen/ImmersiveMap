@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Started by hand (the Actions tab, or `gh workflow run ci.yml --ref
+  # <branch>`), the run is the macOS SPM job alone: it compiles the whole
+  # engine and runs its tests, and one macOS runner is far easier to get
+  # than three when the arm64 runners are short.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -43,6 +48,7 @@ jobs:
   # hand only, with IMMERSIVE_MAP_RUN_PICTURE_TESTS=1. Do not set that here.
   gpu-test:
     name: Test with shaders (Xcode, macOS)
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-26
 
     env:
@@ -80,6 +86,7 @@ jobs:
   # only compiles and runs on iOS, so the macOS jobs above never touch it.
   ios-test:
     name: Test (Xcode, iOS Simulator)
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-26
 
     env:
@@ -144,6 +151,7 @@ jobs:
   # system misreads the GNU linker's version, so these use the native one.
   linux-test:
     name: Build & Test (Linux)
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     container: swift:6.4.2-noble
 
@@ -174,6 +182,7 @@ jobs:
   # a relative one, it traps before the first test, with no message.
   wasm-test:
     name: Build & Test (WebAssembly)
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     container: swift:6.4.2-noble
 
