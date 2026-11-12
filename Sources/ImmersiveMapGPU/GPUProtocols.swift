@@ -8,6 +8,8 @@
 /// A GPU memory allocation.
 package protocol GPUBuffer: AnyObject {
     var length: Int { get }
+    /// A name for GPU captures and debuggers. No effect on drawing.
+    var label: String? { get set }
 
     /// The buffer's bytes, for a buffer made with `.shared` storage. A
     /// backend whose GPU memory the CPU cannot map (WebGPU) gives a copy

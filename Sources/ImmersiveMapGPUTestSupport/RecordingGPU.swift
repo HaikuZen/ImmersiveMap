@@ -56,6 +56,7 @@ package final class RecordingBuffer: GPUBuffer {
     }
 
     package let length: Int
+    package var label: String?
 
     package func contents() -> UnsafeMutableRawPointer {
         memory.baseAddress!

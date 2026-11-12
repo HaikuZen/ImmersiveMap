@@ -29,6 +29,11 @@ package final class MetalBuffer: GPUBuffer {
 
     package var length: Int { buffer.length }
 
+    package var label: String? {
+        get { buffer.label }
+        set { buffer.label = newValue }
+    }
+
     package func contents() -> UnsafeMutableRawPointer {
         buffer.contents()
     }

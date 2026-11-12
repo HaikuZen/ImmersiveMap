@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import Metal
 
 /// The air around the surface's edge, drawn last in the world pass on both
@@ -65,18 +66,19 @@ final class HorizonRenderSubsystem: RenderSubsystem {
         let uniform = HorizonUniform.make(haze: haze,
                                           projectionView: frameContext.cameraMatrices.projectionView,
                                           cameraEye: frameContext.cameraEye)
+        let gpuEncoder = MetalRenderEncoder(encoder)
         if haze.drawsGround {
             encoder.setDepthStencilState(groundDepthState)
             // The ground state tests the surface mask bit against zero: the
             // haze lands on the ground, never on a building or a model.
             encoder.setStencilReferenceValue(0)
-            horizonRenderer.draw(renderEncoder: encoder,
+            horizonRenderer.draw(renderEncoder: gpuEncoder,
                                  uniform: uniform,
                                  groundSide: true)
         }
         if haze.drawsSky {
             encoder.setDepthStencilState(skyDepthState)
-            horizonRenderer.draw(renderEncoder: encoder,
+            horizonRenderer.draw(renderEncoder: gpuEncoder,
                                  uniform: uniform,
                                  groundSide: false)
         }
