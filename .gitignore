@@ -9,6 +9,8 @@
 # The README frames tool is a package of its own with its own build folder.
 /Tools/ReadmeFrames/.build/
 /Tools/ReadmeFrames/.swiftpm/
+# The WGSL check's Node packages (Dawn), installed with npm ci there.
+/Tools/WGSLCheck/node_modules
 # The model tile baker is a package of its own with its own build folder.
 /.swiftpm/
 /.worktrees/
