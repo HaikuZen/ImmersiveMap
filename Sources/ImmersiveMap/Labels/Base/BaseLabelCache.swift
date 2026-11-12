@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The `Labels` folder: runtime label state after the schema-specific
@@ -49,7 +49,7 @@ final class BaseLabelCache {
         let count: Int
     }
 
-    private let labelRuntimeMetaBufferStore: FrameSlottedDynamicMetalBuffer<LabelRuntimeMeta>
+    private let labelRuntimeMetaBufferStore: GPUFrameSlottedBuffer<LabelRuntimeMeta>
 
     private var records: [TileRecord] = []
     private var tileSlotVisibleTileIndices: [UInt32] = []
@@ -79,10 +79,9 @@ final class BaseLabelCache {
     /// hands the kept copies' fades over from.
     private(set) var copyIndices: [Int] = []
 
-    init(metalDevice: MTLDevice) {
-        self.labelRuntimeMetaBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                          slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                          options: [.storageModeShared])
+    init(device: any GPUDevice) {
+        self.labelRuntimeMetaBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                                          slotsCount: InFlightFramePool.inFlightFramesCount)
     }
 
     @discardableResult
@@ -134,7 +133,7 @@ final class BaseLabelCache {
     }
 
     /// The runtime meta of the set for the frame's slot, uploaded whole.
-    func labelRuntimeMetaBuffer(frameSlotIndex: Int) -> MTLBuffer {
+    func labelRuntimeMetaBuffer(frameSlotIndex: Int) -> any GPUBuffer {
         let buffer = labelRuntimeMetaBufferStore.ensureCapacity(slot: frameSlotIndex,
                                                                 count: max(1, labelInputsCount))
         if labelRuntimeMetaData.isEmpty {

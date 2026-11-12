@@ -230,7 +230,7 @@ if portable {
         ),
         .testTarget(
             name: "ImmersiveMapTests",
-            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "Mvt", "MvtTestSupport", "PMTilesTestSupport"]
+            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapMetal", "Mvt", "MvtTestSupport", "PMTilesTestSupport"]
         )
     ]
 }

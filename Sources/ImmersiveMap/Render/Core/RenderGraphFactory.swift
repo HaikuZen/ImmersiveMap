@@ -19,7 +19,7 @@ enum RenderGraphFactory {
         let baseLabelSubsystem = BaseLabelPrepareSubsystem(baseLabelCache: context.baseLabelCache,
                                                            roadLabelCache: context.roadLabelCache,
                                                            baseLabelTraceRecorder: context.baseLabelTraceRecorder,
-                                                           metalDevice: context.metalContext.device,
+                                                           device: context.gpuDevice,
                                                            settings: settings.labels,
                                                            debugOverlayControls: debugOverlayControls)
         let baseLabelDrawSubsystem = BaseLabelDrawSubsystem(textRenderer: context.textRenderer,

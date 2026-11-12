@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 @testable import ImmersiveMap
 import Metal
 import XCTest
@@ -27,7 +28,7 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
             (buffer.contents() + offset).copyMemory(from: bytes.baseAddress!, byteCount: bytes.count)
         }
         let extruded = TileBuffers.Extruded(vertices: nil,
-                                            indices: TileBufferView(buffer: buffer, offset: offset, count: indices.count),
+                                            indices: TileBufferView(gpuBuffer: MetalBuffer(buffer), offset: offset, count: indices.count),
                                             styles: nil,
                                             indexType: .uint16,
                                             buildingRanges: [TileBuildingRange(featureID: 1, indexStart: 0, indexCount: 3),

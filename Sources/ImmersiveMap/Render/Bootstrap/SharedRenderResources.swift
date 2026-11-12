@@ -392,7 +392,7 @@ final class SharedRenderResources {
 
         // SF Symbol rasterization goes through UIImage/NSImage and stays on
         // the main thread rather than joining the background build.
-        self.poiSpriteAtlas = PoiSpriteAtlas(device: built.device)
+        self.poiSpriteAtlas = PoiSpriteAtlas(device: built.gpuDevice)
     }
 
     // MARK: - Concurrent pipeline compilation
@@ -464,9 +464,8 @@ final class SharedRenderResources {
         // with nothing shared between them.
         nonisolated(unsafe) let jobs: [() -> Void] = [
             // The heaviest groups go first so they overlap the whole batch.
-            { textRenderer = TextRenderer(device: device,
-                                          library: library,
-                                          resourceBundle: resourceBundle,
+            { textRenderer = TextRenderer(device: gpuDevice,
+                                          resource: { resourceBundle.url(forResource: $0, withExtension: $1) },
                                           sampleCount: 1) },
             { avatars = AvatarsRenderer.SharedResources.make(metalDevice: device,
                                                              pixelFormat: pixelFormat,

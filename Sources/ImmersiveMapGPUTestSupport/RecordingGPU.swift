@@ -38,7 +38,7 @@ package enum RecordedCommand: Equatable {
     case endEncoding
 }
 
-package final class RecordingBuffer: GPUBuffer {
+package final class RecordingBuffer: GPUBuffer, @unchecked Sendable {
     /// A name for the log: "buffer N", in the order the device made them.
     package let name: String
     package let storage: GPUStorage

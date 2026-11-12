@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// The `Text` folder: text atlas decoding, glyph metrics, label text layout
@@ -11,40 +11,85 @@ import simd
 /// data and geometry only: no schema-specific name or language rules, no
 /// runtime label caches, collision state or fade policy, no tile loading.
 /// The text shader sits beside it in `Text/Shaders`.
-class TextRenderer {
+final class TextRenderer {
     /// The layout half: atlas metrics and every measure, wrap and vertex
     /// build (`TextLayout`). The renderer adds the atlas textures and the
     /// pipelines.
     let layout: TextLayout
-    private var device: MTLDevice!
-    var texture: MTLTexture!
-    var thinTexture: MTLTexture!
-    private var bundle: Bundle!
-    var pipelineState: MTLRenderPipelineState!
-    var labelPipelineState: MTLRenderPipelineState!
-    var roadLabelPipelineState: MTLRenderPipelineState!
-    var poiIconPipelineState: MTLRenderPipelineState!
+    /// The bold and the thin atlas. The thin one is the bold one when the
+    /// thin atlas is missing, and the bold one a blank texel when it is.
+    let texture: any GPUTexture
+    let thinTexture: any GPUTexture
+    let pipelineState: any GPURenderPipeline
+    let labelPipelineState: any GPURenderPipeline
+    let roadLabelPipelineState: any GPURenderPipeline
+    let poiIconPipelineState: any GPURenderPipeline
     /// The route sign plates: the POI quad's vertex stage and the plate's
     /// distance field (RouteShield.metal).
-    var routeShieldPipelineState: MTLRenderPipelineState!
-    private var library: MTLLibrary
-    private let sampleCount: Int
+    let routeShieldPipelineState: any GPURenderPipeline
 
-    /// `resourceBundle` holds the atlases (`ImmersiveMapResourceBundle`).
-    init(device: MTLDevice,
-         library: MTLLibrary,
-         resourceBundle: Bundle,
+    /// `resource` finds a file of the engine's resources by name and
+    /// extension: the bundle on Apple's platforms
+    /// (`ImmersiveMapResourceBundle`), the resources folder elsewhere.
+    init(device: any GPUDevice,
+         resource: (_ name: String, _ extension: String) -> URL?,
          sampleCount: Int = 1) {
-        self.device = device
-        self.library = library
-        self.sampleCount = sampleCount
-        self.bundle = resourceBundle
-
         // The JSON first: it carries the dimensions the raw pixel file has
         // no header for.
-        layout = TextLayout(resource: { resourceBundle.url(forResource: $0, withExtension: $1) })
-        loadAtlasTexture()
-        createPipelines()
+        layout = TextLayout(resource: resource)
+        let bold = Self.loadAtlasTexture(device: device, url: resource(TextLayout.boldAtlasName, "bgra"),
+                                         name: TextLayout.boldAtlasName, atlas: layout.atlasData.atlas)
+            ?? Self.makeFallbackTexture(device: device)
+        texture = bold
+        thinTexture = Self.loadAtlasTexture(device: device, url: resource(TextLayout.thinAtlasName, "bgra"),
+                                            name: TextLayout.thinAtlasName, atlas: layout.thinAtlasData.atlas)
+            ?? bold
+
+        // Mirrors TextVertex: a float4 position and a float2 uv.
+        var textLayout = GPUVertexLayout()
+        textLayout.attributes[0] = GPUVertexAttribute(format: .float4, offset: 0, bufferIndex: 0)
+        textLayout.attributes[1] = GPUVertexAttribute(format: .float2, offset: MemoryLayout<SIMD4<Float>>.stride, bufferIndex: 0)
+        textLayout.strides[0] = MemoryLayout<TextVertex>.stride
+        // Mirrors LabelVertex.
+        var labelLayout = GPUVertexLayout()
+        labelLayout.attributes[0] = GPUVertexAttribute(format: .float2,
+                                                       offset: MemoryLayout<LabelVertex>.offset(of: \LabelVertex.position) ?? 0,
+                                                       bufferIndex: 0)
+        labelLayout.attributes[1] = GPUVertexAttribute(format: .float2,
+                                                       offset: MemoryLayout<LabelVertex>.offset(of: \LabelVertex.uv) ?? 0,
+                                                       bufferIndex: 0)
+        labelLayout.attributes[2] = GPUVertexAttribute(format: .int,
+                                                       offset: MemoryLayout<LabelVertex>.offset(of: \LabelVertex.labelIndex) ?? 0,
+                                                       bufferIndex: 0)
+        labelLayout.attributes[3] = GPUVertexAttribute(format: .float2,
+                                                       offset: MemoryLayout<LabelVertex>.offset(of: \LabelVertex.spriteUV) ?? 0,
+                                                       bufferIndex: 0)
+        labelLayout.strides[0] = MemoryLayout<LabelVertex>.stride
+
+        func makePipeline(_ vertex: String, _ fragment: String, _ layout: GPUVertexLayout) -> any GPURenderPipeline {
+            var color = GPUColorTarget(format: .bgra8Unorm)
+            // Alpha blends with .one so glyph coverage accumulates on a transparent
+            // destination; over an opaque one the result is unchanged.
+            color.blend = (color: GPUBlendComponent(source: .sourceAlpha, destination: .oneMinusSourceAlpha),
+                           alpha: GPUBlendComponent(source: .one, destination: .oneMinusSourceAlpha))
+            var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: vertex),
+                                                         fragmentFunction: GPUShaderFunction(name: fragment),
+                                                         colorTargets: [color])
+            descriptor.label = vertex
+            descriptor.vertexLayout = layout
+            descriptor.depthStencilFormat = .depth32FloatStencil8
+            descriptor.sampleCount = sampleCount
+            do {
+                return try device.makeRenderPipeline(descriptor)
+            } catch {
+                fatalError("Pipeline creation failed: \(error)")
+            }
+        }
+        pipelineState = makePipeline("textVertex", "textFragment", textLayout)
+        labelPipelineState = makePipeline("labelTextVertex", "textFragment", labelLayout)
+        roadLabelPipelineState = makePipeline("roadLabelTextVertex", "roadTextFragment", labelLayout)
+        poiIconPipelineState = makePipeline("poiSpriteVertex", "poiSpriteFragment", labelLayout)
+        routeShieldPipelineState = makePipeline("poiSpriteVertex", "routeShieldFragment", labelLayout)
     }
 
     // The layout, for the callers that reach it through the renderer.
@@ -86,19 +131,11 @@ class TextRenderer {
         layout.collectTextVertices(for: text, at: position, scale: scale)
     }
 
-    private func loadAtlasTexture() {
-        texture = loadAtlasTexture(named: TextLayout.boldAtlasName, atlas: layout.atlasData.atlas) ?? makeFallbackTexture()
-        thinTexture = loadAtlasTexture(named: TextLayout.thinAtlasName, atlas: layout.thinAtlasData.atlas) ?? texture
-    }
-
-    private func makeFallbackTexture() -> MTLTexture {
-        let descriptor = MTLTextureDescriptor()
-        descriptor.textureType = .type2D
-        descriptor.pixelFormat = .bgra8Unorm
-        descriptor.width = 1
-        descriptor.height = 1
-        descriptor.usage = [.shaderRead]
-        return device.makeTexture(descriptor: descriptor)!
+    private static func makeFallbackTexture(device: any GPUDevice) -> any GPUTexture {
+        guard let texture = device.makeTexture(GPUTextureDescriptor(format: .bgra8Unorm, width: 1, height: 1)) else {
+            fatalError("Failed to create the fallback text atlas texture")
+        }
+        return texture
     }
 
     /// The atlas pixels ship raw (`<name>.bgra`: BGRA8, the byte order of
@@ -108,8 +145,8 @@ class TextRenderer {
     /// staging buffer and a blit into the private texture: no PNG inflate
     /// and unfilter, which was the largest single item of the engine's
     /// creation on the main thread.
-    private func loadAtlasTexture(named name: String, atlas: AtlasInfo) -> MTLTexture? {
-        guard let url = bundle.url(forResource: name, withExtension: "bgra") else {
+    private static func loadAtlasTexture(device: any GPUDevice, url: URL?, name: String, atlas: AtlasInfo) -> (any GPUTexture)? {
+        guard let url else {
             #if DEBUG
             print("Could not find atlas pixels in bundle: \(name).bgra")
             #endif
@@ -126,116 +163,26 @@ class TextRenderer {
             #endif
             return nil
         }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
-                                                                  width: width,
-                                                                  height: height,
-                                                                  mipmapped: false)
-        descriptor.usage = [.shaderRead]
-        // .private: the atlas is static, no CPU access is needed after the
-        // upload, and a shared texture would keep a CPU copy for its whole
-        // lifetime (2 x 16 MB).
-        descriptor.storageMode = .private
-        guard let texture = device.makeTexture(descriptor: descriptor),
+        // .private (the descriptor's default): the atlas is static, no CPU
+        // access is needed after the upload, and a shared texture would keep
+        // a CPU copy for its whole lifetime (2 x 16 MB).
+        guard let texture = device.makeTexture(GPUTextureDescriptor(format: .bgra8Unorm, width: width, height: height)),
               let staging = pixels.withUnsafeBytes({ bytes in
-                  device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+                  device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, storage: .shared)
               }),
               let queue = device.makeCommandQueue(),
               let commandBuffer = queue.makeCommandBuffer(),
-              let blit = commandBuffer.makeBlitCommandEncoder() else {
+              let blit = commandBuffer.makeBlitEncoder() else {
             return nil
         }
-        blit.copy(from: staging,
-                  sourceOffset: 0,
-                  sourceBytesPerRow: bytesPerRow,
-                  sourceBytesPerImage: bytesPerRow * height,
-                  sourceSize: MTLSize(width: width, height: height, depth: 1),
-                  to: texture,
-                  destinationSlice: 0,
-                  destinationLevel: 0,
-                  destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
+        blit.copy(from: staging, sourceOffset: 0, bytesPerRow: bytesPerRow,
+                  to: texture, slice: 0, mipmapLevel: 0,
+                  x: 0, y: 0, width: width, height: height)
         blit.endEncoding()
         commandBuffer.commit()
         // The render queues that sample the atlas are not ordered against
         // this one; waiting here is what makes the texture whole for them.
         commandBuffer.waitUntilCompleted()
         return texture
-    }
-
-    private func createPipelines() {
-        guard let textVertexFn = library.makeFunction(name: "textVertex"),
-              let labelVertexFn = library.makeFunction(name: "labelTextVertex"),
-              let roadLabelVertexFn = library.makeFunction(name: "roadLabelTextVertex"),
-              let poiIconVertexFn = library.makeFunction(name: "poiSpriteVertex"),
-              let poiIconFragmentFn = library.makeFunction(name: "poiSpriteFragment"),
-              let routeShieldFragmentFn = library.makeFunction(name: "routeShieldFragment"),
-              let fragmentFn = library.makeFunction(name: "textFragment"),
-              let roadFragmentFn = library.makeFunction(name: "roadTextFragment") else { fatalError("Functions not found") }
-        
-        let textVertexDescriptor = MTLVertexDescriptor()
-        textVertexDescriptor.attributes[0].format = .float4
-        textVertexDescriptor.attributes[0].offset = 0
-        textVertexDescriptor.attributes[0].bufferIndex = 0
-        textVertexDescriptor.attributes[1].format = .float2
-        textVertexDescriptor.attributes[1].offset = MemoryLayout<SIMD4<Float>>.stride
-        textVertexDescriptor.attributes[1].bufferIndex = 0
-        textVertexDescriptor.layouts[0].stride = MemoryLayout<TextVertex>.stride
-        
-        let labelVertexDescriptor = MTLVertexDescriptor()
-        labelVertexDescriptor.attributes[0].format = .float2
-        labelVertexDescriptor.attributes[0].offset = MemoryLayout<LabelVertex>.offset(of: \LabelVertex.position) ?? 0
-        labelVertexDescriptor.attributes[0].bufferIndex = 0
-        labelVertexDescriptor.attributes[1].format = .float2
-        labelVertexDescriptor.attributes[1].offset = MemoryLayout<LabelVertex>.offset(of: \LabelVertex.uv) ?? 0
-        labelVertexDescriptor.attributes[1].bufferIndex = 0
-        labelVertexDescriptor.attributes[2].format = .int
-        labelVertexDescriptor.attributes[2].offset = MemoryLayout<LabelVertex>.offset(of: \LabelVertex.labelIndex) ?? 0
-        labelVertexDescriptor.attributes[2].bufferIndex = 0
-        labelVertexDescriptor.attributes[3].format = .float2
-        labelVertexDescriptor.attributes[3].offset = MemoryLayout<LabelVertex>.offset(of: \LabelVertex.spriteUV) ?? 0
-        labelVertexDescriptor.attributes[3].bufferIndex = 0
-        labelVertexDescriptor.layouts[0].stride = MemoryLayout<LabelVertex>.stride
-        
-        do {
-            pipelineState = try makePipelineState(vertexFunction: textVertexFn,
-                                                  vertexDescriptor: textVertexDescriptor,
-                                                  fragmentFunction: fragmentFn)
-            labelPipelineState = try makePipelineState(vertexFunction: labelVertexFn,
-                                                       vertexDescriptor: labelVertexDescriptor,
-                                                       fragmentFunction: fragmentFn)
-            roadLabelPipelineState = try makePipelineState(vertexFunction: roadLabelVertexFn,
-                                                           vertexDescriptor: labelVertexDescriptor,
-                                                           fragmentFunction: roadFragmentFn)
-            poiIconPipelineState = try makePipelineState(vertexFunction: poiIconVertexFn,
-                                                         vertexDescriptor: labelVertexDescriptor,
-                                                         fragmentFunction: poiIconFragmentFn)
-            routeShieldPipelineState = try makePipelineState(vertexFunction: poiIconVertexFn,
-                                                             vertexDescriptor: labelVertexDescriptor,
-                                                             fragmentFunction: routeShieldFragmentFn)
-        } catch {
-            fatalError("Pipeline creation failed: \(error)")
-        }
-    }
-    
-    private func makePipelineState(vertexFunction: MTLFunction,
-                                   vertexDescriptor: MTLVertexDescriptor,
-                                   fragmentFunction: MTLFunction) throws -> MTLRenderPipelineState {
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexDescriptor = vertexDescriptor
-        descriptor.vertexFunction = vertexFunction
-        descriptor.fragmentFunction = fragmentFunction
-        descriptor.rasterSampleCount = sampleCount
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        descriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        descriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-        descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].rgbBlendOperation = .add
-        descriptor.colorAttachments[0].alphaBlendOperation = .add
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        // Alpha blends with .one so glyph coverage accumulates on a transparent
-        // destination; over an opaque one the result is unchanged.
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        return try device.makeRenderPipelineState(descriptor: descriptor)
     }
 }

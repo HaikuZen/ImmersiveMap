@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Mvt
 import XCTest
 
@@ -261,7 +262,7 @@ final class LabelScreenUnitTests: XCTestCase {
     private func makeTextLabelsBuilder() throws -> TileTextLabelsBuilder {
         let device = try MetalTestEnvironment.requireDevice()
         let library = try device.makeDefaultLibrary(bundle: ImmersiveMapResourceBundle.bundle())
-        return try TileTextLabelsBuilder(textRenderer: TextRenderer(device: device, library: library, resourceBundle: ImmersiveMapResourceBundle.bundle()))
+        return try TileTextLabelsBuilder(textRenderer: TextRenderer(device: MetalDevice(device: device, library: library), resource: { (try? ImmersiveMapResourceBundle.location())?.url(forResource: $0, withExtension: $1) }))
     }
 
     private func labelSizePoints(builder: TileTextLabelsBuilder,

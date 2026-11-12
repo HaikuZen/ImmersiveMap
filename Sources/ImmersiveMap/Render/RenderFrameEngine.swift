@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import ImmersiveMapMetal
 import Metal
 import MetalKit
 import os
@@ -526,8 +527,8 @@ final class RenderFrameEngine {
         resourceRegistry.setPipeline(persistentContext.polygonPipeline.pipelineState, named: .polygonPipeline)
         resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState, named: .tilePipeline)
         resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState, named: .extrudedTilePipeline)
-        resourceRegistry.setTexture(persistentContext.textRenderer.texture, named: .labelGlyphAtlas)
-        resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture, named: .poiSpriteAtlas)
+        resourceRegistry.setTexture(persistentContext.textRenderer.texture.metalTexture, named: .labelGlyphAtlas)
+        resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture.metalTexture, named: .poiSpriteAtlas)
     }
 
     private func prepareGPU(frameContext: FrameContext) {

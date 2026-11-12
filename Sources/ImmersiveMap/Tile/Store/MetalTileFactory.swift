@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import MetalKit
 
 /// Turns a parsed tile into GPU state. Every buffer of the tile lives in one
@@ -424,6 +426,9 @@ final class MetalTileFactory: @unchecked Sendable {
         private let spans: [TileArenaSpan]
         private let expectedSlots: [TileArenaSlot]
         private let backingBuffer: MTLBuffer?
+        /// The same allocation as the GPU interface's buffer, made once for
+        /// all the tile's views (`TileBufferView.gpuBuffer`).
+        private let gpuBackingBuffer: (any GPUBuffer)?
         private var index = 0
         private var failed = false
 
@@ -433,6 +438,7 @@ final class MetalTileFactory: @unchecked Sendable {
             self.spans = spans
             self.expectedSlots = expectedSlots
             self.backingBuffer = backingBuffer
+            gpuBackingBuffer = backingBuffer.map(MetalBuffer.init)
         }
 
         var isConsistent: Bool {
@@ -488,6 +494,7 @@ final class MetalTileFactory: @unchecked Sendable {
             // The stride check pins byteCount to the slot's element type, so a
             // corrupt element count cannot make a draw read past its span.
             guard let backingBuffer,
+                  let gpuBackingBuffer,
                   span.byteOffset >= 0,
                   span.byteCount == span.elementCount * elementStride,
                   span.byteOffset % TileArenaImageMath.spanAlignment == 0,
@@ -495,7 +502,7 @@ final class MetalTileFactory: @unchecked Sendable {
                 failed = true
                 return nil
             }
-            return TileBufferView(buffer: backingBuffer, offset: span.byteOffset, count: span.elementCount)
+            return TileBufferView(gpuBuffer: gpuBackingBuffer, offset: span.byteOffset, count: span.elementCount)
         }
     }
 

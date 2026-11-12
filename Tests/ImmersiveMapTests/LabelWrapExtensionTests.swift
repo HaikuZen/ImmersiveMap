@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import simd
 import XCTest
 
@@ -16,7 +17,7 @@ final class LabelWrapExtensionTests: XCTestCase {
     private func makeRenderer() throws -> TextRenderer {
         let device = try MetalTestEnvironment.requireDevice()
         let library = try device.makeDefaultLibrary(bundle: ImmersiveMapResourceBundle.bundle())
-        return try TextRenderer(device: device, library: library, resourceBundle: ImmersiveMapResourceBundle.bundle())
+        return TextRenderer(device: MetalDevice(device: device, library: library), resource: { (try? ImmersiveMapResourceBundle.location())?.url(forResource: $0, withExtension: $1) })
     }
 
     private func metrics(_ text: String, renderer: TextRenderer) -> TextMetrics {

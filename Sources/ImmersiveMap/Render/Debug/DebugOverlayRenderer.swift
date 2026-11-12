@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -377,13 +378,13 @@ final class DebugOverlayRenderer {
 
         var textStyle = style ?? TextStyleUniform(textColor: settings.textColor)
         var matrix = screenMatrix
-        renderEncoder.setRenderPipelineState(textRenderer.pipelineState)
+        renderEncoder.setRenderPipelineState(textRenderer.pipelineState.metalPipeline)
         setTileTextVertices(renderEncoder: renderEncoder,
                             vertices: textVerticesScratch,
                             frameSlotIndex: frameSlotIndex,
                             frameIndex: frameIndex)
         renderEncoder.setVertexBytes(&matrix, length: MemoryLayout<matrix_float4x4>.stride, index: 1)
-        renderEncoder.setFragmentTexture(textRenderer.texture, index: 0)
+        renderEncoder.setFragmentTexture(textRenderer.texture.metalTexture, index: 0)
         renderEncoder.setFragmentBytes(&textStyle, length: MemoryLayout<TextStyleUniform>.stride, index: 0)
         renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: textVerticesScratch.count)
     }

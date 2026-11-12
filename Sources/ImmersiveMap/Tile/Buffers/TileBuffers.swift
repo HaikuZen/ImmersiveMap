@@ -3,33 +3,6 @@
 
 import MetalKit
 
-struct LabelsByStyleRun {
-    let style: LabelTextStyle
-    let localGlyphVertices: TileBufferView?
-
-    var localGlyphVertexCount: Int {
-        localGlyphVertices?.count ?? 0
-    }
-}
-
-struct PoiIconRunBuffer {
-    let style: LabelTextStyle
-    let localVertices: TileBufferView?
-
-    var localVertexCount: Int {
-        localVertices?.count ?? 0
-    }
-}
-
-struct RouteShieldRunBuffer {
-    let style: RouteShieldRunStyle
-    let localVertices: TileBufferView?
-
-    var localVertexCount: Int {
-        localVertices?.count ?? 0
-    }
-}
-
 struct TileBuffers {
     // Views are nil for empty layers (a tile without bridges/tunnels has
     // mostly those); every non-empty view points into the one backing

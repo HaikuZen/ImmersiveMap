@@ -6,6 +6,7 @@
 //  ImmersiveMap
 //
 
+import ImmersiveMapGPU
 import Metal
 
 struct BaseLabelState {
@@ -16,8 +17,8 @@ struct BaseLabelState {
                                       hasActiveFadeAnimations: false)
 
     var labelInputsCount: Int
-    var labelRuntimeMetaBuffer: MTLBuffer?
-    var screenPositionsBuffer: MTLBuffer?
+    var labelRuntimeMetaBuffer: (any GPUBuffer)?
+    var screenPositionsBuffer: (any GPUBuffer)?
     var baseLabelsDrawBatches: [BaseLabelDrawBatch]
     var hasActiveFadeAnimations: Bool
 }
@@ -53,7 +54,7 @@ struct RoadLabelState {
     var instanceCount: Int
     var glyphCount: Int
     var activeRoadLabelTiles: [VisibleTile]
-    var runtimeMetaBuffer: MTLBuffer?
+    var runtimeMetaBuffer: (any GPUBuffer)?
     var drawLabels: [DrawRoadLabels]
     var hasActiveFadeAnimations: Bool
 }

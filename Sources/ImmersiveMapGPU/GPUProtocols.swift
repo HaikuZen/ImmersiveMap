@@ -5,8 +5,9 @@
 // to: Metal on Apple's platforms, WebGPU elsewhere. Shaped after what the
 // engine does with Metal today, so a feature moves onto them call for call.
 
-/// A GPU memory allocation.
-package protocol GPUBuffer: AnyObject {
+/// A GPU memory allocation. Sendable, as Metal's: a tile's buffers are
+/// made where the tile is built and drawn on the main thread.
+package protocol GPUBuffer: AnyObject, Sendable {
     var length: Int { get }
     /// A name for GPU captures and debuggers. No effect on drawing.
     var label: String? { get set }

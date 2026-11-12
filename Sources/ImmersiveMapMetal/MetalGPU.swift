@@ -20,7 +20,9 @@ private func metalObject<Expected, Given>(_ given: Given, as _: Expected.Type) -
     return object
 }
 
-package final class MetalBuffer: GPUBuffer {
+/// Unchecked Sendable: it holds the Metal buffer alone, which Metal makes
+/// safe to use from any thread.
+package final class MetalBuffer: GPUBuffer, @unchecked Sendable {
     package let buffer: MTLBuffer
 
     package init(_ buffer: MTLBuffer) {

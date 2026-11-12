@@ -15,6 +15,8 @@ final class RenderPersistentContext {
     // MARK: - Metal Core
 
     let metalContext: RenderMetalContext
+    /// The shared device as the GPU interface (`SharedRenderResources.gpuDevice`).
+    let gpuDevice: MetalDevice
 
     // MARK: - Pipelines
 
@@ -137,6 +139,7 @@ final class RenderPersistentContext {
         let shared = try SharedRenderResources.shared(sampleCount: config.postProcessing.multisampleCount)
         let metal = RendererSetup.buildMetal(layer: layer, sharedResources: shared)
         self.metalContext = metal
+        self.gpuDevice = shared.gpuDevice
         self.tileTraceRecorder = tileTraceRecorder
         self.baseLabelTraceRecorder = baseLabelTraceRecorder
         self.tileLoadingStatusReporter = config.debug.enableDebugPanel ? TileLoadingStatusReporter() : nil
@@ -197,11 +200,11 @@ final class RenderPersistentContext {
                                                tileTraceRecorder: tileTraceRecorder,
                                                tileLoadingStatusReporter: tileLoadingStatusReporter)
         self.tileRenderStore.eventSink = eventSink
-        self.baseLabelCache = BaseLabelCache(metalDevice: metal.device)
+        self.baseLabelCache = BaseLabelCache(device: shared.gpuDevice)
         // On the relief the labels' paths are cut where the roads' ribbons
         // were, so the names ride the relief with the roads.
         let parseOptions = TileParseOptions(settings: config)
-        self.roadLabelCache = RoadLabelCache(metalDevice: metal.device,
+        self.roadLabelCache = RoadLabelCache(device: shared.gpuDevice,
                                              reliefSubdivisionStep: { parseOptions.reliefSubdivisionStep(tileZoom: $0) })
 
         self.sceneModelSource = sceneModelSource

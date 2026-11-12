@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Metal
+import ImmersiveMapGPU
 import CoreGraphics
 #if canImport(UIKit)
 import UIKit
@@ -20,18 +20,18 @@ final class PoiSpriteAtlas {
     let descriptor: PoiSpriteAtlasDescriptor
     let layout: PoiSpriteAtlasLayout
     let bitmapImage: CGImage
-    let texture: MTLTexture
+    let texture: any GPUTexture
 
-    init(device: MTLDevice,
+    /// The icons are drawn with Core Graphics and the platform's symbol
+    /// images, so the atlas is made on Apple's platforms alone. The browser
+    /// host will hand the engine an atlas it drew.
+    init(device: any GPUDevice,
          icons: [PoiSpriteIcon] = PoiSpriteIcon.allCases,
          descriptor: PoiSpriteAtlasDescriptor = .default) {
         self.descriptor = descriptor
         self.layout = PoiSpriteAtlasLayout(icons: icons, descriptor: descriptor)
         self.bitmapImage = Self.makeBitmapImage(layout: layout, descriptor: descriptor)
         self.texture = Self.makeTexture(device: device, image: bitmapImage)
-        if self.texture.label == nil {
-            self.texture.label = RenderResourceName.poiSpriteAtlas.rawValue
-        }
     }
 
     func region(for icon: PoiSpriteIcon) -> PoiSpriteAtlasRegion? {
@@ -62,20 +62,16 @@ final class PoiSpriteAtlas {
         return image
     }
 
-    private static func makeTexture(device: MTLDevice, image: CGImage) -> MTLTexture {
+    private static func makeTexture(device: any GPUDevice, image: CGImage) -> any GPUTexture {
         let width = image.width
         let height = image.height
         let bytesPerRow = width * 4
         let byteCount = bytesPerRow * height
 
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
-                                                                  width: width,
-                                                                  height: height,
-                                                                  mipmapped: false)
-        descriptor.usage = [.shaderRead]
-        descriptor.storageMode = .shared
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm, width: width, height: height)
+        descriptor.storage = .shared
 
-        guard let texture = device.makeTexture(descriptor: descriptor) else {
+        guard let texture = device.makeTexture(descriptor) else {
             fatalError("Failed to create POI sprite atlas texture.")
         }
 
@@ -102,10 +98,9 @@ final class PoiSpriteAtlas {
 
         data.withUnsafeBytes { bytes in
             guard let baseAddress = bytes.baseAddress else { return }
-            texture.replace(region: MTLRegionMake2D(0, 0, width, height),
-                            mipmapLevel: 0,
-                            withBytes: baseAddress,
-                            bytesPerRow: bytesPerRow)
+            texture.replace(x: 0, y: 0, width: width, height: height,
+                            mipmapLevel: 0, slice: 0,
+                            bytes: baseAddress, bytesPerRow: bytesPerRow)
         }
         return texture
     }

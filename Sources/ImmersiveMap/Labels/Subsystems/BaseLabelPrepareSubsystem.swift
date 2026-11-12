@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import ImmersiveMapGPU
 import Metal
 import simd
 
@@ -49,8 +50,8 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     private var projectedMaximumDistanceScale: Float?
     /// The distance the local detail was last resolved for.
     private var resolvedLocalDetailDistance: Float?
-    private let screenPositionsBufferStore: FrameSlottedDynamicMetalBuffer<ScreenPointOutput>
-    private let roadRuntimeMetaBufferStore: FrameSlottedDynamicMetalBuffer<LabelRuntimeMeta>
+    private let screenPositionsBufferStore: GPUFrameSlottedBuffer<ScreenPointOutput>
+    private let roadRuntimeMetaBufferStore: GPUFrameSlottedBuffer<LabelRuntimeMeta>
     private let fadeInSeconds: TimeInterval
     private let fadeOutSeconds: TimeInterval
     private let maxGlyphTurnRadians: Float
@@ -117,7 +118,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     init(baseLabelCache: BaseLabelCache,
          roadLabelCache: RoadLabelCache? = nil,
          baseLabelTraceRecorder: BaseLabelTraceRecorder = BaseLabelTraceRecorder(),
-         metalDevice: MTLDevice,
+         device: any GPUDevice,
          settings: ImmersiveMapSettings.LabelSettings = ImmersiveMapSettings.default.labels,
          debugOverlayControls: DebugOverlayControlState? = nil) {
         self.baseLabelCache = baseLabelCache
@@ -125,12 +126,10 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
         self.baseLabelTraceRecorder = baseLabelTraceRecorder
         self.debugOverlayControls = debugOverlayControls
         self.localDetailMaximumDistanceMeters = settings.base.localDetailMaximumDistanceMeters
-        self.screenPositionsBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                         slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                         options: [.storageModeShared])
-        self.roadRuntimeMetaBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                         slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                         options: [.storageModeShared])
+        self.screenPositionsBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                                         slotsCount: InFlightFramePool.inFlightFramesCount)
+        self.roadRuntimeMetaBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                                         slotsCount: InFlightFramePool.inFlightFramesCount)
         self.fadeInSeconds = settings.base.fadeInSeconds
         self.fadeOutSeconds = settings.base.fadeOutSeconds
         self.maxGlyphTurnRadians = settings.road.maxGlyphTurnRadians
@@ -772,7 +771,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     private func publishBaseLabelState(frameContext: FrameContext,
                                        hasActiveFadeAnimations: Bool) {
         let count = baseLabelCache.labelInputsCount
-        var screenPositionsBuffer: MTLBuffer?
+        var screenPositionsBuffer: (any GPUBuffer)?
         if count > 0 {
             let buffer = screenPositionsBufferStore.ensureCapacity(slot: frameContext.frameSlotIndex, count: count)
             let byteCount = min(baseScreenPoints.count, count) * MemoryLayout<ScreenPointOutput>.stride
