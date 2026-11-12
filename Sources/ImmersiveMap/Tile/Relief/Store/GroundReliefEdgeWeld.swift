@@ -1,7 +1,12 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import PortableFoundation
+// Accelerate converts to half floats on Apple's platforms. Elsewhere the
+// conversion is PortableFoundation's, the same rounding.
+#if canImport(Accelerate)
 import Accelerate
+#endif
 
 /// Welds a terrain tile's edges to its neighbours' of the same zoom.
 ///
@@ -120,6 +125,7 @@ enum GroundReliefEdgeWeld {
     /// Floats as half floats: `Float16` is not on every platform the
     /// package builds for.
     static func halves(_ floats: [Float]) -> [UInt16] {
+        #if canImport(Accelerate)
         var source = floats
         var result = [UInt16](repeating: 0, count: floats.count)
         guard floats.isEmpty == false else { return result }
@@ -133,6 +139,9 @@ enum GroundReliefEdgeWeld {
             }
         }
         return result
+        #else
+        return floats.map(HalfFloat.bits)
+        #endif
     }
 }
 

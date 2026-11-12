@@ -1,9 +1,14 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
+// ImageIO decodes the tiles on Apple's platforms. Elsewhere PortableImage's
+// PNG decoder does, so a terrain source there serves PNG.
+#if canImport(ImageIO)
 import ImageIO
+#else
+import PortableImage
+#endif
 
 /// A terrain tile decoded: its heights in metres, row by row from the
 /// north edge, `size` a side.
@@ -14,8 +19,9 @@ struct GroundReliefHeights: Equatable {
 
 /// Decodes a terrain tile, a square image whose pixel holds its height in
 /// metres in one of the RGB encodings
-/// (`TileSettings.GroundReliefEncoding`). Any format ImageIO reads (PNG,
-/// WebP).
+/// (`TileSettings.GroundReliefEncoding`). On Apple's platforms any format
+/// ImageIO reads (PNG, WebP). Elsewhere PNG alone, which leaves out the
+/// default source, Mapterhorn, until a host gives a WebP decoder.
 enum GroundReliefDecoder {
     typealias Encoding = ImmersiveMapSettings.TileSettings.GroundReliefEncoding
 
@@ -25,6 +31,18 @@ enum GroundReliefDecoder {
     }
 
     static func decode(_ data: Data, encoding: Encoding = .terrarium) throws -> GroundReliefHeights {
+        let (size, pixels) = try squarePixels(data)
+        var metres = [Float](repeating: 0, count: size * size)
+        for index in 0 ..< size * size {
+            metres[index] = height(red: pixels[index * 4], green: pixels[index * 4 + 1], blue: pixels[index * 4 + 2],
+                                   encoding: encoding)
+        }
+        return GroundReliefHeights(size: size, metres: metres)
+    }
+
+    /// The image's side and its pixels, four bytes each, red first.
+    private static func squarePixels(_ data: Data) throws -> (size: Int, pixels: [UInt8]) {
+        #if canImport(ImageIO)
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw Failure.unreadableImage
@@ -55,12 +73,16 @@ enum GroundReliefDecoder {
         guard drawn else {
             throw Failure.unreadableImage
         }
-        var metres = [Float](repeating: 0, count: size * size)
-        for index in 0 ..< size * size {
-            metres[index] = height(red: pixels[index * 4], green: pixels[index * 4 + 1], blue: pixels[index * 4 + 2],
-                                   encoding: encoding)
+        return (size, pixels)
+        #else
+        guard let image = try? PNGDecoder.decode(data) else {
+            throw Failure.unreadableImage
         }
-        return GroundReliefHeights(size: size, metres: metres)
+        guard image.width == image.height else {
+            throw Failure.notSquare(width: image.width, height: image.height)
+        }
+        return (image.width, image.pixels)
+        #endif
     }
 
     /// The height of one pixel, in metres.

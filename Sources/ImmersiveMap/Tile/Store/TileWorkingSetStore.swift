@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// The tiles resident in GPU memory. Membership is a function of the
 /// present, nothing is carried from one frame to the next: the frame's
@@ -264,16 +264,8 @@ final class TileWorkingSetStore {
     }
 
     private static func residentByteSize(of metalTile: MetalTile) -> Int {
-        metalTile.tileBuffers.backingBuffer.map(byteSize(of:)) ?? 0
-    }
-
-    /// What one tile holds in GPU memory.
-    ///
-    /// `allocatedSize` is the figure to use where it is available: it counts
-    /// the padding the driver added, which the requested length does not. The
-    /// iOS Simulator's GPU reports 0 for it, for every buffer at every size,
-    /// so the requested length is the honest lower bound to fall back on.
-    private static func byteSize(of buffer: MTLBuffer) -> Int {
-        buffer.allocatedSize > 0 ? buffer.allocatedSize : buffer.length
+        // What the tile holds in GPU memory, the driver's padding included
+        // (`GPUBuffer.allocatedSize`).
+        metalTile.tileBuffers.gpuBackingBuffer?.allocatedSize ?? 0
     }
 }

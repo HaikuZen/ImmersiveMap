@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 package struct BaseLabelTraceRecorderSnapshot: Equatable {
     package let isRecording: Bool
@@ -48,18 +48,18 @@ enum BaseLabelTraceValue {
     case string(String)
     case tile(Tile)
 
-    var jsonValue: Any {
+    var jsonValue: JSONValue {
         switch self {
         case let .bool(value):
-            return value
+            return .bool(value)
         case let .double(value):
-            return value
+            return .number(value)
         case let .int(value):
-            return value
+            return .number(Double(value))
         case let .string(value):
-            return value
+            return .string(value)
         case let .tile(tile):
-            return "\(tile.z)/\(tile.x)/\(tile.y)"
+            return .string("\(tile.z)/\(tile.x)/\(tile.y)")
         }
     }
 }
@@ -142,7 +142,7 @@ package final class BaseLabelTraceRecorder: @unchecked Sendable {
     private let queue = DispatchQueue(label: "ImmersiveMap.BaseLabelTraceRecorder")
     private let stateLock = NSLock()
 
-    private var fileHandle: FileHandle?
+    private var fileHandle: AppendOnlyFile?
     private var currentFileURL: URL?
     private var isRecordingFlag = false
     private var pendingEventCount = 0
@@ -168,8 +168,7 @@ package final class BaseLabelTraceRecorder: @unchecked Sendable {
             do {
                 try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
                 let fileURL = directoryURL.appendingPathComponent(makeFileName(for: now()))
-                fileManager.createFile(atPath: fileURL.path, contents: nil)
-                let handle = try FileHandle(forWritingTo: fileURL)
+                let handle = try AppendOnlyFile(truncating: fileURL)
                 fileHandle = handle
                 currentFileURL = fileURL
                 resetQueueCounters()
@@ -187,8 +186,8 @@ package final class BaseLabelTraceRecorder: @unchecked Sendable {
     package func stopRecording() {
         queue.sync {
             guard let fileHandle else { return }
-            try? fileHandle.synchronize()
-            try? fileHandle.close()
+            fileHandle.synchronize()
+            fileHandle.close()
             self.fileHandle = nil
             setRecordingFlag(false)
         }
@@ -269,19 +268,19 @@ package final class BaseLabelTraceRecorder: @unchecked Sendable {
     }
 
     private func makeJSONLine(event: BaseLabelTraceEvent, timestamp: Date) -> String? {
-        var object: [String: Any] = [
-            "t": timestamp.timeIntervalSince1970,
-            "event": event.name
+        var object: [String: JSONValue] = [
+            "t": .number(timestamp.timeIntervalSince1970),
+            "event": .string(event.name)
         ]
         if let frameIndex = event.frameIndex {
-            object["frame"] = Int(frameIndex)
+            object["frame"] = .number(Double(frameIndex))
         }
         for key in event.fields.keys.sorted() {
             object[key] = event.fields[key]?.jsonValue
         }
 
-        guard JSONSerialization.isValidJSONObject(object),
-              let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+        // A number that is not finite is no JSON, and the line is dropped.
+        guard let data = try? JSONValue.object(object).serialized(sortedKeys: true),
               let json = String(data: data, encoding: .utf8) else {
             return nil
         }
@@ -289,12 +288,7 @@ package final class BaseLabelTraceRecorder: @unchecked Sendable {
     }
 
     private func makeFileName(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyyMMdd-HHmmss-SSS"
-        return "immersive-map-base-label-trace-\(formatter.string(from: date)).jsonl"
+        return "immersive-map-base-label-trace-\(date.compactUTCTimestamp).jsonl"
     }
 
     private static func defaultDirectoryURL(fileManager: FileManager) -> URL {

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How the terrain store's loads go (`GroundReliefStore`): which tiles are
 /// on their way and since when, which failed and when they are tried

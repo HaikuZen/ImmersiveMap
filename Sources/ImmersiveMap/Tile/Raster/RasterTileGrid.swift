@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// The surface a raster tile is drawn on: a square grid over the tile's
 /// extent, in tile-local units (0 to 4096, y up, the parser's render
@@ -15,12 +15,14 @@ import Metal
 /// (`GroundGeometrySubdivider`), and on the plane they are where the
 /// ground relief lifts the ground.
 final class RasterTileGrid {
+    /// The draws still on Metal read the buffers and the index type by
+    /// Metal's names (`RasterTileGrid+Metal.swift`).
     struct Mesh {
-        let vertices: MTLBuffer
-        let indices: MTLBuffer
+        let gpuVertices: any GPUBuffer
+        let gpuIndices: any GPUBuffer
         let indexCount: Int
         /// 16-bit indices up to 255 cells a side, 32-bit past it.
-        let indexType: MTLIndexType
+        let gpuIndexType: GPUIndexType
     }
 
     /// The cells a side of the plane's grid and of the sphere's deep
@@ -71,10 +73,10 @@ final class RasterTileGrid {
         return sizes
     }
 
-    private let device: MTLDevice
+    private let device: any GPUDevice
     private var meshesByCells: [Int: Mesh] = [:]
 
-    init(device: MTLDevice) {
+    init(device: any GPUDevice) {
         self.device = device
     }
 
@@ -105,17 +107,15 @@ final class RasterTileGrid {
     }
 
     private func makeMesh<Index: FixedWidthInteger>(geometry: (vertices: [SIMD2<Float>], indices: [Index]),
-                                                    indexType: MTLIndexType) -> Mesh? {
-        guard let vertices = device.makeBuffer(bytes: geometry.vertices,
-                                               length: geometry.vertices.count * MemoryLayout<SIMD2<Float>>.stride),
-              let indices = device.makeBuffer(bytes: geometry.indices,
-                                              length: geometry.indices.count * MemoryLayout<Index>.stride) else {
+                                                    indexType: GPUIndexType) -> Mesh? {
+        guard let vertices = device.makeBuffer(geometry.vertices, storage: .shared),
+              let indices = device.makeBuffer(geometry.indices, storage: .shared) else {
             return nil
         }
         let cells = Int(Double(geometry.vertices.count).squareRoot().rounded()) - 1
         vertices.label = "RasterTileGrid.vertices.\(cells)"
         indices.label = "RasterTileGrid.indices.\(cells)"
-        return Mesh(vertices: vertices, indices: indices, indexCount: geometry.indices.count, indexType: indexType)
+        return Mesh(gpuVertices: vertices, gpuIndices: indices, indexCount: geometry.indices.count, gpuIndexType: indexType)
     }
 
     /// The vertices row by row from the tile's south edge, and two

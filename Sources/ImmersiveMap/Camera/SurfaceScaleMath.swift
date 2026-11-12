@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Local scale of the render surface at the view centre relative to
 /// normalized Mercator: the sphere compresses the world by

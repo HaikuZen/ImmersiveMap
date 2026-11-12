@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// The static geometry of the globe's atmosphere band: a grid of azimuths
 /// about the eye's local vertical by stations either side of the limb
@@ -15,11 +15,11 @@ struct HorizonBandMesh {
         var station: Float
     }
 
-    let vertexBuffer: MTLBuffer
-    let indexBuffer: MTLBuffer
+    let vertexBuffer: any GPUBuffer
+    let indexBuffer: any GPUBuffer
     let indexCount: Int
 
-    init?(metalDevice: MTLDevice) {
+    init?(device: any GPUDevice) {
         let segments = HorizonBandMath.segmentCount
         let stations = HorizonBandMath.stationCount
         var vertices: [Vertex] = []
@@ -42,12 +42,8 @@ struct HorizonBandMesh {
                 indices.append(contentsOf: [a, b, c, a, c, d])
             }
         }
-        guard let vertexBuffer = metalDevice.makeBuffer(bytes: vertices,
-                                                        length: vertices.count * MemoryLayout<Vertex>.stride,
-                                                        options: .storageModeShared),
-              let indexBuffer = metalDevice.makeBuffer(bytes: indices,
-                                                       length: indices.count * MemoryLayout<UInt16>.stride,
-                                                       options: .storageModeShared) else {
+        guard let vertexBuffer = device.makeBuffer(vertices, storage: .shared),
+              let indexBuffer = device.makeBuffer(indices, storage: .shared) else {
             return nil
         }
         vertexBuffer.label = "HorizonBandVertices"

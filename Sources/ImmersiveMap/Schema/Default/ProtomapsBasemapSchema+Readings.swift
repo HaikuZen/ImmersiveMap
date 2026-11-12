@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The Protomaps basemap's readings of one feature's tags into the facts.
 /// What the tags are called is the basemap's contract; the facts they
@@ -90,12 +90,12 @@ extension ProtomapsBasemapSchema {
             return []
         }
         return ref.split(separator: ";")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.trimmingWhitespace() }
             .filter { $0.isEmpty == false }
     }
 
     private func trimmed(_ text: String?) -> String? {
-        guard let text = text?.trimmingCharacters(in: .whitespaces), text.isEmpty == false else {
+        guard let text = text?.trimmingWhitespace(), text.isEmpty == false else {
             return nil
         }
         return text
@@ -104,7 +104,7 @@ extension ProtomapsBasemapSchema {
     /// An address point's house number, `addr_housenumber`, as a label.
     /// Nil for a point without one.
     func houseNumber(_ properties: ImmersiveMapFeatureProperties) -> ImmersiveMapLabelFacts? {
-        guard let number = properties.string("addr_housenumber")?.trimmingCharacters(in: .whitespaces),
+        guard let number = properties.string("addr_housenumber")?.trimmingWhitespace(),
               number.isEmpty == false else {
             return nil
         }

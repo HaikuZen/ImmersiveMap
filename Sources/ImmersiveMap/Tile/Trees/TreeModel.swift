@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 enum TreeModelError: Error, Equatable {
@@ -114,45 +114,32 @@ struct TreeModelContents: Sendable, Equatable {
 }
 
 /// The tree model on the GPU: the file in one buffer, drawn by the levels'
-/// offsets into it. Immutable after creation (`@unchecked Sendable`: Metal
-/// objects are safe to use from any thread, and nothing here changes).
+/// offsets into it. Immutable after creation (`@unchecked Sendable`: GPU
+/// buffers are safe to use from any thread, and nothing here changes).
 final class TreeModelMesh: @unchecked Sendable {
     let contents: TreeModelContents
-    let buffer: MTLBuffer
+    let buffer: any GPUBuffer
 
-    /// How long a load from the file may take before the bytes are copied
-    /// from memory instead: the file is a few kilobytes, so this is
-    /// reached only by a request the driver never answers.
-    static let fileLoadTimeout: TimeInterval = 15
+    /// Fills a buffer of `length` bytes straight from the file, true when
+    /// it did: a backend's fast path (Metal's IO queue,
+    /// `TreeModelMesh+Metal.swift`). Without one the bytes are copied.
+    typealias FileLoader = @Sendable (_ buffer: any GPUBuffer, _ fileURL: URL, _ length: Int) async -> Bool
 
-    /// Puts the model file on the GPU: by the device's IO queue straight
-    /// from the file where there is one, else copied from `data`.
+    /// Puts the model file on the GPU: by the file loader where there is
+    /// one and it succeeds, else copied from `data`.
     static func make(contents: TreeModelContents,
                      data: Data,
                      fileURL: URL,
-                     device: MTLDevice) async throws -> TreeModelMesh {
-        guard let buffer = device.makeBuffer(length: contents.byteCount, options: .storageModeShared) else {
+                     device: any GPUDevice,
+                     fileLoader: FileLoader? = nil) async throws -> TreeModelMesh {
+        guard let buffer = device.makeBuffer(length: contents.byteCount, storage: .shared) else {
             throw TreeModelError.allocationFailed
         }
         buffer.label = "TreeModel"
         var isLoaded = false
-#if !targetEnvironment(simulator)
-        if let queue = MetalIOCommandQueues.shared(for: device),
-           let fileHandle = try? device.makeIOFileHandle(url: fileURL) {
-            let commandBuffer = queue.makeCommandBuffer()
-            commandBuffer.load(buffer, offset: 0, size: contents.byteCount, sourceHandle: fileHandle, sourceHandleOffset: 0)
-            let completed: Bool? = await CallbackTimeout.await(seconds: fileLoadTimeout) { complete in
-                commandBuffer.addCompletedHandler { completedBuffer in
-                    complete(completedBuffer.status == .complete)
-                }
-                commandBuffer.commit()
-            }
-            if completed == nil {
-                commandBuffer.tryCancel()
-            }
-            isLoaded = completed == true
+        if let fileLoader {
+            isLoaded = await fileLoader(buffer, fileURL, contents.byteCount)
         }
-#endif
         if isLoaded == false {
             data.withUnsafeBytes { bytes in
                 buffer.contents().copyMemory(from: bytes.baseAddress!, byteCount: min(bytes.count, contents.byteCount))
@@ -161,7 +148,7 @@ final class TreeModelMesh: @unchecked Sendable {
         return TreeModelMesh(contents: contents, buffer: buffer)
     }
 
-    private init(contents: TreeModelContents, buffer: MTLBuffer) {
+    private init(contents: TreeModelContents, buffer: any GPUBuffer) {
         self.contents = contents
         self.buffer = buffer
     }
@@ -189,22 +176,25 @@ final class TreeModelStore: @unchecked Sendable {
         lock.withLock { loadedMesh }
     }
 
-    init(device: MTLDevice) {
+    /// `fileLoader` is the backend's way to read the file straight into the
+    /// buffer, if it has one (`TreeModelMesh.FileLoader`).
+    init(device: any GPUDevice, fileLoader: TreeModelMesh.FileLoader? = nil) {
         Task.detached(priority: .utility) { [self] in
-            await load(device: device)
+            await load(device: device, fileLoader: fileLoader)
         }
     }
 
-    private func load(device: MTLDevice) async {
-        guard let url = (try? ImmersiveMapResourceBundle.bundle())?.url(forResource: Self.resourceName,
-                                                                         withExtension: Self.resourceExtension) else {
+    private func load(device: any GPUDevice, fileLoader: TreeModelMesh.FileLoader?) async {
+        guard let url = (try? ImmersiveMapResourceBundle.location())?.url(forResource: Self.resourceName,
+                                                                           withExtension: Self.resourceExtension) else {
             assertionFailure("The tree model is missing from the package resources")
             return
         }
         do {
             let data = try Data(contentsOf: url)
             let contents = try TreeModelContents.read(data)
-            let mesh = try await TreeModelMesh.make(contents: contents, data: data, fileURL: url, device: device)
+            let mesh = try await TreeModelMesh.make(contents: contents, data: data, fileURL: url,
+                                                    device: device, fileLoader: fileLoader)
             lock.withLock { loadedMesh = mesh }
             eventSink?.invalidate(.sceneModelAssetLoaded)
         } catch {

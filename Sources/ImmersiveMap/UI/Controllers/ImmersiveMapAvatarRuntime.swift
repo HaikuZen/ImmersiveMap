@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Owns the avatar controller attached to a single map view runtime.
 /// Bridges avatar mutations to the selection/render runtimes and feeds avatar data to the renderer.

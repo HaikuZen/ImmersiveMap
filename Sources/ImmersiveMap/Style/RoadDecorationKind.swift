@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A decoration the separate-road path stamps along a line on top of its
 /// ribbon. Every figure's dimensions are the style's: each case carries

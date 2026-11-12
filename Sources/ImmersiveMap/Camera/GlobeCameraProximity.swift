@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How much closer the render camera sits to the globe than the zoom alone
 /// would put it, so the globe shows the Mercator scale of the view centre.

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Owns the layers controller attached to a single map view runtime.
 /// Asks for a frame when the app changes its layers and feeds them to the

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What can be wrong with the bytes of an archive. Every case names the
 /// place it was found so a wrong URL (an HTML page, an old v2 archive, a

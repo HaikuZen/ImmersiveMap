@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import PMTiles
 
 /// Which upload of the tile archive the map is reading, by the ETag the
@@ -92,7 +92,7 @@ final class TileArchiveVersion: @unchecked Sendable {
         DispatchQueue.global(qos: .utility).async {
             try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(),
                                                      withIntermediateDirectories: true)
-            try? Data((observed ?? "").utf8).write(to: fileURL, options: .atomic)
+            try? Data((observed ?? "").utf8).writeReplacing(to: fileURL)
         }
     }
 

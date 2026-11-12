@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 protocol FrameDiagnosticsService: AnyObject {
     func incrementCounter(_ counter: FrameDiagnostics.Counter, by value: Int)

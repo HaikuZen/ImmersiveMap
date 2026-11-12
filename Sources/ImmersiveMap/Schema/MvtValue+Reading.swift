@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import Mvt
 
 /// The readings behind `ImmersiveMapFeatureProperties`: the decoder hands
@@ -38,7 +38,7 @@ extension MvtValue {
         case .bool, .absent:
             return nil
         case .string(let text):
-            let raw = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let raw = text.trimmingWhitespaceAndNewlines().lowercased()
             let token = raw.split(whereSeparator: { $0 == ";" || $0 == "," || $0 == " " }).first
             guard let token else { return nil }
             var numeric = ""

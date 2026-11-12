@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Which terrain tiles the ground reads this frame: the zoom each band of
 /// the frame's ring rules reads its terrain at (`FlatRingRule

@@ -254,7 +254,7 @@ public struct ProtomapsBasemapDefaultMapStyle: ImmersiveMapVectorTileStyle {
         case .float(let number):
             return Int(number)
         case .string(let text):
-            return Int(text.trimmingCharacters(in: .whitespaces))
+            return Int(text.trimmingWhitespace())
         case .bool, .absent, nil:
             return nil
         }

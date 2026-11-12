@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// The fullscreen pass that writes the ground shadow mask: one 8-bit shadow
 /// factor per screen pixel, read by every flat ground layer in the world
@@ -10,7 +10,7 @@ import Metal
 /// function of the pixel, not geometry with edges, and the MSAA world pass
 /// reads it once per pixel.
 final class GroundShadowMaskPipeline {
-    static let pixelFormat: MTLPixelFormat = .r8Unorm
+    static let format: GPUPixelFormat = .r8Unorm
     /// Mask pixels per drawable pixel. Half resolution: the shadow edge is
     /// already a two-texel ramp of a cascade whose texel spans several
     /// screen pixels at street zoom, so a bilinear upsample of a half-size
@@ -25,18 +25,24 @@ final class GroundShadowMaskPipeline {
                height: (drawSize.height * resolutionScale).rounded(.up))
     }
 
-    let pipelineState: MTLRenderPipelineState
+    let pipelineState: any GPURenderPipeline
 
-    init(metalDevice: MTLDevice, library: MTLLibrary) {
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexFunction = library.makeFunction(name: "groundShadowMaskVertexShader")
-        descriptor.fragmentFunction = library.makeFunction(name: "groundShadowMaskFragmentShader")
-        descriptor.rasterSampleCount = 1
-        descriptor.colorAttachments[0].pixelFormat = Self.pixelFormat
-        self.pipelineState = try! metalDevice.makeRenderPipelineState(descriptor: descriptor)
+    init(device: any GPUDevice) {
+        // A fullscreen triangle made in the vertex shader: no vertices, no
+        // depth, no blending.
+        var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "groundShadowMaskVertexShader"),
+                                                     fragmentFunction: GPUShaderFunction(name: "groundShadowMaskFragmentShader"),
+                                                     colorTargets: [GPUColorTarget(format: Self.format)])
+        descriptor.label = "GroundShadowMask"
+        descriptor.sampleCount = 1
+        do {
+            pipelineState = try device.makeRenderPipeline(descriptor)
+        } catch {
+            fatalError("Failed to create the ground shadow mask pipeline: \(error)")
+        }
     }
 
-    func select(renderEncoder: MTLRenderCommandEncoder) {
-        renderEncoder.setRenderPipelineState(pipelineState)
+    func select(renderEncoder: any GPURenderEncoder) {
+        renderEncoder.setPipeline(pipelineState)
     }
 }

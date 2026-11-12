@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import CoreGraphics
-import Foundation
+import PortableFoundation
 
 public struct AvatarMarkerImageSource: Sendable {
     private enum Storage {

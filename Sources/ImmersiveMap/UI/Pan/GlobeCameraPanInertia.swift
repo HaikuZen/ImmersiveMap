@@ -6,8 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 /// Simulates post-pan inertia for globe camera movement.
 /// Holds decay state and returns translations for each frame until the motion stops.

@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 /// Limits repetitive debug logs by a minimum time interval.
 struct DebugLogThrottle {

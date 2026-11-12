@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How the directories and the tiles are compressed inside the archive.
 package enum PMTilesCompression: UInt8, Sendable, Equatable {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import simd
 import XCTest
@@ -62,7 +63,7 @@ final class GroundReliefShadowCasterTests: XCTestCase {
                                                                   mipmapped: false)
         let texture = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
         let metres = (0 ..< size * size).map { Float($0 * 10) }
-        let terrain = GroundReliefTile(texture: texture,
+        let terrain = GroundReliefTile(texture: MetalTexture(texture, format: .r16Float),
                                        size: size,
                                        halves: GroundReliefEdgeWeld.halves(metres),
                                        heightRange: 0 ... 150)

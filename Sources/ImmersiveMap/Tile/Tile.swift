@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The `Tile` folder: tile identity, loading, parsing, styling, visibility and
 /// placement, the CPU pipeline from a tile request to the prepared content the

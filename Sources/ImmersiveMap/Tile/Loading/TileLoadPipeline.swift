@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A prepared tile read back from the disk cache in arena-image form,
 /// together with the raw-tile ETag it was parsed from. `sourceETag` is nil

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Where a road sits in the draw stack. Besides the physical structures,
 /// the ground splits in two tiers: the pedestrian network (footways,

@@ -1,7 +1,11 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
+// Outside Apple's platforms `URLSession` is in a module of its own.
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import PMTiles
 import os
 
@@ -60,8 +64,7 @@ class TileDownloader: @unchecked Sendable {
     /// wording is frozen the day they release; the service is a config reload
     /// away. The fallback covers an endpoint that sends nothing useful.
     static func rateLimitMessage(responseBody: Data) -> String {
-        if let object = try? JSONSerialization.jsonObject(with: responseBody) as? [String: Any],
-           let message = object["message"] as? String,
+        if let message = (try? JSONValue(parsing: responseBody))?["message"]?.stringValue,
            message.isEmpty == false {
             return "ImmersiveMap: tile requests are being rate limited. \(message)"
         }
@@ -84,8 +87,7 @@ class TileDownloader: @unchecked Sendable {
             message += " Check the credential the tile source sends: a key in the archive URL's query, or an Authorization header in tileArchive(_:headers:)."
         }
         message += " Tiles will be missing until the credential is fixed."
-        if let object = try? JSONSerialization.jsonObject(with: responseBody) as? [String: Any],
-           let serverMessage = object["message"] as? String,
+        if let serverMessage = (try? JSONValue(parsing: responseBody))?["message"]?.stringValue,
            serverMessage.isEmpty == false {
             message += " The server says: \(serverMessage)"
         }
@@ -120,13 +122,21 @@ class TileDownloader: @unchecked Sendable {
     private let archive: PMTilesArchiveClient
 
     init(config: ImmersiveMapSettings) {
-        let configuration = Self.makeSessionConfiguration(maxConcurrentFetches: config.tiles.network.maxConcurrentFetches)
         let network = config.tiles.network
         // Nothing is fetched here: the client reads the archive header on
         // the first tile, so building a downloader touches no network.
+        #if canImport(Darwin) || canImport(FoundationNetworking)
+        let configuration = Self.makeSessionConfiguration(maxConcurrentFetches: network.maxConcurrentFetches)
         archive = PMTilesArchiveClient(archiveURL: network.tileArchiveURL,
                                        requestHeaders: network.tileRequestHeaders,
                                        session: URLSession(configuration: configuration))
+        #else
+        // No `URLSession` (WebAssembly): the host's fetcher comes with the
+        // browser host, until then the tiles do not arrive.
+        archive = PMTilesArchiveClient(archiveURL: network.tileArchiveURL,
+                                       requestHeaders: network.tileRequestHeaders,
+                                       fetchRange: PMTilesArchiveClient.noNetwork)
+        #endif
     }
 
     /// The test seam: a client over whatever fetcher the test wants.
@@ -134,6 +144,7 @@ class TileDownloader: @unchecked Sendable {
         self.archive = archive
     }
 
+    #if canImport(Darwin) || canImport(FoundationNetworking)
     static func makeSessionConfiguration(maxConcurrentFetches: Int = 5) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.default
         // The loader dispatches up to maxConcurrentFetches tile requests at
@@ -156,6 +167,7 @@ class TileDownloader: @unchecked Sendable {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         return configuration
     }
+    #endif
 
     /// The ETag the host gives the archive, nil for a host that sends none
     /// and for an archive read from disk. Throws when the archive cannot be

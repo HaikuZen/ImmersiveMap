@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The heights a flattened ground tile rises by (`Tile.metal`, the ground
@@ -24,17 +24,17 @@ struct GroundRelief {
     let strength: Float
     /// The terrain tile's occlusion of the sky (`GroundReliefOcclusion`),
     /// over the same square of the tile as the heights, nil while it is
-    /// not computed, which draws no darkening.
-    let occlusion: MTLTexture?
+    /// not computed, which draws no darkening. The relief drawers still on
+    /// Metal read it and the heights' texture as Metal's
+    /// (`GroundRelief+Metal.swift`).
+    let gpuOcclusion: (any GPUTexture)?
 
-    var texture: MTLTexture { terrain.texture }
-
-    init(terrain: GroundReliefTile, origin: SIMD2<Float>, scale: Float, strength: Float, occlusion: MTLTexture? = nil) {
+    init(terrain: GroundReliefTile, origin: SIMD2<Float>, scale: Float, strength: Float, occlusion: (any GPUTexture)? = nil) {
         self.terrain = terrain
         self.origin = origin
         self.scale = scale
         self.strength = strength
-        self.occlusion = occlusion
+        self.gpuOcclusion = occlusion
     }
 
     /// The terrain's height in metres under a point of the ground tile, in
@@ -60,7 +60,7 @@ struct GroundRelief {
                             origin: origin + inner.origin * scale,
                             scale: scale * inner.scale,
                             strength: strength,
-                            occlusion: occlusion)
+                            occlusion: gpuOcclusion)
     }
 
     /// Where a tile lies in the terrain tile `source` over it.

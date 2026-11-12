@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
+import ImmersiveMapGPUTestSupport
 import XCTest
 @testable import ImmersiveMap
 
@@ -29,35 +30,26 @@ final class StarfieldStarCountTests: XCTestCase {
     /// The regression from issue #17: `makeBuffer(bytes:length:)` returns nil for a zero
     /// length, and the renderer used to force unwrap it. An empty model must produce no
     /// buffer so the star pass can be skipped.
-    func testEmptyStarsProduceNoVertexBuffer() throws {
-        let device = try makeDevice()
-        XCTAssertNil(StarfieldRenderer.makeVerticesBuffer(metalDevice: device, stars: []))
+    func testEmptyStarsProduceNoVertexBuffer() {
+        XCTAssertNil(StarfieldRenderer.makeVerticesBuffer(device: RecordingGPUDevice(), stars: []))
     }
 
     /// The same path the renderer takes, from config through the model to the buffer.
-    func testZeroStarCountConfigProducesNoVertexBuffer() throws {
-        let device = try makeDevice()
+    func testZeroStarCountConfigProducesNoVertexBuffer() {
         let stars = StarfieldModel.makeStars(config: makeConfig(starCount: 0))
-        XCTAssertNil(StarfieldRenderer.makeVerticesBuffer(metalDevice: device, stars: stars))
+        XCTAssertNil(StarfieldRenderer.makeVerticesBuffer(device: RecordingGPUDevice(), stars: stars))
     }
 
     func testNonEmptyStarsProduceVertexBufferCoveringEveryStar() throws {
-        let device = try makeDevice()
         let stars = StarfieldModel.makeStars(config: makeConfig(starCount: 7))
         XCTAssertEqual(stars.count, 7)
 
-        let buffer = try XCTUnwrap(StarfieldRenderer.makeVerticesBuffer(metalDevice: device,
+        let buffer = try XCTUnwrap(StarfieldRenderer.makeVerticesBuffer(device: RecordingGPUDevice(),
                                                                        stars: stars))
         XCTAssertEqual(buffer.length % stars.count, 0)
         XCTAssertGreaterThanOrEqual(buffer.length, stars.count)
     }
 
-    private func makeDevice() throws -> MTLDevice {
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            throw XCTSkip("Metal device is unavailable")
-        }
-        return device
-    }
 
     private func makeConfig(starCount: Int) -> ImmersiveMapSettings.StarfieldSettings {
         var config = ImmersiveMapSettings.default.scene.starfield

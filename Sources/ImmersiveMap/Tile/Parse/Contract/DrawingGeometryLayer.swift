@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// One drawable layer of a tile's prepared geometry: the unified vertex
 /// and index streams and the style tables they index into, as the tile

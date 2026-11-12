@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 enum FrameStage: String, CaseIterable {
     case collectInput

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import PMTiles
 import os
 
@@ -84,8 +84,8 @@ final class OverviewTileSource: @unchecked Sendable {
     /// resource, which is logged: the map then draws the tiles' own land
     /// cover, as it did before the overview.
     static func bundled() -> OverviewTileSource? {
-        guard let archiveURL = (try? ImmersiveMapResourceBundle.bundle())?.url(forResource: resourceName,
-                                                                               withExtension: resourceExtension) else {
+        guard let archiveURL = (try? ImmersiveMapResourceBundle.location())?.url(forResource: resourceName,
+                                                                                 withExtension: resourceExtension) else {
             logger.warning("ImmersiveMap: the overview archive \(resourceName, privacy: .public).\(resourceExtension, privacy: .public) is missing from the package resources, so the overview zooms draw the tile source's own land cover.")
             return nil
         }
@@ -95,9 +95,16 @@ final class OverviewTileSource: @unchecked Sendable {
     /// An overview read from the archive at the URL, on disk or over the
     /// network: the tests write their own.
     init(archiveURL: URL) {
+        #if canImport(Darwin) || canImport(FoundationNetworking)
         archive = PMTilesArchiveClient(archiveURL: archiveURL,
                                        requestHeaders: [:],
                                        session: .shared)
+        #else
+        // No `URLSession` (WebAssembly): until the host's fetcher, nothing.
+        archive = PMTilesArchiveClient(archiveURL: archiveURL,
+                                       requestHeaders: [:],
+                                       fetchRange: PMTilesArchiveClient.noNetwork)
+        #endif
     }
 
     /// The overview's bytes for the tile, decompressed, or nil: a tile zoom

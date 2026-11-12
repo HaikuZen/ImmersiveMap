@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import QuartzCore
+import PortableFoundation
 
 /// Drives the camera flight state machine: starting the `CameraFlightAnimator`,
 /// the target position, the completion callback and the stepwise application of animated camera state.

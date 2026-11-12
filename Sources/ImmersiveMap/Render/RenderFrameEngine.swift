@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import ImmersiveMapMetal
 import Metal
 import MetalKit
 import os
@@ -506,7 +507,7 @@ final class RenderFrameEngine {
                             viewport: cameraFrameState.viewport,
                             cameraMatrices: cameraMatrices,
                             cameraEye: cameraEye,
-                            commandBuffer: commandBuffer,
+                            gpuCommandBuffer: MetalCommandBuffer(commandBuffer),
                             services: services,
                             mapCameraState: cameraFrameState.mapCameraState,
                             animatedZoom: animatedZoomValue,
@@ -525,9 +526,9 @@ final class RenderFrameEngine {
         resourceRegistry.beginFrame(frameIndex: frameIndex)
         resourceRegistry.setPipeline(persistentContext.polygonPipeline.pipelineState, named: .polygonPipeline)
         resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState, named: .tilePipeline)
-        resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState, named: .extrudedTilePipeline)
-        resourceRegistry.setTexture(persistentContext.textRenderer.texture, named: .labelGlyphAtlas)
-        resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture, named: .poiSpriteAtlas)
+        resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState.metalPipeline, named: .extrudedTilePipeline)
+        resourceRegistry.setTexture(persistentContext.textRenderer.texture.metalTexture, named: .labelGlyphAtlas)
+        resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture.metalTexture, named: .poiSpriteAtlas)
     }
 
     private func prepareGPU(frameContext: FrameContext) {

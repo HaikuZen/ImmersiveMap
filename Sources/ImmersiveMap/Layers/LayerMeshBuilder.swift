@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Earcut
-import Foundation
+import PortableFoundation
 import simd
 
 /// A zone's fill vertex: the position in its chunk's render units and the

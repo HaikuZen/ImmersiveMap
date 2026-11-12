@@ -1,43 +1,37 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// GPU buffers of the map surface grid: vertices, indices, the index count and
 /// the index type for an indexed draw.
 struct MapSurfaceGridBuffers {
-    let verticesBuffer: MTLBuffer
-    let indicesBuffer: MTLBuffer
+    let verticesBuffer: any GPUBuffer
+    let indicesBuffer: any GPUBuffer
     let indicesCount: Int
-    let indexType: MTLIndexType
+    let indexType: GPUIndexType
 
     /// Builds the GPU buffers for a static grid, narrowing the indices to 16
     /// bits when the vertex count allows it.
-    static func make<Vertex>(metalDevice: MTLDevice,
+    static func make<Vertex>(device: any GPUDevice,
                              vertices: [Vertex],
                              indices: [UInt32]) -> MapSurfaceGridBuffers {
-        let verticesBuffer = vertices.withUnsafeBytes { bytes in
-            metalDevice.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count)
-        }!
-        if let narrowedIndices = IndexStorageMath.narrowedIndices(indices, vertexCount: vertices.count) {
-            return MapSurfaceGridBuffers(
-                verticesBuffer: verticesBuffer,
-                indicesBuffer: metalDevice.makeBuffer(
-                    bytes: narrowedIndices,
-                    length: MemoryLayout<UInt16>.stride * narrowedIndices.count
-                )!,
-                indicesCount: narrowedIndices.count,
-                indexType: .uint16
-            )
+        func buffer<Element>(_ values: [Element]) -> any GPUBuffer {
+            guard let buffer = device.makeBuffer(values, storage: .shared) else {
+                fatalError("Failed to allocate a map surface grid buffer")
+            }
+            return buffer
         }
-        return MapSurfaceGridBuffers(
-            verticesBuffer: verticesBuffer,
-            indicesBuffer: metalDevice.makeBuffer(
-                bytes: indices,
-                length: MemoryLayout<UInt32>.stride * indices.count
-            )!,
-            indicesCount: indices.count,
-            indexType: .uint32
-        )
+        let verticesBuffer = buffer(vertices)
+        if let narrowedIndices = IndexStorageMath.narrowedIndices(indices, vertexCount: vertices.count) {
+            return MapSurfaceGridBuffers(verticesBuffer: verticesBuffer,
+                                         indicesBuffer: buffer(narrowedIndices),
+                                         indicesCount: narrowedIndices.count,
+                                         indexType: .uint16)
+        }
+        return MapSurfaceGridBuffers(verticesBuffer: verticesBuffer,
+                                     indicesBuffer: buffer(indices),
+                                     indicesCount: indices.count,
+                                     indexType: .uint32)
     }
 }

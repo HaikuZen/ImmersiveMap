@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// One tile's road labels in the working set: the roads and glyphs the
@@ -33,7 +33,7 @@ final class RoadLabelTileRecord {
 
     let localGlyphVertices: TileBufferView?
     /// The glyph data the road text vertex shader reads, uploaded once.
-    let glyphInputsBuffer: MTLBuffer?
+    let glyphInputsBuffer: (any GPUBuffer)?
 
     /// The last placement of the record's glyphs (`RoadLabelPlacer`),
     /// hidden until the record is first placed.
@@ -68,8 +68,8 @@ final class RoadLabelTileRecord {
         return reliefMetres
     }
 
-    private let placementBufferStore: FrameSlottedDynamicMetalBuffer<RoadGlyphPlacementOutput>
-    private let runtimeMetaBufferStore: FrameSlottedDynamicMetalBuffer<LabelRuntimeMeta>
+    private let placementBufferStore: GPUFrameSlottedBuffer<RoadGlyphPlacementOutput>
+    private let runtimeMetaBufferStore: GPUFrameSlottedBuffer<LabelRuntimeMeta>
 
     var glyphCount: Int {
         geometry.glyphCount
@@ -83,7 +83,7 @@ final class RoadLabelTileRecord {
         geometry.instanceGlyphRanges
     }
 
-    init(metalDevice: MTLDevice,
+    init(device: any GPUDevice,
          ownerKey: VisibleTile,
          metalTileIdentity: ObjectIdentifier,
          sourcePriority: Int,
@@ -107,13 +107,11 @@ final class RoadLabelTileRecord {
         self.instanceAnchorOrdinals = instanceAnchorOrdinals
         self.instanceSourcePriorities = Array(repeating: sourcePriority, count: instanceKeys.count)
         self.localGlyphVertices = localGlyphVertices
-        self.glyphInputsBuffer = Self.makeBuffer(device: metalDevice, values: geometry.glyphs)
-        self.placementBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                   slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                   options: [.storageModeShared])
-        self.runtimeMetaBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                     slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                     options: [.storageModeShared])
+        self.glyphInputsBuffer = device.makeBuffer(geometry.glyphs, storage: .shared)
+        self.placementBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                                   slotsCount: InFlightFramePool.inFlightFramesCount)
+        self.runtimeMetaBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                                     slotsCount: InFlightFramePool.inFlightFramesCount)
         placement.resize(glyphCount: geometry.glyphCount)
     }
 
@@ -129,7 +127,7 @@ final class RoadLabelTileRecord {
     }
 
     /// The frame slot's copy of the record's placement, for the shader.
-    func placementBuffer(slot: Int) -> MTLBuffer {
+    func placementBuffer(slot: Int) -> any GPUBuffer {
         let buffer = placementBufferStore.ensureCapacity(slot: slot, count: max(1, glyphCount))
         placement.placements.withUnsafeBytes { bytes in
             if bytes.count > 0 {
@@ -140,7 +138,7 @@ final class RoadLabelTileRecord {
     }
 
     /// The frame slot's copy of the record's instance meta (the fades).
-    func runtimeMetaBuffer(slot: Int, meta: [LabelRuntimeMeta]) -> MTLBuffer {
+    func runtimeMetaBuffer(slot: Int, meta: [LabelRuntimeMeta]) -> any GPUBuffer {
         let buffer = runtimeMetaBufferStore.ensureCapacity(slot: slot, count: max(1, meta.count))
         meta.withUnsafeBytes { bytes in
             if bytes.count > 0 {
@@ -148,17 +146,6 @@ final class RoadLabelTileRecord {
             }
         }
         return buffer
-    }
-
-    private static func makeBuffer<T>(device: MTLDevice, values: [T]) -> MTLBuffer? {
-        guard values.isEmpty == false else {
-            return nil
-        }
-        return values.withUnsafeBytes { bytes in
-            device.makeBuffer(bytes: bytes.baseAddress!,
-                              length: bytes.count,
-                              options: [.storageModeShared])
-        }
     }
 }
 
@@ -176,7 +163,7 @@ final class RoadLabelTileRecord {
 /// crossing to crossing instead of cutting straight between the road's own
 /// points, which on a cable car are its two stations kilometres apart.
 final class RoadLabelCache {
-    private let metalDevice: MTLDevice
+    private let device: any GPUDevice
     /// The grid step a tile of a zoom cuts its label paths at, in tile
     /// units, nil off the relief.
     private let reliefSubdivisionStep: (Int) -> Float?
@@ -193,8 +180,8 @@ final class RoadLabelCache {
     /// `reliefSubdivisionStep` is the parse's
     /// (`TileParseOptions.reliefSubdivisionStep(tileZoom:)`), what the
     /// roads' ribbons were cut at.
-    init(metalDevice: MTLDevice, reliefSubdivisionStep: @escaping (Int) -> Float? = { _ in nil }) {
-        self.metalDevice = metalDevice
+    init(device: any GPUDevice, reliefSubdivisionStep: @escaping (Int) -> Float? = { _ in nil }) {
+        self.device = device
         self.reliefSubdivisionStep = reliefSubdivisionStep
     }
 
@@ -422,7 +409,7 @@ final class RoadLabelCache {
                                                 instanceGlyphRanges: instanceGlyphRanges,
                                                 glyphs: glyphs,
                                                 glyphHalfSizes: glyphHalfSizes)
-        return RoadLabelTileRecord(metalDevice: metalDevice,
+        return RoadLabelTileRecord(device: device,
                                    ownerKey: sourceEntry.ownerKey,
                                    metalTileIdentity: sourceEntry.metalTileIdentity,
                                    sourcePriority: sourcePriority,

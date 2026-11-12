@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -63,7 +64,9 @@ final class StarfieldRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
         // depth test rejects every fragment the sphere covered, so only
         // space is shaded.
         encoder.setDepthStencilState(skyBackdropDepthState)
-        starfieldRenderer.draw(renderEncoder: encoder,
+        // The render core still encodes with Metal: the starfield draws
+        // through the GPU interface over the same encoder.
+        starfieldRenderer.draw(renderEncoder: MetalRenderEncoder(encoder),
                                globe: frameContext.globeRenderUniform,
                                cameraView: frameContext.cameraMatrices.view,
                                cameraEye: frameContext.cameraEye,

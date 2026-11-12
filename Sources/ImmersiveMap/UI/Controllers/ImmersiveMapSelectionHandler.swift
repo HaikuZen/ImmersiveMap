@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 /// Holds the map's selection state and applies `ImmersiveMapSelectionController` commands.
 /// Responsible for hit-testing avatar markers and scene models, select/clear events,

@@ -1,8 +1,9 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapGPUTestSupport
 @testable import ImmersiveMap
-import Metal
 import XCTest
 
 /// The working index buffer a tile's buildings draw from while models
@@ -10,31 +11,28 @@ import XCTest
 /// hidden buildings, drawn in one call, built when the hidden buildings
 /// change and kept for the tile's life.
 final class HiddenBuildingIndexBuffersTests: XCTestCase {
-    private func makeDevice() throws -> MTLDevice {
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            throw XCTSkip("Metal device is unavailable")
-        }
-        return device
+    private func makeDevice() -> RecordingGPUDevice {
+        RecordingGPUDevice()
     }
 
     /// A tile of three buildings, 3, 6 and 3 indices long, with ids 1, 2
     /// and 3. The indices count up from 0, behind `offset` bytes of other
     /// data, as a tile's index span sits inside its backing buffer.
-    private func makeTile(device: MTLDevice, offset: Int = 8) throws -> MetalTile {
+    private func makeTile(device: RecordingGPUDevice, offset: Int = 8) throws -> MetalTile {
         let indices: [UInt16] = Array(0..<12)
-        let buffer = try XCTUnwrap(device.makeBuffer(length: offset + indices.count * 2, options: .storageModeShared))
+        let buffer = try XCTUnwrap(device.makeBuffer(length: offset + indices.count * 2, storage: .shared))
         indices.withUnsafeBytes { bytes in
             (buffer.contents() + offset).copyMemory(from: bytes.baseAddress!, byteCount: bytes.count)
         }
         let extruded = TileBuffers.Extruded(vertices: nil,
-                                            indices: TileBufferView(buffer: buffer, offset: offset, count: indices.count),
+                                            indices: TileBufferView(gpuBuffer: buffer, offset: offset, count: indices.count),
                                             styles: nil,
-                                            indexType: .uint16,
+                                            gpuIndexType: .uint16,
                                             buildingRanges: [TileBuildingRange(featureID: 1, indexStart: 0, indexCount: 3),
                                                              TileBuildingRange(featureID: 2, indexStart: 3, indexCount: 6),
                                                              TileBuildingRange(featureID: 3, indexStart: 9, indexCount: 3)])
         return MetalTile(tile: Tile(x: 9904, y: 5121, z: 15),
-                         tileBuffers: try TileBuffersFixtures.makeEmptyTileBuffers(extruded: extruded))
+                         tileBuffers: TestTiles.buffers(backing: buffer, extruded: extruded))
     }
 
     /// What the tile draws from with `ids` hidden in the map tiles of its
@@ -48,7 +46,7 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
 
     private func contents(_ indices: HiddenBuildingIndexBuffers.Indices,
                           file: StaticString = #filePath,
-                          line: UInt = #line) throws -> (buffer: MTLBuffer, indices: [UInt16]) {
+                          line: UInt = #line) throws -> (buffer: any GPUBuffer, indices: [UInt16]) {
         guard case .working(let buffer, let indexCount, _) = indices else {
             XCTFail("expected a working buffer, got \(indices)", file: file, line: line)
             throw XCTSkip("no working buffer")
@@ -72,8 +70,9 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
     }
 
     func testNothingHiddenDrawsTheTilesOwnBuffer() throws {
-        let tile = try makeTile(device: makeDevice())
-        let buffers = HiddenBuildingIndexBuffers()
+        let device = makeDevice()
+        let tile = try makeTile(device: device)
+        let buffers = HiddenBuildingIndexBuffers(device: device)
 
         guard case .whole = indices(buffers, tile, hiding: []) else {
             return XCTFail("with nothing hidden the tile draws whole")
@@ -86,16 +85,18 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
     /// The working buffer holds the tile's indices without the hidden
     /// building's, read from the tile's span inside its backing buffer.
     func testAHiddenBuildingIsLeftOutOfTheWorkingBuffer() throws {
-        let tile = try makeTile(device: makeDevice())
-        let buffers = HiddenBuildingIndexBuffers()
+        let device = makeDevice()
+        let tile = try makeTile(device: device)
+        let buffers = HiddenBuildingIndexBuffers(device: device)
 
         XCTAssertEqual(try contents(indices(buffers, tile, hiding: [2])).indices, [0, 1, 2, 9, 10, 11])
         XCTAssertEqual(try contents(indices(buffers, tile, hiding: [1, 3])).indices, [3, 4, 5, 6, 7, 8])
     }
 
     func testATileWithEveryBuildingHiddenDrawsNothing() throws {
-        let tile = try makeTile(device: makeDevice())
-        guard case .none = indices(HiddenBuildingIndexBuffers(), tile, hiding: [1, 2, 3]) else {
+        let device = makeDevice()
+        let tile = try makeTile(device: device)
+        guard case .none = indices(HiddenBuildingIndexBuffers(device: device), tile, hiding: [1, 2, 3]) else {
             return XCTFail("every building is hidden")
         }
     }
@@ -103,8 +104,9 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
     /// The buffer is built once and answers every frame after, in the world
     /// pass and in the shadow casters alike.
     func testTheWorkingBufferIsBuiltOnce() throws {
-        let tile = try makeTile(device: makeDevice())
-        let buffers = HiddenBuildingIndexBuffers()
+        let device = makeDevice()
+        let tile = try makeTile(device: device)
+        let buffers = HiddenBuildingIndexBuffers(device: device)
 
         let first = try contents(indices(buffers, tile, hiding: [2])).buffer
         let second = try contents(indices(buffers, tile, hiding: [2])).buffer
@@ -115,8 +117,9 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
     /// released), the tile draws its own buffer again, with every building.
     /// The working buffer waits, and the models' return costs nothing.
     func testTheWorkingBufferWaitsWhileNothingIsHidden() throws {
-        let tile = try makeTile(device: makeDevice())
-        let buffers = HiddenBuildingIndexBuffers()
+        let device = makeDevice()
+        let tile = try makeTile(device: device)
+        let buffers = HiddenBuildingIndexBuffers(device: device)
 
         let first = try contents(indices(buffers, tile, hiding: [2])).buffer
         guard case .whole = indices(buffers, tile, hiding: []) else {
@@ -129,8 +132,9 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
     /// Another tile of models loading changes the hidden set, and most map
     /// tiles hold none of its buildings: their working buffers stand.
     func testAChangeElsewhereKeepsTheWorkingBuffer() throws {
-        let tile = try makeTile(device: makeDevice())
-        let buffers = HiddenBuildingIndexBuffers()
+        let device = makeDevice()
+        let tile = try makeTile(device: device)
+        let buffers = HiddenBuildingIndexBuffers(device: device)
 
         let first = try contents(indices(buffers, tile, hiding: [2])).buffer
         let afterChange = try contents(indices(buffers, tile, hiding: [2, 500, 600])).buffer
@@ -145,8 +149,9 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
     /// tiles of zoom 14 are groups there, and take nothing out of a tile
     /// of zoom 15 that happens to carry the same id.
     func testATileTakesTheHiddenBuildingsOfItsOwnZoom() throws {
-        let tile = try makeTile(device: makeDevice())
-        let buffers = HiddenBuildingIndexBuffers()
+        let device = makeDevice()
+        let tile = try makeTile(device: device)
+        let buffers = HiddenBuildingIndexBuffers(device: device)
 
         buffers.update(ReplacedBuildings(byMapTileZoom: [14: [2], 15: [77]]))
         guard case .whole = buffers.indices(of: tile) else {
@@ -159,8 +164,8 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
     /// A released tile's entry never answers for a later tile, even one
     /// that took its address: the entry is checked against the tile itself.
     func testEachTileHasItsOwnWorkingBuffer() throws {
-        let device = try makeDevice()
-        let buffers = HiddenBuildingIndexBuffers()
+        let device = makeDevice()
+        let buffers = HiddenBuildingIndexBuffers(device: device)
         let first = try makeTile(device: device)
         let second = try makeTile(device: device)
 

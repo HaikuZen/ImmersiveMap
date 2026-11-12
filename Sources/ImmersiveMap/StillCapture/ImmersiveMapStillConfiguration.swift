@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 // The `StillCapture` folder: the public value types for rendering one frame
 // offscreen into an image, the configuration and its error, and the

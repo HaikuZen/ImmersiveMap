@@ -4,14 +4,6 @@
 import Metal
 import simd
 
-struct FlatTileOriginData {
-    // Origin in flat render-local space already shifted by current frame pan normalization.
-    var panRelativeOrigin: SIMD2<Float>
-    // Tile size in flat render-local units.
-    var size: Float
-    var padding: Float = 0
-}
-
 /// Prepares per-tile flat world-space origin and size data for GPU screen projection.
 /// Compute kernels use this payload to convert tile-local UV points into world/screen coordinates.
 final class FlatTileOriginCalculator {

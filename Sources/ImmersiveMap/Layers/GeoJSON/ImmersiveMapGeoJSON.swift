@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// Why a GeoJSON document could not be read into a layer.
@@ -56,7 +56,7 @@ enum ImmersiveMapGeoJSON {
     }
 
     static func decode(_ data: Data, base: BaseStyles = BaseStyles()) throws -> Shapes {
-        guard let root = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+        guard let root = try? JSONValue(parsing: data) else {
             throw ImmersiveMapGeoJSONError.invalidJSON
         }
         var context = GeoJSONReadContext(base: base)
@@ -66,7 +66,7 @@ enum ImmersiveMapGeoJSON {
 
     // MARK: - Coordinates
 
-    static func polygon(_ value: Any, style: ImmersiveMapPolygonStyle?, path: String) throws -> ImmersiveMapPolygon {
+    static func polygon(_ value: JSONValue, style: ImmersiveMapPolygonStyle?, path: String) throws -> ImmersiveMapPolygon {
         let rings = try array(value, path: path)
         guard let exterior = rings.first else {
             throw ImmersiveMapGeoJSONError.invalidCoordinates(path)
@@ -79,23 +79,23 @@ enum ImmersiveMapGeoJSON {
                                    style: style)
     }
 
-    static func array(_ value: Any, path: String) throws -> [Any] {
-        guard let array = value as? [Any] else {
+    static func array(_ value: JSONValue, path: String) throws -> [JSONValue] {
+        guard let array = value.arrayValue else {
             throw ImmersiveMapGeoJSONError.invalidCoordinates(path)
         }
         return array
     }
 
-    static func positions(_ value: Any, path: String) throws -> [GeoCoordinate] {
+    static func positions(_ value: JSONValue, path: String) throws -> [GeoCoordinate] {
         try array(value, path: path).enumerated().map { index, item in
             try position(item, path: "\(path)[\(index)]")
         }
     }
 
-    static func position(_ value: Any, path: String) throws -> GeoCoordinate {
-        guard let numbers = value as? [Any], numbers.count >= 2,
-              let longitude = (numbers[0] as? NSNumber)?.doubleValue,
-              let latitude = (numbers[1] as? NSNumber)?.doubleValue,
+    static func position(_ value: JSONValue, path: String) throws -> GeoCoordinate {
+        guard let numbers = value.arrayValue, numbers.count >= 2,
+              let longitude = numbers[0].doubleValue,
+              let latitude = numbers[1].doubleValue,
               longitude.isFinite, latitude.isFinite else {
             throw ImmersiveMapGeoJSONError.invalidCoordinates(path)
         }
@@ -104,7 +104,7 @@ enum ImmersiveMapGeoJSON {
 
     // MARK: - simplestyle
 
-    static func simpleStyle(of properties: [String: Any]) -> SimpleStyle {
+    static func simpleStyle(of properties: [String: JSONValue]) -> SimpleStyle {
         var style = SimpleStyle()
         style.fill = color(properties["fill"])
         style.fillOpacity = number(properties["fill-opacity"]).map { min(max($0, 0), 1) }
@@ -114,7 +114,7 @@ enum ImmersiveMapGeoJSON {
         style.markerColor = color(properties["marker-color"])
         if let radius = number(properties["marker-radius"]) {
             style.markerRadius = max(radius, 0)
-        } else if let size = properties["marker-size"] as? String {
+        } else if let size = properties["marker-size"]?.stringValue {
             switch size {
             case "small": style.markerRadius = 3
             case "medium": style.markerRadius = 5
@@ -125,19 +125,19 @@ enum ImmersiveMapGeoJSON {
         return style
     }
 
-    private static func number(_ value: Any?) -> Float? {
-        if let number = value as? NSNumber, number.floatValue.isFinite {
-            return number.floatValue
+    private static func number(_ value: JSONValue?) -> Float? {
+        if let number = value?.doubleValue.map(Float.init), number.isFinite {
+            return number
         }
-        if let string = value as? String, let parsed = Float(string), parsed.isFinite {
+        if let string = value?.stringValue, let parsed = Float(string), parsed.isFinite {
             return parsed
         }
         return nil
     }
 
     /// A `#rgb` or `#rrggbb` colour, the hash optional.
-    static func color(_ value: Any?) -> SIMD3<Float>? {
-        guard var text = (value as? String)?.trimmingCharacters(in: .whitespaces) else { return nil }
+    static func color(_ value: JSONValue?) -> SIMD3<Float>? {
+        guard var text = value?.stringValue?.trimmingWhitespace() else { return nil }
         if text.hasPrefix("#") {
             text.removeFirst()
         }

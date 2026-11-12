@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
-import Metal
+import simd
 
 class RenderCamera {
     /// The fixed vertical field of view of the render camera, read by the

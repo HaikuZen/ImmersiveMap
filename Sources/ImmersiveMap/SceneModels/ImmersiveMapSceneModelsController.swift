@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Public thread-safe owner of the 3D scene models supplied by app code.
 /// Collects model mutations into snapshots for the renderer.

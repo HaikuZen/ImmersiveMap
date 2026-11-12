@@ -1,47 +1,39 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import ImmersiveMapGPU
 
-class GlobeCapPipeline {
-    let pipelineState: MTLRenderPipelineState
-    
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+final class GlobeCapPipeline {
+    let pipelineState: any GPURenderPipeline
+
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int = 1) {
-        let vertexFunction = library.makeFunction(name: "globeCapVertexShader")
-        let fragmentFunction = library.makeFunction(name: "globeCapFragmentShader")
-        
-        let vertexDescriptor = MTLVertexDescriptor()
-        vertexDescriptor.attributes[0].format = .float2
-        vertexDescriptor.attributes[0].offset = 0
-        vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.layouts[0].stride = MemoryLayout<CapGeometry.Vertex>.stride
-        vertexDescriptor.layouts[0].stepFunction = .perVertex
-        
-        let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.vertexFunction = vertexFunction
-        pipelineDescriptor.fragmentFunction = fragmentFunction
-        pipelineDescriptor.vertexDescriptor = vertexDescriptor
-        pipelineDescriptor.rasterSampleCount = sampleCount
-        pipelineDescriptor.colorAttachments[0].pixelFormat = pixelFormat
-        pipelineDescriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        pipelineDescriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-        pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
-        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
-        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
-        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        var layout = GPUVertexLayout()
+        layout.attributes[0] = GPUVertexAttribute(format: .float2, offset: 0, bufferIndex: 0)
+        layout.strides[0] = MemoryLayout<CapGeometry.Vertex>.stride
+
+        var color = GPUColorTarget(format: pixelFormat)
         // Alpha blends with .one so coverage accumulates on a transparent
         // destination; over an opaque one the result is unchanged.
-        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        
-        self.pipelineState = try! metalDevice.makeRenderPipelineState(descriptor: pipelineDescriptor)
+        color.blend = (color: GPUBlendComponent(source: .sourceAlpha, destination: .oneMinusSourceAlpha),
+                       alpha: GPUBlendComponent(source: .one, destination: .oneMinusSourceAlpha))
+
+        var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "globeCapVertexShader"),
+                                                     fragmentFunction: GPUShaderFunction(name: "globeCapFragmentShader"),
+                                                     colorTargets: [color])
+        descriptor.label = "GlobeCap"
+        descriptor.vertexLayout = layout
+        descriptor.depthStencilFormat = .depth32FloatStencil8
+        descriptor.sampleCount = sampleCount
+        do {
+            pipelineState = try device.makeRenderPipeline(descriptor)
+        } catch {
+            fatalError("Failed to create the globe cap pipeline: \(error)")
+        }
     }
-    
-    func selectPipeline(renderEncoder: MTLRenderCommandEncoder) {
-        renderEncoder.setRenderPipelineState(pipelineState)
+
+    func selectPipeline(renderEncoder: any GPURenderEncoder) {
+        renderEncoder.setPipeline(pipelineState)
     }
 }

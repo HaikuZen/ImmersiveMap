@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Owns the scene models controller attached to a single map view runtime.
 /// Bridges model mutations to the render runtime and feeds model data to the renderer.

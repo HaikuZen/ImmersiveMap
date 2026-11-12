@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A building footprint that will be extruded once the whole tile has been
 /// read: the resolver needs every candidate of a building (and of the

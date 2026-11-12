@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The identity of a parsed label, an FNV-1a style hash: the layer and the
 /// feature id where the tile ships one, otherwise the layer, the text and

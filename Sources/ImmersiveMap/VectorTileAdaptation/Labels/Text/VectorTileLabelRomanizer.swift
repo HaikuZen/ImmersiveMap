@@ -1,14 +1,18 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Writes a local name in Latin letters for a map whose language is written
 /// in them, so a street that has no spelling in the map's language reads
 /// "Georgiyevskiy Lane" instead of "Георгиевский переулок" and the map shows
 /// one alphabet.
 ///
-/// The system's ICU transliterators do the work: Cyrillic through the BGN
+/// The system's ICU transliterators do the work, on Apple's platforms, the
+/// only ones whose Foundation this engine links with them: elsewhere nothing
+/// is romanized and a name keeps its local spelling, which is what the
+/// romanizer falls back to anyway when it cannot spell a name well.
+/// Cyrillic goes through the BGN
 /// romanization (the one maps use), Greek, Armenian and Georgian through the
 /// generic one, then folded to plain ASCII, with the soft and hard signs
 /// dropped rather than written as apostrophes. Only the words in those
@@ -30,9 +34,15 @@ struct VectorTileLabelRomanizer: Equatable {
     private let translatesRussianStreetTypes: Bool
 
     init(targetLanguage: ImmersiveMapSettings.LabelLanguage) {
+        #if canImport(Darwin)
         let language = Locale.Language(identifier: targetLanguage.code)
         self.isEnabled = language.script == .latin
         self.translatesRussianStreetTypes = language.languageCode == .english
+        #else
+        // No transliterator to spell with (see the type's comment).
+        self.isEnabled = false
+        self.translatesRussianStreetTypes = targetLanguage.nameFieldSuffix == "en"
+        #endif
     }
 
     /// The name in ASCII Latin letters, or nil when there is nothing to
@@ -64,7 +74,7 @@ struct VectorTileLabelRomanizer: Equatable {
             word.isRomanizable ? Self.transliterate(word.text) : word.text
         }.joined()
         if let trailingType {
-            result = result.trimmingCharacters(in: .whitespaces) + " " + trailingType
+            result = result.trimmingWhitespace() + " " + trailingType
         }
         return result
     }
@@ -95,14 +105,21 @@ struct VectorTileLabelRomanizer: Equatable {
         return words
     }
 
+    #if canImport(Darwin)
     private static let transform = StringTransform("Russian-Latin/BGN; Any-Latin; Latin-ASCII")
+    #endif
 
     /// One word in ASCII. The soft and hard signs come out of the ASCII fold
     /// as `'` and `"` and are dropped ("Bolshoy", not "Bol'shoy"). A Georgian
     /// word starts with a capital: the script writes names without one
     /// (Unicode counts its everyday letters as lowercase), Latin does not.
     private static func transliterate(_ word: String) -> String {
+        #if canImport(Darwin)
         guard var latin = word.applyingTransform(transform, reverse: false) else { return word }
+        #else
+        // Never reached: the romanizer is not enabled here (see `init`).
+        var latin = word
+        #endif
         latin.removeAll { $0 == "'" || $0 == "\"" }
         if let first = word.unicodeScalars.first, isGeorgian(first) {
             latin = latin.prefix(1).uppercased() + latin.dropFirst()

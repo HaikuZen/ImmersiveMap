@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Keeps the reasons why the render loop must keep running.
 /// Picks the frame rate and pause state for the `CAMetalDisplayLink` based on render loop activity.

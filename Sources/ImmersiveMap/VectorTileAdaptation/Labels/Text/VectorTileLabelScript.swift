@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The alphabets the label text logic tells apart: Latin, and the ones the
 /// romanizer handles (`VectorTileLabelRomanizer`). A letter of any other
@@ -17,7 +17,7 @@ enum VectorTileLabelScript: Equatable {
     /// The script a language is written in, nil when it is none of the
     /// ones told apart here (Japanese, Arabic and the rest).
     init?(language: ImmersiveMapSettings.LabelLanguage) {
-        switch Locale.Language(identifier: language.code).script?.identifier {
+        switch Self.likelyScriptIdentifier(of: language) {
         case "Latn": self = .latin
         case "Cyrl": self = .cyrillic
         case "Grek": self = .greek
@@ -25,6 +25,20 @@ enum VectorTileLabelScript: Equatable {
         case "Geor": self = .georgian
         default: return nil
         }
+    }
+
+    /// The ISO 15924 code of the script the language is likely written in.
+    /// `Locale.Language` answers on Apple's platforms. Elsewhere there is no
+    /// `Locale.Language` (FoundationEssentials has none) and a table of the
+    /// same data answers, for the scripts told apart here
+    /// (`LikelyScript`, which leaves out the three letter codes of
+    /// languages written in Latin).
+    private static func likelyScriptIdentifier(of language: ImmersiveMapSettings.LabelLanguage) -> String? {
+        #if canImport(Darwin)
+        Locale.Language(identifier: language.code).script?.identifier
+        #else
+        LikelyScript.of(languageIdentifier: language.code)
+        #endif
     }
 
     /// The script of a letter, nil for anything that is not one: digits,

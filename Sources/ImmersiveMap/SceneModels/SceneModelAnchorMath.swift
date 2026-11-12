@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// The map surface under a scene model's anchor, in render space: the
@@ -34,7 +34,7 @@ struct SceneModelAnchor {
 /// shear).
 enum SceneModelAnchorMath {
     static func resolveAnchor(presented: PresentedSceneModel,
-                              bounds: SceneModelMesh.Bounds,
+                              bounds: SceneModelBounds,
                               constants: GeoScreenProjectionMath.FrameConstants) -> SceneModelAnchor {
         let frame = GeoSurfaceFrameMath.resolve(basis: presented.projectionBasis, constants: constants)
 

@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
+import PortableFoundation
 import simd
 
 /// Ray geometry behind scene model hit-testing.

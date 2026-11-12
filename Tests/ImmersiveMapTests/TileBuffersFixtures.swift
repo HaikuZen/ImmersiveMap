@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import XCTest
 
@@ -52,7 +53,7 @@ enum TileBuffersFixtures {
                                         fill: ground,
                                         detail: ground,
                                         overlay: ground)
-        return TileBuffers(backingBuffer: backingBuffer,
+        return TileBuffers(gpuBackingBuffer: MetalBuffer(backingBuffer),
                            ground: ground,
                            roads: RoadStructureBuckets(tunnel: phases,
                                                        ground: phases,
@@ -62,7 +63,7 @@ enum TileBuffersFixtures {
                            extruded: extruded ?? TileBuffers.Extruded(vertices: nil,
                                                                       indices: nil,
                                                                       styles: nil,
-                                                                      indexType: .uint16),
+                                                                      gpuIndexType: .uint16),
                            textLabels: textLabels ?? emptyTextLabelSet(),
                            roadLabels: emptyRoadLabels())
     }

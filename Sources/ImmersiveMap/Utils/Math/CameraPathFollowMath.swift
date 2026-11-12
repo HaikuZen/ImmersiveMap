@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import QuartzCore
+import PortableFoundation
 import simd
 
 /// Stateless math for a camera chasing a point that moves along a path.

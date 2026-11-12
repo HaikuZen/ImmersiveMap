@@ -1,14 +1,20 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
+#if canImport(zlib)
 import zlib
+#endif
 
 /// The gzip step for directories and tiles. zlib rather than the Compression
 /// framework because the latter speaks raw deflate only: the gzip member
 /// header with its optional name and comment fields, the CRC and the size
 /// trailer would all be ours to parse. `inflateInit2` with window bits 15+32
 /// reads gzip and zlib wrapping alike and verifies the trailer.
+///
+/// zlib is a module of Apple's SDKs. A platform without it (Linux as this
+/// package builds there, WebAssembly) inflates with `PMTilesInflate`, which
+/// reads the same two wrappings and verifies the same trailers.
 package enum PMTilesGzip {
     /// A directory or a tile larger than this is a corrupt length, not data.
     package static let maximumOutputByteCount = 64 * 1024 * 1024
@@ -30,6 +36,17 @@ package enum PMTilesGzip {
         guard data.isEmpty == false else {
             return Data()
         }
+        #if canImport(zlib)
+        return try inflateWithZlib(data, expectedByteCount: expectedByteCount)
+        #else
+        return try PMTilesInflate.inflate(data,
+                                          maximumOutputByteCount: Self.maximumOutputByteCount,
+                                          expectedByteCount: expectedByteCount)
+        #endif
+    }
+
+    #if canImport(zlib)
+    private static func inflateWithZlib(_ data: Data, expectedByteCount: Int?) throws -> Data {
         var stream = z_stream()
         let initStatus = inflateInit2_(&stream, 15 + 32, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
         guard initStatus == Z_OK else {
@@ -74,4 +91,5 @@ package enum PMTilesGzip {
         }
         return output
     }
+    #endif
 }

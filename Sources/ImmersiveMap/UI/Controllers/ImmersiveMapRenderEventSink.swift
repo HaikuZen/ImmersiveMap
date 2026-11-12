@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Receives renderer-pipeline events and forwards them to the owners of the map's runtime state.
 /// Does not own the renderer and makes no frame decisions; it only connects render events

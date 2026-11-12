@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Started by hand (the Actions tab, or `gh workflow run ci.yml --ref
+  # <branch>`), the run is the macOS SPM job alone: it compiles the whole
+  # engine and runs its tests, and one macOS runner is far easier to get
+  # than three when the arm64 runners are short.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -43,6 +48,7 @@ jobs:
   # hand only, with IMMERSIVE_MAP_RUN_PICTURE_TESTS=1. Do not set that here.
   gpu-test:
     name: Test with shaders (Xcode, macOS)
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-26
 
     env:
@@ -80,6 +86,7 @@ jobs:
   # only compiles and runs on iOS, so the macOS jobs above never touch it.
   ios-test:
     name: Test (Xcode, iOS Simulator)
+    if: github.event_name != 'workflow_dispatch'
     runs-on: macos-26
 
     env:
@@ -132,3 +139,78 @@ jobs:
           name: ios-test-results
           path: ios-TestResults.xcresult
           retention-days: 7
+
+  # Off Apple's platforms the package is its portable targets: the tile
+  # formats, the geometry tools and PortableFoundation, with the stand-ins for
+  # Apple's simd and os (see CLAUDE.md, "Portable targets"). The macOS jobs
+  # above never build that package, so a change that brings an Apple-only API
+  # into it fails here or nowhere.
+  #
+  # The Swift here is not the macOS jobs' Xcode Swift but the release the
+  # portable package was brought up and tested with. The default build
+  # system misreads the GNU linker's version, so these use the native one.
+  linux-test:
+    name: Build & Test (Linux)
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container: swift:6.4.2-noble
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build --build-tests --build-system native
+
+      - name: Test
+        run: swift test --build-system native
+
+      # The slim build (the one meant for a browser) has its own geometry
+      # types and lock, and keeps only the tests that run without Foundation.
+      - name: Test the slim build
+        env:
+          IMMERSIVE_MAP_SLIM: "1"
+        run: swift test --build-system native --scratch-path .build-slim
+
+  # The same package for WebAssembly, its tests run by the toolchain's own
+  # runtime (WasmKit, an interpreter, so the flattener's tests take minutes).
+  # The test binary is given the checkout, for the Earcut fixtures, and /tmp,
+  # where the file tests write. It is named by its absolute path: started by
+  # a relative one, it traps before the first test, with no message.
+  wasm-test:
+    name: Build & Test (WebAssembly)
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container: swift:6.4.2-noble
+
+    env:
+      WASM_SDK: swift-6.4.2-RELEASE_wasm
+      WASM_SDK_URL: https://download.swift.org/swift-6.4.2-release/wasm-sdk/swift-6.4.2-RELEASE/swift-6.4.2-RELEASE_wasm.artifactbundle.tar.gz
+      WASM_SDK_CHECKSUM: 83baca83553f8c443cda7b84800912e6e709c3acd2e7ebf277794ca5836c0da5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install the WebAssembly SDK
+        run: swift sdk install "$WASM_SDK_URL" --checksum "$WASM_SDK_CHECKSUM"
+
+      - name: Build
+        run: swift build --swift-sdk "$WASM_SDK" --build-tests --build-system native
+
+      - name: Test (XCTest)
+        run: wasmkit run --dir "$PWD" --dir /tmp "$PWD/.build/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest"
+
+      - name: Test (Swift Testing)
+        run: wasmkit run --dir "$PWD" --dir /tmp "$PWD/.build/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest" --testing-library swift-testing
+
+      - name: Build the slim build
+        env:
+          IMMERSIVE_MAP_SLIM: "1"
+        run: swift build --swift-sdk "$WASM_SDK" --build-tests --build-system native --scratch-path .build-slim
+
+      - name: Test the slim build
+        run: wasmkit run --dir "$PWD" --dir /tmp "$PWD/.build-slim/wasm32-unknown-wasip1/debug/ImmersiveMapPackageTests.xctest" --testing-library swift-testing

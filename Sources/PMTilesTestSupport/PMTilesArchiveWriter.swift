@@ -1,9 +1,11 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import PMTiles
+#if canImport(zlib)
 import zlib
+#endif
 
 /// Writes a PMTiles v3 archive the way the specification describes it, so a
 /// test states an archive as tiles and options and the bytes travel the real
@@ -237,7 +239,47 @@ package struct PMTilesArchiveWriter {
 
     /// A gzip member with a file name field, so the reader is checked
     /// against the optional header fields and not only the minimal member.
+    ///
+    /// Compressed by zlib where there is one. Elsewhere the member holds the
+    /// data in stored blocks, which is as valid a gzip member: the header,
+    /// the block framing and the trailer are read the same, and the Huffman
+    /// blocks are covered by `PMTilesInflateTests`.
     package static func gzip(_ data: Data, fileName: String? = nil) -> Data {
+        #if canImport(zlib)
+        return zlibGzip(data, fileName: fileName)
+        #else
+        return storedGzip(data, fileName: fileName)
+        #endif
+    }
+
+    /// A gzip member whose deflate stream is stored blocks only.
+    package static func storedGzip(_ data: Data, fileName: String? = nil) -> Data {
+        let bytes = [UInt8](data)
+        // The magic, deflate, the flags (a name or none), no time, no extra
+        // flags, an unknown operating system.
+        var member: [UInt8] = [0x1F, 0x8B, 8, fileName == nil ? 0 : 0x08, 0, 0, 0, 0, 0, 0xFF]
+        if let fileName {
+            member += Array(fileName.utf8) + [0]
+        }
+        // A stored block holds at most 65535 bytes, and an empty input still
+        // needs its one final block.
+        var offset = 0
+        repeat {
+            let count = min(0xFFFF, bytes.count - offset)
+            let isLast = offset + count == bytes.count
+            member.append(isLast ? 1 : 0)
+            member += [UInt8(count & 0xFF), UInt8(count >> 8), UInt8(~count & 0xFF), UInt8((~count >> 8) & 0xFF)]
+            member += bytes[offset..<offset + count]
+            offset += count
+        } while offset < bytes.count
+        for value in [PMTilesInflate.crc32(bytes), UInt32(truncatingIfNeeded: bytes.count)] {
+            member += [UInt8(value & 0xFF), UInt8((value >> 8) & 0xFF), UInt8((value >> 16) & 0xFF), UInt8(value >> 24)]
+        }
+        return Data(member)
+    }
+
+    #if canImport(zlib)
+    private static func zlibGzip(_ data: Data, fileName: String?) -> Data {
         var stream = z_stream()
         let status = deflateInit2_(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8,
                                    Z_DEFAULT_STRATEGY, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
@@ -271,4 +313,5 @@ package struct PMTilesArchiveWriter {
         }
         return Data(output[0..<produced])
     }
+    #endif
 }

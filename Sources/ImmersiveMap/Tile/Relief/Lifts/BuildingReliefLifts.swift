@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The buildings' lifts over the ground relief: for each drawn building
@@ -20,7 +20,7 @@ import simd
 /// well, so a tile allocated where a released one was is not handed the
 /// old lifts.
 final class BuildingReliefLifts {
-    private var buffersByTile: [ObjectIdentifier: (tile: Tile, terrain: ObjectIdentifier, revision: UInt64, buffer: MTLBuffer)] = [:]
+    private var buffersByTile: [ObjectIdentifier: (tile: Tile, terrain: ObjectIdentifier, revision: UInt64, buffer: any GPUBuffer)] = [:]
 
     /// Lets go of every tile's lifts.
     func evict() {
@@ -34,14 +34,14 @@ final class BuildingReliefLifts {
     func update(placements: [PlaceTile],
                 drawnKeys: [VisibleTile?],
                 relief frame: GroundReliefFrame?,
-                device: MTLDevice) -> [MTLBuffer?] {
+                device: any GPUDevice) -> [(any GPUBuffer)?] {
         guard let frame else {
             buffersByTile.removeAll()
             return Array(repeating: nil, count: placements.count)
         }
-        var lifts: [MTLBuffer?] = []
+        var lifts: [(any GPUBuffer)?] = []
         lifts.reserveCapacity(placements.count)
-        var kept: [ObjectIdentifier: (tile: Tile, terrain: ObjectIdentifier, revision: UInt64, buffer: MTLBuffer)] = [:]
+        var kept: [ObjectIdentifier: (tile: Tile, terrain: ObjectIdentifier, revision: UInt64, buffer: any GPUBuffer)] = [:]
         for (placement, key) in zip(placements, drawnKeys) {
             let metalTile = placement.metalTile
             let anchors = metalTile.tileBuffers.extruded.buildingAnchors
@@ -70,9 +70,7 @@ final class BuildingReliefLifts {
                 let uv = SIMD2<Float>(anchor.x, TileCoordinateSpace.tileExtent - anchor.y) / TileCoordinateSpace.tileExtent
                 metres[index] = relief.metres(atTileUV: uv)
             }
-            guard let buffer = metres.withUnsafeBytes({ bytes in
-                device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
-            }) else {
+            guard let buffer = device.makeBuffer(metres, storage: .shared) else {
                 lifts.append(nil)
                 continue
             }

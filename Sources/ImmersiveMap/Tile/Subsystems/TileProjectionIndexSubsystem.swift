@@ -50,7 +50,6 @@ final class TileProjectionIndexSubsystem: RenderSubsystem {
             sourceProjectionTiles: sourceProjectionTiles,
             tileIndexAllocator: tileIndexAllocator,
             tileOriginData: flatTileOriginCalculator.currentTileOriginData,
-            tileOriginDataBuffer: tileOriginDataBuffer,
             sourceIndexVersion: sourceIndexVersion
         )
     }

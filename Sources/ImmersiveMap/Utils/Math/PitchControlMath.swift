@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// The one-thumb tilt zone works in an inverted control value: 0 is the full
 /// tilt (the pitch ceiling), and the value grows as the camera levels off, so

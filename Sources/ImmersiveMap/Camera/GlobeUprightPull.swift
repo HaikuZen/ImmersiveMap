@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How far from upright (north up, looking straight down) the globe's camera
 /// may rest at a zoom. Unlike `CameraConstraints` this is not a wall: the

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Earcut
-import Foundation
+import PortableFoundation
 import simd
 
 /// A building with rounded edges (`ExtrusionStyle.edgeRadius`): the box

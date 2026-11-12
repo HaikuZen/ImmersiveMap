@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// One tessellated polygon in render space (x east, y up, float tile
 /// units): a fill, a line ribbon or a decoration, before the unification

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The `Utils` folder: small cross-cutting helpers with several callers and no
 /// better domain owner, such as deterministic math, main-thread checks,
@@ -10,7 +10,7 @@ import Foundation
 /// subsystem, runtime controller, renderer, parser, cache or public API of a
 /// domain folder lives here.
 func performOnMain(_ block: @escaping () -> Void) {
-    if Thread.isMainThread {
+    if isOnMainThread {
         block()
     } else {
         // The block is handed over to the main thread and runs there

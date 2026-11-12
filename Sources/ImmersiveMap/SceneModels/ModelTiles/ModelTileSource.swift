@@ -1,7 +1,11 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
+// Outside Apple's platforms `URLSession` is in a module of its own.
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import PMTiles
 
 /// Where model tiles come from: the disk cache, and behind it the model
@@ -65,6 +69,7 @@ final class ModelTileSource: @unchecked Sendable {
                                                         qos: .utility)
 
     convenience init(archiveURL: URL, settings: ImmersiveMapSettings.ModelArchiveSettings, clearsDiskCache: Bool) {
+        #if canImport(Darwin) || canImport(FoundationNetworking)
         let configuration = URLSessionConfiguration.ephemeral
         // A model tile that stops arriving for 30 s has failed for the
         // frame's purposes: the map's building stands meanwhile, and the
@@ -79,6 +84,15 @@ final class ModelTileSource: @unchecked Sendable {
                                                 tileType: .unknown),
                   diskCacheSizeInBytes: settings.diskCacheSizeInBytes,
                   clearsDiskCache: clearsDiskCache)
+        #else
+        // No `URLSession` (WebAssembly): until the host's fetcher, nothing.
+        self.init(archive: PMTilesArchiveClient(archiveURL: archiveURL,
+                                                requestHeaders: settings.requestHeaders,
+                                                tileType: .unknown,
+                                                fetchRange: PMTilesArchiveClient.noNetwork),
+                  diskCacheSizeInBytes: settings.diskCacheSizeInBytes,
+                  clearsDiskCache: clearsDiskCache)
+        #endif
     }
 
     /// The test seam: a client over whatever fetcher the test wants, and a
@@ -185,8 +199,7 @@ final class ModelTileSource: @unchecked Sendable {
         Self.maintenanceQueue.async {
             let fileManager = FileManager.default
             try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-            try? Data(name.utf8).write(to: directory.appendingPathComponent(Self.currentVersionFileName),
-                                       options: .atomic)
+            try? Data(name.utf8).writeReplacing(to: directory.appendingPathComponent(Self.currentVersionFileName))
             for entry in (try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? []
             where entry != name && entry != Self.currentVersionFileName {
                 try? fileManager.removeItem(at: directory.appendingPathComponent(entry))
@@ -198,7 +211,7 @@ final class ModelTileSource: @unchecked Sendable {
         guard diskCacheSizeInBytes > 0 else { return }
         do {
             try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: fileURL, options: .atomic)
+            try data.writeReplacing(to: fileURL)
         } catch {
             // The cache is an optimisation: a tile that could not be kept
             // is asked from the archive again.
@@ -209,25 +222,17 @@ final class ModelTileSource: @unchecked Sendable {
     /// quota. Run once per source, off the caller's thread: a session adds
     /// to the cache far slower than the quota is sized for.
     static func trim(directory: URL, toByteCount quota: Int) {
-        let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
-        guard let files = try? FileManager.default.contentsOfDirectory(at: directory,
-                                                                       includingPropertiesForKeys: Array(keys)) else {
-            return
+        var entries: [(url: URL, byteCount: Int64, date: Date)] = []
+        var total: Int64 = 0
+        for file in FileManager.default.regularFiles(in: directory, recursive: false) {
+            entries.append((file.url, file.byteCount, file.modificationDate ?? .distantPast))
+            total += file.byteCount
         }
-        var entries: [(url: URL, byteCount: Int, date: Date)] = []
-        var total = 0
-        for file in files {
-            guard let values = try? file.resourceValues(forKeys: keys), let byteCount = values.fileSize else {
-                continue
-            }
-            entries.append((file, byteCount, values.contentModificationDate ?? .distantPast))
-            total += byteCount
-        }
-        guard total > quota else { return }
+        guard total > Int64(quota) else { return }
         for entry in entries.sorted(by: { $0.date < $1.date }) {
             try? FileManager.default.removeItem(at: entry.url)
             total -= entry.byteCount
-            if total <= quota {
+            if total <= Int64(quota) {
                 break
             }
         }

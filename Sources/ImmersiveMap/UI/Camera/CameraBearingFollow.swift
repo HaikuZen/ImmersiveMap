@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Time-based follower for camera bearing: the control sets the target angle instantly, while the
 /// actual bearing converges to it exponentially every frame (half-life), along the shortest angular

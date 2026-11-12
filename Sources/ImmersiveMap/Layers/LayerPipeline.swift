@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The pipelines of the layers of the app's data (Layers.metal): zones,
@@ -18,9 +18,9 @@ final class LayerPipeline {
     }
 
     struct States {
-        let fill: MTLRenderPipelineState
-        let line: MTLRenderPipelineState
-        let point: MTLRenderPipelineState
+        let fill: any GPURenderPipeline
+        let line: any GPURenderPipeline
+        let point: any GPURenderPipeline
     }
 
     private let statesBySurface: [Surface: States]
@@ -31,33 +31,30 @@ final class LayerPipeline {
     /// trees raise where they stand (`TileSourceStencilPriority`), as the
     /// roads do, so whatever stands in front of a layer covers it, and
     /// neither writes depth or stencil. The reference is zero.
-    let overGroundState: MTLDepthStencilState
-    let behindTerrainState: MTLDepthStencilState
+    let overGroundState: any GPUDepthStencilState
+    let behindTerrainState: any GPUDepthStencilState
 
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int) {
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.rasterSampleCount = sampleCount
-        descriptor.colorAttachments[0].pixelFormat = pixelFormat
-        descriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        descriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-        descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].rgbBlendOperation = .add
-        descriptor.colorAttachments[0].alphaBlendOperation = .add
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        var color = GPUColorTarget(format: pixelFormat)
+        color.blend = (color: GPUBlendComponent(source: .sourceAlpha, destination: .oneMinusSourceAlpha),
+                       alpha: GPUBlendComponent(source: .one, destination: .oneMinusSourceAlpha))
 
-        func makeState(vertex: String, fragment: String, surface: Surface) -> MTLRenderPipelineState {
-            let values = MTLFunctionConstantValues()
-            var surfaceValue = Int32(surface.rawValue)
-            values.setConstantValue(&surfaceValue, type: .int, index: 0)
-            descriptor.vertexFunction = try! library.makeFunction(name: vertex, constantValues: values)
-            descriptor.fragmentFunction = try! library.makeFunction(name: fragment, constantValues: values)
-            return try! metalDevice.makeRenderPipelineState(descriptor: descriptor)
+        func makeState(vertex: String, fragment: String, surface: Surface) -> any GPURenderPipeline {
+            // Function constant 0 picks the surface, in both functions.
+            let constants: [Int: GPUConstantValue] = [0: .int32(Int32(surface.rawValue))]
+            var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: vertex, constants: constants),
+                                                         fragmentFunction: GPUShaderFunction(name: fragment, constants: constants),
+                                                         colorTargets: [color])
+            descriptor.label = "\(vertex) \(surface)"
+            descriptor.depthStencilFormat = .depth32FloatStencil8
+            descriptor.sampleCount = sampleCount
+            do {
+                return try device.makeRenderPipeline(descriptor)
+            } catch {
+                fatalError("Failed to create the layer pipeline: \(error)")
+            }
         }
         var states: [Surface: States] = [:]
         for surface in Surface.allCases {
@@ -67,20 +64,23 @@ final class LayerPipeline {
         }
         statesBySurface = states
 
-        func makeDepthState(testsDepth: Bool) -> MTLDepthStencilState {
-            let stencil = MTLStencilDescriptor()
-            stencil.stencilCompareFunction = .equal
-            stencil.stencilFailureOperation = .keep
-            stencil.depthFailureOperation = .keep
-            stencil.depthStencilPassOperation = .keep
+        func makeDepthState(testsDepth: Bool) -> any GPUDepthStencilState {
+            var stencil = GPUStencilFaceState()
+            stencil.compare = .equal
+            stencil.stencilFailure = .keep
+            stencil.depthFailure = .keep
+            stencil.pass = .keep
             stencil.readMask = TileSourceStencilPriority.surfaceMaskBit
             stencil.writeMask = 0
-            let descriptor = MTLDepthStencilDescriptor()
-            descriptor.depthCompareFunction = testsDepth ? .less : .always
-            descriptor.isDepthWriteEnabled = false
-            descriptor.frontFaceStencil = stencil
-            descriptor.backFaceStencil = stencil
-            return metalDevice.makeDepthStencilState(descriptor: descriptor)!
+            var descriptor = GPUDepthStencilDescriptor()
+            descriptor.depthCompare = testsDepth ? .less : .always
+            descriptor.depthWriteEnabled = false
+            descriptor.frontStencil = stencil
+            descriptor.backStencil = stencil
+            guard let state = device.makeDepthStencilState(descriptor) else {
+                fatalError("Failed to create the layer depth state")
+            }
+            return state
         }
         overGroundState = makeDepthState(testsDepth: false)
         behindTerrainState = makeDepthState(testsDepth: true)

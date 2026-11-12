@@ -6,18 +6,10 @@
 //  ImmersiveMap
 //
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import simd
-
-/// Mirrors `RoadLabelSceneDepthUniforms` in LabelTextCommon.h: the eye takes
-/// 16 bytes on both sides, so the viewport follows at 144.
-struct RoadLabelSceneDepthUniforms {
-    var projectionView: simd_float4x4
-    var inverseProjectionView: simd_float4x4
-    var eye: SIMD3<Float>
-    var viewportSize: SIMD2<Float>
-    var enabled: UInt32
-}
 
 /// Draws the road names in the overlay pass. From
 /// `RoadSettings.hidesBehindBuildingsFromZoom` on the flat map, the buildings
@@ -75,7 +67,7 @@ final class RoadLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
 
     func prepareGPU(frameContext: FrameContext, resourceRegistry: RenderResourceRegistry) {
         if let runtimeMetaBuffer = frameContext.sharedState.roadLabelState.runtimeMetaBuffer {
-            resourceRegistry.setBuffer(runtimeMetaBuffer, named: .roadLabelRuntimeBuffer)
+            resourceRegistry.setBuffer(runtimeMetaBuffer.metalBuffer, named: .roadLabelRuntimeBuffer)
         }
     }
 
@@ -106,12 +98,16 @@ final class RoadLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
             eye: frameContext.cameraEye,
             viewportSize: SIMD2<Float>(Float(frameContext.drawSize.width), Float(frameContext.drawSize.height)),
             enabled: sceneDepth == nil ? 0 : 1)
-        RendererLabelDrawer.drawRoadLabels(renderEncoder: encoder,
+        let depth = sceneDepth ?? fallbackDepthTexture
+        RendererLabelDrawer.drawRoadLabels(renderEncoder: MetalRenderEncoder(encoder),
                                            screenMatrix: frameContext.cameraMatrices.screen,
                                            screenScale: frameContext.screenScale,
                                            textRenderer: textRenderer,
                                            roadDrawLabels: roadLabelState.drawLabels,
-                                           sceneDepth: sceneDepth ?? fallbackDepthTexture,
+                                           // The world pass's depth, or the fallback in the
+                                           // shadow map's format.
+                                           sceneDepth: MetalTexture(depth,
+                                                                    format: GPUPixelFormat(metal: depth.pixelFormat) ?? .depth32FloatStencil8),
                                            sceneDepthUniforms: sceneDepthUniforms,
                                            labelOpacity: frameContext.services.labelOpacity)
         encoder.setDepthStencilState(depthDisabledState)

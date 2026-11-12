@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// Decides when a two-finger drag on the map is a tilt and how far it tilts.
 /// A tilt is a drag with the fingers roughly side by side moving mostly

@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 /// Owns map tap event handling.
 /// Responsible for rejecting taps over control zones, the selection hit-test, and notifying

@@ -6,8 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 enum GlobeCameraPanInertiaMath {
     static let maximumDeltaTime: CFTimeInterval = 0.05

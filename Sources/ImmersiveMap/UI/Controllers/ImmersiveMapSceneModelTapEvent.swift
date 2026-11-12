@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// Tap event on a 3D scene model.
 /// Delivered on every tap that lands on the model's geometry, regardless of

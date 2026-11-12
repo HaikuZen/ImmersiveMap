@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The reading of the Protomaps basemap schema (tiles version 4): the
 /// `roads` layer's structure flags, names and routes, the

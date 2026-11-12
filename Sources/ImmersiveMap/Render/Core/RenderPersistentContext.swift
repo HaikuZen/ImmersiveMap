@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import Metal
 import MetalKit
 import QuartzCore
@@ -14,6 +15,8 @@ final class RenderPersistentContext {
     // MARK: - Metal Core
 
     let metalContext: RenderMetalContext
+    /// The shared device as the GPU interface (`SharedRenderResources.gpuDevice`).
+    let gpuDevice: MetalDevice
 
     // MARK: - Pipelines
 
@@ -136,6 +139,7 @@ final class RenderPersistentContext {
         let shared = try SharedRenderResources.shared(sampleCount: config.postProcessing.multisampleCount)
         let metal = RendererSetup.buildMetal(layer: layer, sharedResources: shared)
         self.metalContext = metal
+        self.gpuDevice = shared.gpuDevice
         self.tileTraceRecorder = tileTraceRecorder
         self.baseLabelTraceRecorder = baseLabelTraceRecorder
         self.tileLoadingStatusReporter = config.debug.enableDebugPanel ? TileLoadingStatusReporter() : nil
@@ -175,7 +179,7 @@ final class RenderPersistentContext {
         self.fxaaPipeline = shared.fxaaPipeline
         // The starfield renderer bakes the star-generation settings, so it
         // stays per renderer; only its pipeline is shared.
-        self.starfieldRenderer = StarfieldRenderer(metalDevice: metal.device,
+        self.starfieldRenderer = StarfieldRenderer(device: shared.gpuDevice,
                                                    pipeline: shared.starfieldPipeline,
                                                    config: config.scene.starfield)
 
@@ -196,11 +200,11 @@ final class RenderPersistentContext {
                                                tileTraceRecorder: tileTraceRecorder,
                                                tileLoadingStatusReporter: tileLoadingStatusReporter)
         self.tileRenderStore.eventSink = eventSink
-        self.baseLabelCache = BaseLabelCache(metalDevice: metal.device)
+        self.baseLabelCache = BaseLabelCache(device: shared.gpuDevice)
         // On the relief the labels' paths are cut where the roads' ribbons
         // were, so the names ride the relief with the roads.
         let parseOptions = TileParseOptions(settings: config)
-        self.roadLabelCache = RoadLabelCache(metalDevice: metal.device,
+        self.roadLabelCache = RoadLabelCache(device: shared.gpuDevice,
                                              reliefSubdivisionStep: { parseOptions.reliefSubdivisionStep(tileZoom: $0) })
 
         self.sceneModelSource = sceneModelSource
@@ -216,16 +220,17 @@ final class RenderPersistentContext {
         self.groundRelief = GroundReliefFrameState.make(settings: config,
                                                         hillshade: styleRuntime.hillshade,
                                                         occlusion: styleRuntime.terrainOcclusion,
-                                                        device: metal.device)
+                                                        device: shared.gpuDevice)
         self.groundRelief?.store.eventSink = eventSink
         self.treePipeline = shared.treePipeline
         self.treePalette = styleRuntime.treePalette
         self.labelOpacity = styleRuntime.labelOpacity
-        self.treeModelStore = TreeModelStore(device: metal.device)
+        self.treeModelStore = TreeModelStore(device: shared.gpuDevice,
+                                             fileLoader: TreeModelMesh.metalFileLoader(device: metal.device))
         self.treeModelStore.eventSink = eventSink
         self.layerSource = layerSource
         self.layerPipeline = shared.layerPipeline
-        self.layerMeshStore = LayerMeshStore(device: metal.device)
+        self.layerMeshStore = LayerMeshStore(device: shared.gpuDevice)
         self.layerMeshStore.eventSink = eventSink
 
         self.avatarSource = avatarSource

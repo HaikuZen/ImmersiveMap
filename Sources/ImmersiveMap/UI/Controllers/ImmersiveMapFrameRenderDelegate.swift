@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import PortableFoundation
 import QuartzCore
 
 /// Display-link delegate that prepares and renders one frame.

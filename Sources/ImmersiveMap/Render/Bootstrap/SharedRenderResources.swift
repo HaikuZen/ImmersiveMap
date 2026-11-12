@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 
 /// Process-wide immutable GPU resources shared by every renderer instance.
@@ -35,6 +37,9 @@ import Metal
 final class SharedRenderResources {
     let device: MTLDevice
     let library: MTLLibrary
+    /// The device and library as the GPU interface, the one every feature
+    /// that draws through it makes its resources with.
+    let gpuDevice: MetalDevice
     let renderSampleCount: Int
     /// The one color format the engine renders in; `RendererSetup` stamps it
     /// onto every view's layer.
@@ -266,6 +271,7 @@ final class SharedRenderResources {
     private struct Built: @unchecked Sendable {
         let device: MTLDevice
         let library: MTLLibrary
+        let gpuDevice: MetalDevice
         let renderSampleCount: Int
         let extrudedDepthState: MTLDepthStencilState
         let labelDepthState: MTLDepthStencilState
@@ -297,13 +303,16 @@ final class SharedRenderResources {
         // from it whichever library the shaders come from.
         let resourceBundle = try ImmersiveMapResourceBundle.bundle()
         let library = try RendererSetup.makeLibrary(metalDevice: device, bundle: resourceBundle)
+        let gpuDevice = MetalDevice(device: device, library: library)
         let compiled = Self.makeConcurrentlyCompiledResources(device: device,
                                                               library: library,
+                                                              gpuDevice: gpuDevice,
                                                               resourceBundle: resourceBundle,
                                                               pixelFormat: .bgra8Unorm,
                                                               sampleCount: renderSampleCount)
         return Built(device: device,
                      library: library,
+                     gpuDevice: gpuDevice,
                      renderSampleCount: renderSampleCount,
                      extrudedDepthState: device.makeDepthStencilState(descriptor: Self.makeSceneDepthDescriptor())!,
                      labelDepthState: device.makeDepthStencilState(descriptor: Self.makeSceneDepthDescriptor())!,
@@ -336,6 +345,7 @@ final class SharedRenderResources {
     private init(built: Built) {
         self.device = built.device
         self.library = built.library
+        self.gpuDevice = built.gpuDevice
         self.renderSampleCount = built.renderSampleCount
         self.extrudedDepthState = built.extrudedDepthState
         self.labelDepthState = built.labelDepthState
@@ -382,7 +392,7 @@ final class SharedRenderResources {
 
         // SF Symbol rasterization goes through UIImage/NSImage and stays on
         // the main thread rather than joining the background build.
-        self.poiSpriteAtlas = PoiSpriteAtlas(device: built.device)
+        self.poiSpriteAtlas = PoiSpriteAtlas(device: built.gpuDevice)
     }
 
     // MARK: - Concurrent pipeline compilation
@@ -421,10 +431,16 @@ final class SharedRenderResources {
     private nonisolated static func makeConcurrentlyCompiledResources(
         device: MTLDevice,
         library: MTLLibrary,
+        gpuDevice: MetalDevice,
         resourceBundle: Bundle,
         pixelFormat: MTLPixelFormat,
         sampleCount: Int
     ) -> ConcurrentlyCompiledResources {
+        // Converted once, before the jobs: a format the GPU interface does
+        // not name stops here, saying which, rather than in a worker.
+        guard let gpuPixelFormat = GPUPixelFormat(metal: pixelFormat) else {
+            fatalError("The GPU interface has no name for the color format \(pixelFormat.rawValue)")
+        }
         var polygonPipeline: PolygonsPipeline?
         var tilePipeline: TilePipeline?
         var globeVectorSurfacePipeline: TilePipeline?
@@ -448,23 +464,20 @@ final class SharedRenderResources {
         // with nothing shared between them.
         nonisolated(unsafe) let jobs: [() -> Void] = [
             // The heaviest groups go first so they overlap the whole batch.
-            { textRenderer = TextRenderer(device: device,
-                                          library: library,
-                                          resourceBundle: resourceBundle,
+            { textRenderer = TextRenderer(device: gpuDevice,
+                                          resource: { resourceBundle.url(forResource: $0, withExtension: $1) },
                                           sampleCount: 1) },
             { avatars = AvatarsRenderer.SharedResources.make(metalDevice: device,
                                                              pixelFormat: pixelFormat,
                                                              library: library,
                                                              resourceBundle: resourceBundle,
                                                              sampleCount: 1) },
-            { globeCap = GlobeCapRenderer.SharedResources.make(metalDevice: device,
-                                                               pixelFormat: pixelFormat,
-                                                               library: library,
+            { globeCap = GlobeCapRenderer.SharedResources.make(device: gpuDevice,
+                                                               pixelFormat: gpuPixelFormat,
                                                                sampleCount: sampleCount,
                                                                maxLatitude: WebMercatorMath.maxLatitudeRadians) },
-            { extrudedTilePipeline = ExtrudedTilePipeline(metalDevice: device,
-                                                          pixelFormat: pixelFormat,
-                                                          library: library,
+            { extrudedTilePipeline = ExtrudedTilePipeline(device: gpuDevice,
+                                                          pixelFormat: gpuPixelFormat,
                                                           sampleCount: sampleCount) },
             { polygonPipeline = PolygonsPipeline(metalDevice: device,
                                                  pixelFormat: pixelFormat,
@@ -474,30 +487,26 @@ final class SharedRenderResources {
                                           library: library,
                                           sampleCount: sampleCount,
                                           readsGroundShadowMask: true) },
-            { groundShadowMaskPipeline = GroundShadowMaskPipeline(metalDevice: device, library: library) },
-            { rasterTilePipeline = RasterTilePipeline(metalDevice: device,
-                                                      pixelFormat: pixelFormat,
-                                                      library: library,
+            { groundShadowMaskPipeline = GroundShadowMaskPipeline(device: gpuDevice) },
+            { rasterTilePipeline = RasterTilePipeline(device: gpuDevice,
+                                                      pixelFormat: gpuPixelFormat,
                                                       sampleCount: sampleCount) },
             { globeVectorSurfacePipeline = TilePipeline(metalDevice: device,
                                                         pixelFormat: pixelFormat,
                                                         library: library,
                                                         sampleCount: sampleCount,
                                                         surface: .sphere) },
-            { surfaceLabelPipeline = SurfaceLabelPipeline(metalDevice: device,
-                                                          pixelFormat: pixelFormat,
-                                                          library: library,
+            { surfaceLabelPipeline = SurfaceLabelPipeline(device: gpuDevice,
+                                                          pixelFormat: gpuPixelFormat,
                                                           sampleCount: sampleCount) },
             { fxaaPipeline = FXAAPipeline(metalDevice: device,
                                           pixelFormat: pixelFormat,
                                           library: library) },
-            { starfieldPipeline = StarfieldPipeline(metalDevice: device,
-                                                    pixelFormat: pixelFormat,
-                                                    library: library,
+            { starfieldPipeline = StarfieldPipeline(device: gpuDevice,
+                                                    pixelFormat: gpuPixelFormat,
                                                     sampleCount: sampleCount) },
-            { horizonPipeline = HorizonPipeline(metalDevice: device,
-                                                pixelFormat: pixelFormat,
-                                                library: library,
+            { horizonPipeline = HorizonPipeline(device: gpuDevice,
+                                                pixelFormat: gpuPixelFormat,
                                                 sampleCount: sampleCount) },
             { sceneModelPipeline = SceneModelPipeline(metalDevice: device,
                                                       pixelFormat: pixelFormat,
@@ -507,17 +516,14 @@ final class SharedRenderResources {
                                                     pixelFormat: pixelFormat,
                                                     library: library,
                                                     sampleCount: sampleCount) },
-            { placementStencilPipeline = PlacementStencilPipeline(metalDevice: device,
-                                                                  pixelFormat: pixelFormat,
-                                                                  library: library,
+            { placementStencilPipeline = PlacementStencilPipeline(device: gpuDevice,
+                                                                  pixelFormat: gpuPixelFormat,
                                                                   sampleCount: sampleCount) },
-            { treePipeline = TreePipeline(metalDevice: device,
-                                          pixelFormat: pixelFormat,
-                                          library: library,
+            { treePipeline = TreePipeline(device: gpuDevice,
+                                          pixelFormat: gpuPixelFormat,
                                           sampleCount: sampleCount) },
-            { layerPipeline = LayerPipeline(metalDevice: device,
-                                            pixelFormat: pixelFormat,
-                                            library: library,
+            { layerPipeline = LayerPipeline(device: gpuDevice,
+                                            pixelFormat: gpuPixelFormat,
                                             sampleCount: sampleCount) }
         ]
         DispatchQueue.concurrentPerform(iterations: jobs.count) { jobs[$0]() }

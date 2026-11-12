@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
-import QuartzCore
+import ImmersiveMapGPU
 import simd
 
 /// The two polar caps of the globe.
@@ -36,9 +35,8 @@ final class GlobeCapRenderer {
         let northCapBuffers: MapSurfaceGridBuffers
         let southCapBuffers: MapSurfaceGridBuffers
 
-        static func make(metalDevice: MTLDevice,
-                         pixelFormat: MTLPixelFormat,
-                         library: MTLLibrary,
+        static func make(device: any GPUDevice,
+                         pixelFormat: GPUPixelFormat,
                          sampleCount: Int,
                          maxLatitude: Double,
                          stacks: Int = 12,
@@ -53,14 +51,13 @@ final class GlobeCapRenderer {
                                                      isNorth: false,
                                                      maxLatitude: maxLatitude)
             return SharedResources(
-                pipeline: GlobeCapPipeline(metalDevice: metalDevice,
+                pipeline: GlobeCapPipeline(device: device,
                                            pixelFormat: pixelFormat,
-                                           library: library,
                                            sampleCount: sampleCount),
-                northCapBuffers: MapSurfaceGridBuffers.make(metalDevice: metalDevice,
+                northCapBuffers: MapSurfaceGridBuffers.make(device: device,
                                                             vertices: northCap.vertices,
                                                             indices: northCap.indices),
-                southCapBuffers: MapSurfaceGridBuffers.make(metalDevice: metalDevice,
+                southCapBuffers: MapSurfaceGridBuffers.make(device: device,
                                                             vertices: southCap.vertices,
                                                             indices: southCap.indices)
             )
@@ -76,7 +73,7 @@ final class GlobeCapRenderer {
         palette = Self.makePalette(baseColors: baseColors)
     }
 
-    func draw(renderEncoder: MTLRenderCommandEncoder,
+    func draw(renderEncoder: any GPURenderEncoder,
               globeFrame: GlobeFrameConstantsUniform,
               globe: GlobeUniform,
               globeLight: GlobeLightUniform = .disabled) {
@@ -90,12 +87,8 @@ final class GlobeCapRenderer {
         // the back of the fan would draw through the planet.
         renderEncoder.setFrontFacing(.counterClockwise)
         renderEncoder.setCullMode(.back)
-        var globeFrame = globeFrame
-        var globe = globe
-        renderEncoder.setVertexBytes(&globe, length: MemoryLayout<GlobeUniform>.stride, index: 2)
-        renderEncoder.setVertexBytes(&globeFrame,
-                                     length: MemoryLayout<GlobeFrameConstantsUniform>.stride,
-                                     index: 10)
+        renderEncoder.setVertexValue(globe, index: 2)
+        renderEncoder.setVertexValue(globeFrame, index: 10)
 
         for pole in GlobeCapPole.allCases {
             switch pole {
@@ -121,25 +114,23 @@ final class GlobeCapRenderer {
         SIMD4<Float>(color.x, color.y, color.z, 1)
     }
 
-    private func drawNorthCap(renderEncoder: MTLRenderCommandEncoder) {
-        var capParams = palette.north
-        renderEncoder.setFragmentBytes(&capParams, length: MemoryLayout<GlobeCapParams>.stride, index: 0)
+    private func drawNorthCap(renderEncoder: any GPURenderEncoder) {
+        renderEncoder.setFragmentValue(palette.north, index: 0)
         renderEncoder.setVertexBuffer(northCapBuffers.verticesBuffer, offset: 0, index: 0)
-        renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                            indexCount: northCapBuffers.indicesCount,
-                                            indexType: northCapBuffers.indexType,
-                                            indexBuffer: northCapBuffers.indicesBuffer,
-                                            indexBufferOffset: 0)
+        renderEncoder.drawIndexed(.triangle,
+                                  indexCount: northCapBuffers.indicesCount,
+                                  indexType: northCapBuffers.indexType,
+                                  indexBuffer: northCapBuffers.indicesBuffer,
+                                  indexBufferOffset: 0)
     }
 
-    private func drawSouthCap(renderEncoder: MTLRenderCommandEncoder) {
-        var capParams = palette.south
-        renderEncoder.setFragmentBytes(&capParams, length: MemoryLayout<GlobeCapParams>.stride, index: 0)
+    private func drawSouthCap(renderEncoder: any GPURenderEncoder) {
+        renderEncoder.setFragmentValue(palette.south, index: 0)
         renderEncoder.setVertexBuffer(southCapBuffers.verticesBuffer, offset: 0, index: 0)
-        renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                            indexCount: southCapBuffers.indicesCount,
-                                            indexType: southCapBuffers.indexType,
-                                            indexBuffer: southCapBuffers.indicesBuffer,
-                                            indexBufferOffset: 0)
+        renderEncoder.drawIndexed(.triangle,
+                                  indexCount: southCapBuffers.indicesCount,
+                                  indexType: southCapBuffers.indexType,
+                                  indexBuffer: southCapBuffers.indicesBuffer,
+                                  indexBufferOffset: 0)
     }
 }

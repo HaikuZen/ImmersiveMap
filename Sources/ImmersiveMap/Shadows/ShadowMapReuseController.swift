@@ -1,7 +1,6 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
 import simd
 
 /// Keeps the rendered shadow map alive across frames. The sun is static and
@@ -113,11 +112,13 @@ final class ShadowMapReuseController {
         return ShadowFrameStateResolver.materialize(fits: fits, inputs: inputs)
     }
 
+    /// The shadow map texture is only told apart by its identity (a
+    /// recreated texture is blank), so any texture object does.
     /// The single render-or-reuse decision for one window, made once per
     /// frame at pass planning. Returns true when the window's caster pass
     /// must run this frame, and then also records the render, so the next
     /// frames can reuse it.
-    func planShadowRender(frameContext: FrameContext, texture: MTLTexture, slot: ShadowCascadeSlot) -> Bool {
+    func planShadowRender(frameContext: FrameContext, texture: AnyObject, slot: ShadowCascadeSlot) -> Bool {
         let sceneModelState = frameContext.sharedState.sceneModelState
         return planShadowRender(casterKeys: Self.casterKeys(drawnPlacements: frameContext.sharedState.drawnBuildingPlacements),
                                 hasModelCasters: sceneModelState.hasMovingShadowCasters,
@@ -138,7 +139,7 @@ final class ShadowMapReuseController {
                           hiddenBuildings: ReplacedBuildings = .none,
                           heightScales: SIMD2<Float> = SIMD2<Float>(1, 1),
                           terrain: GroundReliefFrame.ShadowSignature? = nil,
-                          texture: MTLTexture,
+                          texture: AnyObject,
                           slot: ShadowCascadeSlot = .near) -> Bool {
         let window = RenderedWindow(fitGeneration: fitGenerations[slot] ?? 0,
                                     textureIdentity: ObjectIdentifier(texture),

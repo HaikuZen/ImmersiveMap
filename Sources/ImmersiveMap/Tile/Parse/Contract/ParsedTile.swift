@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What one tile parses to: every geometry layer unified into GPU-ready
 /// streams, the styles they index, and the labels the layers carried,

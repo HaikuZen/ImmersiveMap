@@ -1,29 +1,26 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// A layer on the GPU: its buffers and the chunks that draw from them
 /// (`LayerMeshBuilder`). Immutable after creation, so it is shared between
 /// the build that makes it and the frames that draw it (`@unchecked
-/// Sendable`: Metal objects are safe to use from any thread, and nothing
-/// here changes).
+/// Sendable`: the GPU's buffers are safe to use from any thread, and
+/// nothing here changes).
 final class LayerMesh: @unchecked Sendable {
     let key: LayerMeshKey
-    let fillVertices: MTLBuffer?
-    let fillIndices: MTLBuffer?
-    let lineVertices: MTLBuffer?
-    let lineIndices: MTLBuffer?
-    let discs: MTLBuffer?
+    let fillVertices: (any GPUBuffer)?
+    let fillIndices: (any GPUBuffer)?
+    let lineVertices: (any GPUBuffer)?
+    let lineIndices: (any GPUBuffer)?
+    let discs: (any GPUBuffer)?
     let chunks: [LayerMeshChunk]
 
-    init?(key: LayerMeshKey, data: LayerMeshData, device: MTLDevice) {
-        func buffer<Element>(_ values: [Element], label: String) -> MTLBuffer? {
-            guard values.isEmpty == false else { return nil }
-            let buffer = values.withUnsafeBytes { bytes in
-                device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
-            }
+    init?(key: LayerMeshKey, data: LayerMeshData, device: any GPUDevice) {
+        func buffer<Element>(_ values: [Element], label: String) -> (any GPUBuffer)? {
+            let buffer = device.makeBuffer(values, storage: .shared)
             buffer?.label = label
             return buffer
         }
@@ -49,13 +46,13 @@ final class LayerMesh: @unchecked Sendable {
 /// by a queue: the frames read it on the main thread, the builds write it
 /// from theirs.
 final class LayerMeshStore: @unchecked Sendable {
-    private let device: MTLDevice
+    private let device: any GPUDevice
     private let queue = DispatchQueue(label: "ImmersiveMap.LayerMeshStore")
     private var meshes: [String: LayerMesh] = [:]
     private var building: [String: LayerMeshKey] = [:]
     weak var eventSink: RenderFrameEventSink?
 
-    init(device: MTLDevice) {
+    init(device: any GPUDevice) {
         self.device = device
     }
 

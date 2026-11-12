@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import MetalKit
 
 /// Turns a parsed tile into GPU state. Every buffer of the tile lives in one
@@ -237,9 +239,13 @@ final class MetalTileFactory: @unchecked Sendable {
                                          roadLabels: PreparedTileArenaImage.RoadLabelsMeta,
                                          surfaceLabels: [SurfaceLabelRecord]) -> TileBuffers? {
         let expectedSlots = TileArenaSchema.slots(text: TileArenaSchema.runCounts(of: textLabels))
+        // One wrapper for the tile's allocation, shared by every view and
+        // the tile itself.
+        let gpuBackingBuffer: (any GPUBuffer)? = backingBuffer.map(MetalBuffer.init)
         var cursor = SpanCursor(spans: spans,
                                 expectedSlots: expectedSlots,
-                                backingBuffer: backingBuffer)
+                                backingBuffer: backingBuffer,
+                                gpuBackingBuffer: gpuBackingBuffer)
 
         var ground = takeGeometryLayer(.ground, cursor: &cursor)
         ground = TileBuffers.GeometryLayer(vertices: ground.vertices,
@@ -247,7 +253,7 @@ final class MetalTileFactory: @unchecked Sendable {
                                            styles: ground.styles,
                                            styleZoomFade: ground.styleZoomFade,
                                            lineStyles: ground.lineStyles,
-                                           indexType: ground.indexType,
+                                           indexType: ground.gpuIndexType,
                                            styleRuns: groundStyleRuns)
         // The stored boundaries are in the arena's layer order, the order
         // the layers are taken in here.
@@ -277,7 +283,7 @@ final class MetalTileFactory: @unchecked Sendable {
         let extruded = TileBuffers.Extruded(vertices: extrudedVertices,
                                             indices: extrudedIndices.view,
                                             styles: cursor.takeView(.extrudedStyles),
-                                            indexType: extrudedIndices.indexType,
+                                            gpuIndexType: extrudedIndices.indexType,
                                             buildingRanges: buildingRanges,
                                             buildingAnchors: buildingAnchors,
                                             quarterIndexStarts: quarterIndexStarts)
@@ -312,7 +318,7 @@ final class MetalTileFactory: @unchecked Sendable {
               }) else {
             return nil
         }
-        return TileBuffers(backingBuffer: backingBuffer,
+        return TileBuffers(gpuBackingBuffer: gpuBackingBuffer,
                            ground: ground,
                            roads: roads,
                            bridgeOverlay: bridgeOverlay,
@@ -387,7 +393,7 @@ final class MetalTileFactory: @unchecked Sendable {
                                          styles: layer.styles,
                                          styleZoomFade: layer.styleZoomFade,
                                          lineStyles: layer.lineStyles,
-                                         indexType: layer.indexType,
+                                         indexType: layer.gpuIndexType,
                                          roadStyles: RoadLayerStyles(styles: layer.styles,
                                                                      styleZoomFades: layer.styleZoomFade,
                                                                      lineStyles: layer.lineStyles),
@@ -424,15 +430,20 @@ final class MetalTileFactory: @unchecked Sendable {
         private let spans: [TileArenaSpan]
         private let expectedSlots: [TileArenaSlot]
         private let backingBuffer: MTLBuffer?
+        /// The same allocation as the GPU interface's buffer, made once for
+        /// all the tile's views (`TileBufferView.gpuBuffer`).
+        private let gpuBackingBuffer: (any GPUBuffer)?
         private var index = 0
         private var failed = false
 
         init(spans: [TileArenaSpan],
              expectedSlots: [TileArenaSlot],
-             backingBuffer: MTLBuffer?) {
+             backingBuffer: MTLBuffer?,
+             gpuBackingBuffer: (any GPUBuffer)?) {
             self.spans = spans
             self.expectedSlots = expectedSlots
             self.backingBuffer = backingBuffer
+            self.gpuBackingBuffer = gpuBackingBuffer
         }
 
         var isConsistent: Bool {
@@ -451,7 +462,7 @@ final class MetalTileFactory: @unchecked Sendable {
             return makeView(from: span, elementStride: elementStride)
         }
 
-        mutating func takeIndexView(_ slot: TileArenaSlot) -> (view: TileBufferView?, indexType: MTLIndexType) {
+        mutating func takeIndexView(_ slot: TileArenaSlot) -> (view: TileBufferView?, indexType: GPUIndexType) {
             guard let span = takeSpan(claiming: slot) else {
                 return (nil, .uint32)
             }
@@ -488,6 +499,7 @@ final class MetalTileFactory: @unchecked Sendable {
             // The stride check pins byteCount to the slot's element type, so a
             // corrupt element count cannot make a draw read past its span.
             guard let backingBuffer,
+                  let gpuBackingBuffer,
                   span.byteOffset >= 0,
                   span.byteCount == span.elementCount * elementStride,
                   span.byteOffset % TileArenaImageMath.spanAlignment == 0,
@@ -495,7 +507,7 @@ final class MetalTileFactory: @unchecked Sendable {
                 failed = true
                 return nil
             }
-            return TileBufferView(buffer: backingBuffer, offset: span.byteOffset, count: span.elementCount)
+            return TileBufferView(gpuBuffer: gpuBackingBuffer, offset: span.byteOffset, count: span.elementCount)
         }
     }
 

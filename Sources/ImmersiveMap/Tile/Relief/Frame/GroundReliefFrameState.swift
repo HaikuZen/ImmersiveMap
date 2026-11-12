@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// The ground relief's state across frames, which the frame engine sets
@@ -106,7 +106,7 @@ final class GroundReliefFrameState {
     static func make(settings: ImmersiveMapSettings,
                      hillshade: ImmersiveMapHillshade,
                      occlusion: ImmersiveMapTerrainOcclusion = ImmersiveMapTerrainOcclusion(),
-                     device: MTLDevice) -> GroundReliefFrameState? {
+                     device: any GPUDevice) -> GroundReliefFrameState? {
         let relief = settings.tiles.groundRelief
         guard relief.isEnabled else {
             return nil
@@ -172,7 +172,7 @@ final class GroundReliefFrameState {
     /// (`GroundReliefStore.applyPendingWelds`). Returns the welds' command
     /// buffer, nil with nothing to write.
     @discardableResult
-    func beginFrame(commandQueue: MTLCommandQueue) -> MTLCommandBuffer? {
+    func beginFrame(commandQueue: any GPUCommandQueue) -> (any GPUCommandBuffer)? {
         store.applyPendingWelds(commandQueue: commandQueue)
     }
 

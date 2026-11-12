@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// The terrain tiles the flattened ground rises by
@@ -72,9 +72,9 @@ final class GroundReliefStore: GroundReliefTerrainDemand, @unchecked Sendable {
 
     /// What a draw samples for a tile whose occlusion of the sky is not
     /// computed: one texel of 0, no darkening.
-    var occlusionFallbackTexture: MTLTexture? { occlusion.fallbackTexture }
+    var occlusionFallbackTexture: (any GPUTexture)? { occlusion.fallbackTexture }
 
-    private let device: MTLDevice
+    private let device: any GPUDevice
     private let source: any GroundReliefTerrainSource
     private let minimumSourceZoom: Int
     private let now: @Sendable () -> TimeInterval
@@ -101,7 +101,7 @@ final class GroundReliefStore: GroundReliefTerrainDemand, @unchecked Sendable {
     /// occlusion of the sky is computed with until the frame says
     /// otherwise (`setOcclusionKey`), and `now` is the clock the retries
     /// wait by, a test's seam.
-    init(device: MTLDevice,
+    init(device: any GPUDevice,
          settings: ImmersiveMapSettings.TileSettings.GroundReliefSettings,
          source: any GroundReliefTerrainSource,
          occlusionKey: GroundReliefOcclusion.Key = GroundReliefOcclusion.Key(style: ImmersiveMapTerrainOcclusion()),
@@ -192,11 +192,11 @@ final class GroundReliefStore: GroundReliefTerrainDemand, @unchecked Sendable {
     /// A terrain tile in, with its occlusion of the sky when that is
     /// computed under the current key: nil for a tile not in, which
     /// includes one the source has not got or does not answer for.
-    func terrain(at source: Tile) -> (terrain: GroundReliefTile, occlusion: MTLTexture?)? {
+    func terrain(at source: Tile) -> (terrain: GroundReliefTile, occlusion: (any GPUTexture)?)? {
         lock.lock()
         defer { lock.unlock() }
         guard let terrain = terrains[source] else { return nil }
-        return (terrain, terrain.occlusionKey == occlusion.key ? terrain.occlusion : nil)
+        return (terrain, terrain.occlusionKey == occlusion.key ? terrain.gpuOcclusion : nil)
     }
 
     /// The terrain tile of `terrainZoom` over `tile` (its own address when
@@ -431,7 +431,7 @@ final class GroundReliefStore: GroundReliefTerrainDemand, @unchecked Sendable {
     /// (`RenderFrameEngine`). Returns the blit's command buffer, nil with
     /// nothing to write.
     @discardableResult
-    func applyPendingWelds(commandQueue: MTLCommandQueue) -> MTLCommandBuffer? {
+    func applyPendingWelds(commandQueue: any GPUCommandQueue) -> (any GPUCommandBuffer)? {
         lock.lock()
         let writes = pendingWelds
         pendingWelds.removeAll()
@@ -446,25 +446,17 @@ final class GroundReliefStore: GroundReliefTerrainDemand, @unchecked Sendable {
             offsets.append(staging.count * MemoryLayout<UInt16>.stride)
             staging += write.values
         }
-        guard let buffer = staging.withUnsafeBytes({ bytes in
-                  device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
-              }),
+        guard let buffer = device.makeBuffer(staging, storage: .shared),
               let commandBuffer = commandQueue.makeCommandBuffer(),
-              let blit = commandBuffer.makeBlitCommandEncoder() else {
+              let blit = commandBuffer.makeBlitEncoder() else {
             return nil
         }
         commandBuffer.label = "GroundReliefEdgeWeld"
         for (write, offset) in zip(writes, offsets) {
             let rowBytes = write.width * MemoryLayout<UInt16>.stride
-            blit.copy(from: buffer,
-                      sourceOffset: offset,
-                      sourceBytesPerRow: rowBytes,
-                      sourceBytesPerImage: rowBytes * write.height,
-                      sourceSize: MTLSize(width: write.width, height: write.height, depth: 1),
-                      to: write.terrain.texture,
-                      destinationSlice: 0,
-                      destinationLevel: 0,
-                      destinationOrigin: MTLOrigin(x: write.x, y: write.y, z: 0))
+            blit.copy(from: buffer, sourceOffset: offset, bytesPerRow: rowBytes,
+                      to: write.terrain.gpuTexture, slice: 0, mipmapLevel: 0,
+                      x: write.x, y: write.y, width: write.width, height: write.height)
         }
         blit.endEncoding()
         commandBuffer.commit()
@@ -529,7 +521,7 @@ final class GroundReliefStore: GroundReliefTerrainDemand, @unchecked Sendable {
                                           releasedCount: released.count,
                                           releasedBytes: released.bytes,
                                           releasedCacheBytes: released.capacityBytes,
-                                          occlusionComputedCount: terrains.values.count { $0.occlusion != nil && $0.occlusionKey == occlusionKey },
+                                          occlusionComputedCount: terrains.values.count { $0.gpuOcclusion != nil && $0.occlusionKey == occlusionKey },
                                           occlusionMillisecondsLast: occlusion.millisecondsLast,
                                           loadingCount: loads.activeLoads,
                                           maximumConcurrentLoads: loads.maximumConcurrentLoads,

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A polygon of the separate-road path with the keys it sorts by: the
 /// unification stage buckets these by structure and pass role and sorts

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// What the unification stage produces: every layer packed into its GPU
 /// streams, which `parse` wraps into the `ParsedTile`.

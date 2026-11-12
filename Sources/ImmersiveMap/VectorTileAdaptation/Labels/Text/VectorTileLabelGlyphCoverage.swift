@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 struct VectorTileLabelGlyphCoverage {
     static let legacyAtlasForTests = VectorTileLabelGlyphCoverage(
@@ -23,7 +23,7 @@ struct VectorTileLabelGlyphCoverage {
 
     func canRender(_ text: String) -> Bool {
         text.unicodeScalars.allSatisfy {
-            supportedScalars.contains($0.value) || CharacterSet.whitespacesAndNewlines.contains($0)
+            supportedScalars.contains($0.value) || $0.isFoundationWhitespaceOrNewline
         }
     }
 }

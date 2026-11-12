@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Reads a feature's attributes: the `tags` field is a run of key/value
 /// index pairs into the layer's key and value tables, and the result is the

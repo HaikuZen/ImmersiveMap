@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 // The `SceneModels` folder: the engine-side model and CPU presentation of 3D
 // models anchored at coordinates, from the public descriptor to the per-frame
@@ -38,14 +38,17 @@ public struct ImmersiveMapSceneModel: Identifiable, Equatable, Sendable {
             self.url = url
         }
 
+        #if canImport(Darwin)
         /// Resolves a bundle resource (for example `("biplane", "usdz")`) to
-        /// its file URL; nil when the resource is missing.
+        /// its file URL; nil when the resource is missing. On Apple's
+        /// platforms only, the ones with bundles.
         public init?(resource name: String, withExtension ext: String, in bundle: Bundle = .main) {
             guard let url = bundle.url(forResource: name, withExtension: ext) else {
                 return nil
             }
             self.url = url
         }
+        #endif
     }
 
     public var id: UInt64

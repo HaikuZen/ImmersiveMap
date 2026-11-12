@@ -1,8 +1,11 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
+// Outside Apple's platforms `URLSession` is in a module of its own.
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import ImageIO
 
 public enum AvatarMarkerImageLoaderError: Error, Equatable {

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Which tiles of one prepared cache directory have a `.ptile` on disk,
 /// each with the entry's last access date, so an entry the TTL has expired

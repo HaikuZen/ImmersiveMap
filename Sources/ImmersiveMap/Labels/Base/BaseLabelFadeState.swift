@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The fade alpha of every label of a working set, index-aligned with the
 /// set: no dictionary, no per-frame allocation. The arrays are sized once

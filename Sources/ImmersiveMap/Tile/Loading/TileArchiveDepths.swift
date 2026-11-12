@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How deep each tile archive goes: the deepest zoom its header names
 /// (`PMTilesHeader.maxZoom`), by the archive's source revision
@@ -20,9 +20,54 @@ import Foundation
 /// path to the mutable state goes through `lock`.
 final class TileArchiveDepths: @unchecked Sendable {
     static let directoryName = "MapTileArchiveDepths"
-    /// Posted on the main queue when an archive's depth turns out other than
-    /// the one kept, with the archive's source revision as the object.
-    static let didChange = Notification.Name("ImmersiveMapTileArchiveDepthDidChange")
+    /// What is told, on the main queue, when an archive's depth turns out
+    /// other than the one kept: a process-wide list, NotificationCenter's
+    /// role, which FoundationEssentials does not have. An observer is kept
+    /// while its `ChangeObservation` is.
+    final class ChangeObservation: @unchecked Sendable {
+        fileprivate let id: UInt64
+
+        fileprivate init(id: UInt64) {
+            self.id = id
+        }
+
+        deinit {
+            TileArchiveDepths.removeObserver(id: id)
+        }
+    }
+
+    private static let observersLock = NSLock()
+    nonisolated(unsafe) private static var observers: [UInt64: @MainActor @Sendable (_ sourceRevision: UInt64) -> Void] = [:]
+    nonisolated(unsafe) private static var nextObserverID: UInt64 = 0
+
+    /// Calls `handler` on the main queue with the archive's source revision
+    /// each time a depth changes, while the returned observation is kept.
+    static func observeChanges(_ handler: @escaping @MainActor @Sendable (_ sourceRevision: UInt64) -> Void) -> ChangeObservation {
+        observersLock.lock()
+        defer { observersLock.unlock() }
+        nextObserverID += 1
+        observers[nextObserverID] = handler
+        return ChangeObservation(id: nextObserverID)
+    }
+
+    private static func removeObserver(id: UInt64) {
+        observersLock.lock()
+        observers[id] = nil
+        observersLock.unlock()
+    }
+
+    private static func tellObservers(sourceRevision: UInt64) {
+        observersLock.lock()
+        let handlers = Array(observers.values)
+        observersLock.unlock()
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                for handler in handlers {
+                    handler(sourceRevision)
+                }
+            }
+        }
+    }
 
     static let shared = TileArchiveDepths()
 
@@ -45,7 +90,7 @@ final class TileArchiveDepths: @unchecked Sendable {
             return depth
         }
         guard let text = try? String(contentsOf: fileURL(sourceRevision), encoding: .utf8),
-              let depth = Int(text.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+              let depth = Int(text.trimmingWhitespaceAndNewlines()) else {
             return nil
         }
         depths[sourceRevision] = depth
@@ -53,7 +98,7 @@ final class TileArchiveDepths: @unchecked Sendable {
     }
 
     /// The depth the archive's header names, read this session. A depth
-    /// other than the one kept is written down and posted.
+    /// other than the one kept is written down and the observers told.
     func observe(maximumZoom: Int, sourceRevision: UInt64) {
         let previous = self.maximumZoom(sourceRevision: sourceRevision)
         guard previous != maximumZoom else {
@@ -64,9 +109,7 @@ final class TileArchiveDepths: @unchecked Sendable {
         lock.unlock()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try? String(maximumZoom).write(to: fileURL(sourceRevision), atomically: true, encoding: .utf8)
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: Self.didChange, object: sourceRevision)
-        }
+        Self.tellObservers(sourceRevision: sourceRevision)
     }
 
     private func fileURL(_ sourceRevision: UInt64) -> URL {

@@ -85,9 +85,4 @@ enum RendererSetup {
     static let engineFunctionName = "fxaaFragmentShader"
 
     private static let logger = Logger(subsystem: "ImmersiveMap", category: "Renderer")
-
-    static func configureCamera(_ cameraStateController: CameraStateController) {
-        //cameraStateController.setZoom(zoom: 8)
-        cameraStateController.setLatLonDeg(latDeg: 55.751244, lonDeg: 37.618423)
-    }
 }

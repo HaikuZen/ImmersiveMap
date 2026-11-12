@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Reads one kind of GeoJSON object, the one whose `type` member is
 /// `type`: a container descends into its members through the context, a
@@ -15,7 +15,7 @@ protocol GeoJSONObjectReader: Sendable {
     /// Reads `object`, which lies at `path` (the members from the
     /// document's root, ending in a dot unless empty), under `style`, the
     /// simplestyle of the feature it belongs to.
-    func read(_ object: [String: Any],
+    func read(_ object: [String: JSONValue],
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws
@@ -24,14 +24,14 @@ protocol GeoJSONObjectReader: Sendable {
 /// Reads a geometry: an object whose shapes are in its `coordinates`.
 protocol GeoJSONGeometryReader: GeoJSONObjectReader {
     /// Reads the geometry's `coordinates`, which lie at `path`.
-    func read(coordinates: Any,
+    func read(coordinates: JSONValue,
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws
 }
 
 extension GeoJSONGeometryReader {
-    func read(_ object: [String: Any],
+    func read(_ object: [String: JSONValue],
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
@@ -71,8 +71,8 @@ struct GeoJSONReadContext {
         self.base = base
     }
 
-    mutating func read(object: Any, style: ImmersiveMapGeoJSON.SimpleStyle, path: String) throws {
-        guard let dictionary = object as? [String: Any], let type = dictionary["type"] as? String else {
+    mutating func read(object: JSONValue, style: ImmersiveMapGeoJSON.SimpleStyle, path: String) throws {
+        guard let dictionary = object.objectValue, let type = dictionary["type"]?.stringValue else {
             throw ImmersiveMapGeoJSONError.unknownType(path.isEmpty ? "root" : path)
         }
         guard let reader = GeoJSONObjectReaders.byType[type] else {

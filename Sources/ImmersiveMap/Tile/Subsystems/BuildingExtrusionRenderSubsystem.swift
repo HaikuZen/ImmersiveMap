@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 
 /// Draws the extruded buildings of flat mode: opaque geometry straight into
@@ -30,17 +32,19 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
 
     private let extrudedTilePipeline: ExtrudedTilePipeline
     /// Depth-only state of the shadow-caster pass (no stencil attachment there).
-    private let extrudedDepthState: MTLDepthStencilState
+    private let extrudedDepthState: any GPUDepthStencilState
     /// World-pass buildings: scene depth plus the tile-priority stencil test.
-    private let extrudedStencilTestState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let extrudedStencilTestState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     private let shadowMapTextureProvider: () -> MTLTexture?
     private let shadowFallbackTexture: MTLTexture
     private let debugOverlayControls: DebugOverlayControlState
     /// The index buffers the tiles draw from while the frame's models
     /// stand in for some of their buildings, shared by the world pass and
     /// the casters.
-    private let hiddenBuildingIndexBuffers = HiddenBuildingIndexBuffers()
+    private let hiddenBuildingIndexBuffers: HiddenBuildingIndexBuffers
+    /// Makes the relief's lifts and the working index buffers.
+    private let device: any GPUDevice
     private let extrusion: ImmersiveMapSettings.ExtrusionSettings
     private var rise = ExtrusionRise<VisibleTile>()
     /// How far each of the frame's building placements has risen,
@@ -53,20 +57,23 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
     /// units, which change with the zoom, and not as drawn, which changes
     /// with the relief's fade: the drawer binds the units a metre rises
     /// by this frame beside them, the exaggeration in them.
-    private var liftBuffers: [MTLBuffer?] = []
+    private var liftBuffers: [(any GPUBuffer)?] = []
     /// The lifts' cache, by tile and terrain (`BuildingReliefLifts`).
     private let reliefLifts = BuildingReliefLifts()
     private var drawsAny = false
 
-    init(extrudedTilePipeline: ExtrudedTilePipeline,
-         extrudedDepthState: MTLDepthStencilState,
-         extrudedStencilTestState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
+    init(device: any GPUDevice,
+         extrudedTilePipeline: ExtrudedTilePipeline,
+         extrudedDepthState: any GPUDepthStencilState,
+         extrudedStencilTestState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
          shadowMapTextureProvider: @escaping () -> MTLTexture?,
          shadowFallbackTexture: MTLTexture,
          extrusion: ImmersiveMapSettings.ExtrusionSettings = ImmersiveMapSettings.ExtrusionSettings(),
          debugOverlayControls: DebugOverlayControlState) {
         self.debugOverlayControls = debugOverlayControls
+        self.device = device
+        self.hiddenBuildingIndexBuffers = HiddenBuildingIndexBuffers(device: device)
         self.extrusion = extrusion
         self.extrudedTilePipeline = extrudedTilePipeline
         self.extrudedDepthState = extrudedDepthState
@@ -139,7 +146,7 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
         liftBuffers = reliefLifts.update(placements: placements,
                                          drawnKeys: drawnKeys,
                                          relief: frameContext.services.groundRelief,
-                                         device: extrudedTilePipeline.pipelineState.device)
+                                         device: device)
     }
 
     /// The frame's relief the lifts are drawn by: the datum, the terrain
@@ -161,10 +168,11 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
         return Tile(x: tile.x >> shift, y: tile.y >> shift, z: tile.z - shift)
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
         guard frameContext.renderSurfaceMode == .flat, drawsAny else {
             return
         }
+        let encoder = MetalRenderEncoder(metalEncoder)
 
         if let slot = ShadowCascadeSlot(casterLayer: layer) {
             guard let lightProjectionView = frameContext.shadowFrameState?.lightProjectionView(for: slot) else { return }
@@ -199,7 +207,7 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
         reliefLifts.evict()
     }
 
-    private func drawBuildings(encoder: MTLRenderCommandEncoder,
+    private func drawBuildings(encoder: any GPURenderEncoder,
                                frameContext: FrameContext) {
         let shadowBinding = ShadowReceiverBinding.resolve(frameContext: frameContext,
                                                           shadowMapTexture: shadowMapTextureProvider(),
@@ -209,7 +217,10 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
         let lift = Self.lift(frameContext)
         BuildingExtrusionDrawer.drawBuildings(renderEncoder: encoder,
                                               cameraUniform: frameContext.cameraUniform,
-                                              shadowBinding: shadowBinding,
+                                              shadowUniform: shadowBinding.uniform,
+                                              // The render core's shadow map or its fallback,
+                                              // both in the shadow map's format.
+                                              shadowMap: MetalTexture(shadowBinding.texture, format: ShadowCascadeAtlas.depthFormat),
                                               placeTilesContext: frameContext.sharedState.tilePlacementState.buildingPlaceTilesContext,
                                               indexBuffers: hiddenBuildingIndexBuffers,
                                               flatRenderState: frameContext.resolvedPresentation.flatRenderState,

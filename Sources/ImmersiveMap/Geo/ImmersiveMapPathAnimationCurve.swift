@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Timing of a traversal of an ``ImmersiveMapGeoPath``: a scene model flying
 /// along it, or the camera following it. Shared so a model and the camera

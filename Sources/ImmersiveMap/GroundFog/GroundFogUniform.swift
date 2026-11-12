@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The fog on the ground of the flat map (`ImmersiveMapSettings
@@ -240,8 +240,7 @@ struct GroundFogUniform {
 
     /// Binds the fog for every fogged fragment shader the encoder draws
     /// with next.
-    static func bind(_ uniform: GroundFogUniform, encoder: MTLRenderCommandEncoder) {
-        var value = uniform
-        encoder.setFragmentBytes(&value, length: MemoryLayout<GroundFogUniform>.stride, index: bufferIndex)
+    static func bind(_ uniform: GroundFogUniform, encoder: any GPURenderEncoder) {
+        encoder.setFragmentValue(uniform, index: bufferIndex)
     }
 }

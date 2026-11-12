@@ -1,7 +1,10 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import PortableFoundation
+#if canImport(QuartzCore)
 import QuartzCore
+#endif
 
 /// Applies `ImmersiveMapCameraController` commands to the camera runtime.
 /// Uses only narrow dependencies for applying the camera position and starting camera animations.

@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 /// A debug panel drawn over the map: the one the `ImmersiveMapDebug`
 /// product ships, installed with `ImmersiveMapView.debugPanel(_:)`.

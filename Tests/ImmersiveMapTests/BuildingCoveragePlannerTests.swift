@@ -22,7 +22,7 @@ final class BuildingCoveragePlannerTests: XCTestCase {
     private func resident(_ tiles: [Tile], quartered: Set<Tile> = []) throws -> [Tile: MetalTile] {
         var resident: [Tile: MetalTile] = [:]
         for tile in tiles {
-            var extruded = TileBuffers.Extruded(vertices: nil, indices: nil, styles: nil, indexType: .uint16)
+            var extruded = TileBuffers.Extruded(vertices: nil, indices: nil, styles: nil, gpuIndexType: .uint16)
             if quartered.contains(tile) {
                 extruded.quarterIndexStarts = [0, 0, 0, 0, 0]
             }

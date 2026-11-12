@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The sun on the globe (`ImmersiveMapSettings.GlobeLightSettings`) as the
@@ -99,8 +99,7 @@ struct GlobeLightUniform {
 
     /// Binds the light for every lit globe fragment shader the encoder
     /// draws with next.
-    static func bind(_ uniform: GlobeLightUniform, encoder: MTLRenderCommandEncoder) {
-        var value = uniform
-        encoder.setFragmentBytes(&value, length: MemoryLayout<GlobeLightUniform>.stride, index: bufferIndex)
+    static func bind(_ uniform: GlobeLightUniform, encoder: any GPURenderEncoder) {
+        encoder.setFragmentValue(uniform, index: bufferIndex)
     }
 }

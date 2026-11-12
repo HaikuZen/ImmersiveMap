@@ -1,8 +1,11 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+#if canImport(Accelerate)
 import Accelerate
-import Metal
+#endif
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// One terrain tile's heights: as half floats in a texture for the GPU,
@@ -24,8 +27,9 @@ import simd
 /// under the store's lock alone (`setOcclusion`), each read where it is
 /// written.
 final class GroundReliefTile: @unchecked Sendable {
-    /// `r16Float`, row 0 at the north edge.
-    let texture: MTLTexture
+    /// `r16Float`, row 0 at the north edge. The relief drawers still on Metal
+    /// read it as `texture` (`GroundReliefTile+Metal.swift`).
+    let gpuTexture: any GPUTexture
     let size: Int
     /// The texture's texels, row by row, with the edges as welded.
     private(set) var halves: [UInt16]
@@ -41,11 +45,11 @@ final class GroundReliefTile: @unchecked Sendable {
     /// The tile's occlusion of the sky as an `r8Unorm` texture
     /// (`GroundReliefOcclusion`), and the key it was computed with, nil
     /// until computed. Set under the store's lock, read there.
-    private(set) var occlusion: MTLTexture?
+    private(set) var gpuOcclusion: (any GPUTexture)?
     private(set) var occlusionKey: GroundReliefOcclusion.Key?
 
-    func setOcclusion(_ texture: MTLTexture?, key: GroundReliefOcclusion.Key?) {
-        occlusion = texture
+    func setOcclusion(_ texture: (any GPUTexture)?, key: GroundReliefOcclusion.Key?) {
+        gpuOcclusion = texture
         occlusionKey = key
     }
 
@@ -58,8 +62,8 @@ final class GroundReliefTile: @unchecked Sendable {
         let east: [UInt16]
     }
 
-    init(texture: MTLTexture, size: Int, halves: [UInt16], heightRange: ClosedRange<Float>) {
-        self.texture = texture
+    init(texture: any GPUTexture, size: Int, halves: [UInt16], heightRange: ClosedRange<Float>) {
+        self.gpuTexture = texture
         self.size = size
         self.halves = halves
         self.heightRange = heightRange
@@ -71,18 +75,18 @@ final class GroundReliefTile: @unchecked Sendable {
 
     /// A decoded tile's heights as half floats, in a texture for the GPU
     /// and on the CPU. Off the main thread, on the load's own task.
-    static func make(heights: GroundReliefHeights, device: MTLDevice) throws -> GroundReliefTile {
+    /// The GPU made no texture for the tile (memory pressure).
+    struct TextureUnavailable: Error {}
+
+    static func make(heights: GroundReliefHeights, device: any GPUDevice) throws -> GroundReliefTile {
         let size = heights.size
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r16Float,
-                                                                  width: size,
-                                                                  height: size,
-                                                                  mipmapped: false)
-        descriptor.usage = .shaderRead
-        descriptor.storageMode = .shared
-        guard let texture = device.makeTexture(descriptor: descriptor) else {
-            throw URLError(.cannotCreateFile)
+        var descriptor = GPUTextureDescriptor(format: .r16Float, width: size, height: size)
+        descriptor.storage = .shared
+        guard let texture = device.makeTexture(descriptor) else {
+            throw TextureUnavailable()
         }
         var halves = [UInt16](repeating: 0, count: size * size)
+        #if canImport(Accelerate)
         var metres = heights.metres
         metres.withUnsafeMutableBytes { source in
             halves.withUnsafeMutableBytes { destination in
@@ -93,16 +97,23 @@ final class GroundReliefTile: @unchecked Sendable {
                 _ = vImageConvert_PlanarFtoPlanar16F(&sourceBuffer, &destinationBuffer, vImage_Flags(kvImageNoFlags))
             }
         }
-        halves.withUnsafeBytes { bytes in
-            texture.replace(region: MTLRegionMake2D(0, 0, size, size),
-                            mipmapLevel: 0,
-                            withBytes: bytes.baseAddress!,
-                            bytesPerRow: size * MemoryLayout<UInt16>.stride)
-        }
         var lowest: Float = 0
         var highest: Float = 0
         vDSP_minv(heights.metres, 1, &lowest, vDSP_Length(heights.metres.count))
         vDSP_maxv(heights.metres, 1, &highest, vDSP_Length(heights.metres.count))
+        #else
+        // The same rounding as vImage's, to nearest even (`HalfFloat`).
+        for index in halves.indices {
+            halves[index] = HalfFloat.bits(heights.metres[index])
+        }
+        let lowest = heights.metres.min() ?? 0
+        let highest = heights.metres.max() ?? 0
+        #endif
+        halves.withUnsafeBytes { bytes in
+            texture.replace(x: 0, y: 0, width: size, height: size,
+                            mipmapLevel: 0, slice: 0,
+                            bytes: bytes.baseAddress!, bytesPerRow: size * MemoryLayout<UInt16>.stride)
+        }
         return GroundReliefTile(texture: texture,
                                 size: size,
                                 halves: halves,
@@ -115,7 +126,7 @@ final class GroundReliefTile: @unchecked Sendable {
     }
 
     var costInBytes: Int {
-        texture.allocatedSize + (halves.count + size * 4) * MemoryLayout<UInt16>.stride + (occlusion?.allocatedSize ?? 0)
+        gpuTexture.allocatedSize + (halves.count + size * 4) * MemoryLayout<UInt16>.stride + (gpuOcclusion?.allocatedSize ?? 0)
     }
 
     /// Writes texels of a welded edge on the CPU, a rectangle of `width` by
