@@ -286,8 +286,10 @@ package final class MetalCommandQueue: GPUCommandQueue {
 
 /// The GPU interface over a Metal device and the shader library its
 /// pipelines' functions come from. A device made without a library makes
-/// buffers, textures and states, and refuses pipelines.
-package final class MetalDevice: GPUDevice {
+/// buffers, textures and states, and refuses pipelines. Unchecked
+/// Sendable: it holds the device and the library and changes neither, and
+/// Metal makes both safe to use from any thread.
+package final class MetalDevice: GPUDevice, @unchecked Sendable {
     package let device: MTLDevice
     package let library: MTLLibrary?
 

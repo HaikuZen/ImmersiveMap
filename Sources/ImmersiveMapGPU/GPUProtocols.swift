@@ -139,7 +139,9 @@ package enum GPUError: Error, Equatable {
     case pipelineCreationFailed(String)
 }
 
-package protocol GPUDevice: AnyObject {
+/// Sendable: resources are made from the threads that build them (a tile's
+/// or a layer's meshes off the main thread), as with Metal's device.
+package protocol GPUDevice: AnyObject, Sendable {
     var features: GPUDeviceFeatures { get }
 
     func supportsTextureSampleCount(_ count: Int) -> Bool

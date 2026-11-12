@@ -515,9 +515,8 @@ final class SharedRenderResources {
                                           pixelFormat: pixelFormat,
                                           library: library,
                                           sampleCount: sampleCount) },
-            { layerPipeline = LayerPipeline(metalDevice: device,
-                                            pixelFormat: pixelFormat,
-                                            library: library,
+            { layerPipeline = LayerPipeline(device: MetalDevice(device: device, library: library),
+                                            pixelFormat: GPUPixelFormat(metal: pixelFormat)!,
                                             sampleCount: sampleCount) }
         ]
         DispatchQueue.concurrentPerform(iterations: jobs.count) { jobs[$0]() }

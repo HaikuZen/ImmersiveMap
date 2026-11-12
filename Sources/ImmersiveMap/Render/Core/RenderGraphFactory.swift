@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import Metal
 
 enum RenderGraphFactory {
@@ -107,7 +108,7 @@ enum RenderGraphFactory {
         let layerSubsystem = LayerRenderSubsystem(source: context.layerSource,
                                                   store: context.layerMeshStore,
                                                   pipeline: context.layerPipeline,
-                                                  depthDisabledState: context.depthDisabledState)
+                                                  depthDisabledState: MetalDepthStencilState(context.depthDisabledState))
         let reliefShadowCasterSubsystem = GroundReliefShadowCasterSubsystem(device: context.metalContext.device,
                                                                             pipeline: context.rasterTilePipeline,
                                                                             depthState: context.extrudedDepthState,

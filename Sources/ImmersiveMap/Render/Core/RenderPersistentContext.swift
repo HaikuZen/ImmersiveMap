@@ -226,7 +226,7 @@ final class RenderPersistentContext {
         self.treeModelStore.eventSink = eventSink
         self.layerSource = layerSource
         self.layerPipeline = shared.layerPipeline
-        self.layerMeshStore = LayerMeshStore(device: metal.device)
+        self.layerMeshStore = LayerMeshStore(device: MetalDevice(device: metal.device, library: nil))
         self.layerMeshStore.eventSink = eventSink
 
         self.avatarSource = avatarSource

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
+import Synchronization
 
 // A GPU that draws nothing and keeps a log of what it was asked: for the
 // tests of a feature's drawing, which check the calls a feature makes (its
@@ -277,12 +278,20 @@ package final class RecordingCommandQueue: GPUCommandQueue {
 
 /// A recording device. Its pipelines' functions are found in
 /// `shaderFunctions` when it is set, and any name is taken when it is nil.
-package final class RecordingGPUDevice: GPUDevice {
+/// What it makes may be asked for from any thread, as a mesh build does,
+/// so its logs are kept under a lock. Set its properties before handing it
+/// to the code under test.
+package final class RecordingGPUDevice: GPUDevice, @unchecked Sendable {
     package var features: GPUDeviceFeatures
     package var shaderFunctions: Set<String>?
-    package private(set) var buffers: [RecordingBuffer] = []
-    package private(set) var textures: [RecordingTexture] = []
-    package private(set) var pipelines: [GPURenderPipelineDescriptor] = []
+    private let lock = Mutex(())
+    private var bufferLog: [RecordingBuffer] = []
+    private var textureLog: [RecordingTexture] = []
+    private var pipelineLog: [GPURenderPipelineDescriptor] = []
+
+    package var buffers: [RecordingBuffer] { lock.withLock { _ in bufferLog } }
+    package var textures: [RecordingTexture] { lock.withLock { _ in textureLog } }
+    package var pipelines: [GPURenderPipelineDescriptor] { lock.withLock { _ in pipelineLog } }
 
     package init(features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .astc],
                  shaderFunctions: Set<String>? = nil) {
@@ -295,9 +304,11 @@ package final class RecordingGPUDevice: GPUDevice {
     package func makeBuffer(length: Int, storage: GPUStorage) -> (any GPUBuffer)? {
         // Metal makes no buffer of no bytes, and the engine's code counts on it.
         guard length > 0 else { return nil }
-        let buffer = RecordingBuffer(name: "buffer \(buffers.count)", length: length, storage: storage)
-        buffers.append(buffer)
-        return buffer
+        return lock.withLock { _ in
+            let buffer = RecordingBuffer(name: "buffer \(bufferLog.count)", length: length, storage: storage)
+            bufferLog.append(buffer)
+            return buffer
+        }
     }
 
     package func makeBuffer(bytes: UnsafeRawPointer, length: Int, storage: GPUStorage) -> (any GPUBuffer)? {
@@ -307,9 +318,11 @@ package final class RecordingGPUDevice: GPUDevice {
     }
 
     package func makeTexture(_ descriptor: GPUTextureDescriptor) -> (any GPUTexture)? {
-        let texture = RecordingTexture(name: "texture \(textures.count)", descriptor: descriptor)
-        textures.append(texture)
-        return texture
+        lock.withLock { _ in
+            let texture = RecordingTexture(name: "texture \(textureLog.count)", descriptor: descriptor)
+            textureLog.append(texture)
+            return texture
+        }
     }
 
     package func makeSampler(_ descriptor: GPUSamplerDescriptor) -> (any GPUSampler)? {
@@ -326,7 +339,7 @@ package final class RecordingGPUDevice: GPUDevice {
                 throw GPUError.missingFunction(function.name)
             }
         }
-        pipelines.append(descriptor)
+        lock.withLock { _ in pipelineLog.append(descriptor) }
         return RecordingRenderPipeline(descriptor)
     }
 
