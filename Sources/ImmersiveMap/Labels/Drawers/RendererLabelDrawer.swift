@@ -33,7 +33,7 @@ final class RendererLabelDrawer {
                                screenMatrix: matrix_float4x4,
                                screenScale: ScreenScale,
                                textRenderer: TextRenderer,
-                               poiSpriteAtlas: PoiSpriteAtlas,
+                               poiSpriteTexture: any GPUTexture,
                                screenPositionsBuffer: any GPUBuffer,
                                labelRuntimeMetaBuffer: any GPUBuffer,
                                baseLabelsDrawBatches: [BaseLabelDrawBatch],
@@ -59,7 +59,7 @@ final class RendererLabelDrawer {
 
                 if bindings.isPoiPipelineBound == false {
                     renderEncoder.setPipeline(textRenderer.poiIconPipelineState)
-                    setFragmentTexture(poiSpriteAtlas.texture, renderEncoder: renderEncoder, bindings: &bindings)
+                    setFragmentTexture(poiSpriteTexture, renderEncoder: renderEncoder, bindings: &bindings)
                     bindings.isPoiPipelineBound = true
                 }
                 let iconStyle = PoiIconStyleUniform(

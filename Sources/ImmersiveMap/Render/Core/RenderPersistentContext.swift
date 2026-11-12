@@ -220,7 +220,7 @@ final class RenderPersistentContext {
         self.groundRelief = GroundReliefFrameState.make(settings: config,
                                                         hillshade: styleRuntime.hillshade,
                                                         occlusion: styleRuntime.terrainOcclusion,
-                                                        device: metal.device)
+                                                        device: shared.gpuDevice)
         self.groundRelief?.store.eventSink = eventSink
         self.treePipeline = shared.treePipeline
         self.treePalette = styleRuntime.treePalette

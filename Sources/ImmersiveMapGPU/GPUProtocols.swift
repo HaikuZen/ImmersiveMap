@@ -9,6 +9,9 @@
 /// made where the tile is built and drawn on the main thread.
 package protocol GPUBuffer: AnyObject, Sendable {
     var length: Int { get }
+    /// What the allocation takes in GPU memory, the padding the driver adds
+    /// included, where the backend can tell, and `length` where it cannot.
+    var allocatedSize: Int { get }
     /// A name for GPU captures and debuggers. No effect on drawing.
     var label: String? { get set }
 
@@ -25,6 +28,9 @@ package protocol GPUTexture: AnyObject {
     var arrayLength: Int { get }
     var format: GPUPixelFormat { get }
     var type: GPUTextureType { get }
+    /// What the texture takes in GPU memory where the backend can tell,
+    /// its texels' bytes where it cannot.
+    var allocatedSize: Int { get }
 
     /// Writes the bytes into a region of one slice and mip level.
     func replace(x: Int, y: Int, width: Int, height: Int,

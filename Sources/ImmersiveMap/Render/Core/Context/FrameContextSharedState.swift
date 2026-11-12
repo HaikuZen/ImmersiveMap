@@ -7,7 +7,6 @@
 //
 
 import ImmersiveMapGPU
-import Metal
 
 struct BaseLabelState {
     nonisolated(unsafe) static let empty = BaseLabelState(labelInputsCount: 0,
@@ -197,6 +196,7 @@ final class FrameContextSharedState {
     /// The world's depth as the label pass reads it, single-sampled: set by
     /// the pass plan when it was kept, nil otherwise. Only the buildings and
     /// the models write real depth in it; the ground writes a band at the
-    /// far plane, farther than anything real.
-    var sceneDepthTexture: MTLTexture?
+    /// far plane, farther than anything real. The render core still sets and
+    /// reads it as Metal's (`FrameContextSharedState+Metal.swift`).
+    var gpuSceneDepthTexture: (any GPUTexture)?
 }

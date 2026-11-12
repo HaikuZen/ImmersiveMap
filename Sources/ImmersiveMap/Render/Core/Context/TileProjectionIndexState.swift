@@ -6,18 +6,16 @@
 //  ImmersiveMap
 //
 
-import Metal
+import PortableFoundation
 
 struct TileProjectionIndexState {
     nonisolated(unsafe) static let empty = TileProjectionIndexState(sourceProjectionTiles: [],
                                                 tileIndexAllocator: VisibleTileIndexAllocator(indexedTiles: []),
                                                 tileOriginData: [],
-                                                tileOriginDataBuffer: nil,
                                                 sourceIndexVersion: 0)
 
     let sourceProjectionTiles: [VisibleTile]
     let tileIndexAllocator: VisibleTileIndexAllocator
     let tileOriginData: [FlatTileOriginData]
-    let tileOriginDataBuffer: MTLBuffer?
     let sourceIndexVersion: UInt64
 }

@@ -1,5 +1,6 @@
 // swift-tools-version: 6.1
 
+import Foundation
 import PackageDescription
 
 // The engine draws with Metal and its views are SwiftUI, so the products
@@ -123,6 +124,10 @@ var targets: [Target] = [
         name: "ImmersiveMapGPUTests",
         dependencies: ["ImmersiveMapGPU", "ImmersiveMapGPUTestSupport"]
     ),
+    // Holds PortableEngineExclusions.txt to the engine's own imports.
+    .testTarget(
+        name: "PortableEngineLayoutTests"
+    ),
     .testTarget(
         name: "PortableImageTests",
         dependencies: ["PortableImage"]
@@ -148,6 +153,36 @@ var targets: [Target] = [
 
 if slim {
     targets.removeAll { $0.isTest && ["PortableFoundationTests", "PortableImageTests", "ImmersiveMapGPUTests"].contains($0.name) == false }
+}
+
+// The engine's files that build on Apple's platforms alone, listed in
+// PortableEngineExclusions.txt (what goes in it is said there). Pinned, not
+// read from the imports here, so a shared file that gains an Apple import
+// fails `PortableEngineLayoutTests` instead of leaving the portable build
+// without a word.
+func portableEngineExclusions() -> [String] {
+    let list = URL(fileURLWithPath: Context.packageDirectory).appendingPathComponent("PortableEngineExclusions.txt")
+    guard let text = try? String(contentsOf: list, encoding: .utf8) else {
+        fatalError("PortableEngineExclusions.txt is missing")
+    }
+    return text.split(separator: "\n")
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { $0.isEmpty == false && $0.hasPrefix("#") == false }
+}
+
+// The engine in the portable package: asked for with IMMERSIVE_MAP_ENGINE=1
+// (CI's Linux job does) until it builds for WebAssembly too, whose
+// networking and threading stand-ins are still to come, then always.
+let portableEngine = portable && Context.environment["IMMERSIVE_MAP_ENGINE"] == "1"
+
+if portableEngine {
+    targets += [
+        .target(
+            name: "ImmersiveMap",
+            dependencies: ["Earcut", "ImmersiveMapGPU", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening", "simd", "os"],
+            exclude: portableEngineExclusions()
+        )
+    ]
 }
 
 if portable {

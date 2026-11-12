@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// Computes the terrain tiles' occlusion of the sky (`GroundReliefOcclusion`)
 /// off the main thread, for the terrain store (`GroundReliefStore`): a
@@ -22,9 +22,9 @@ final class GroundReliefOcclusionScheduler: @unchecked Sendable {
 
     /// What a draw samples for a tile whose occlusion is not computed:
     /// one texel of 0, no darkening.
-    let fallbackTexture: MTLTexture?
+    let fallbackTexture: (any GPUTexture)?
 
-    private let device: MTLDevice
+    private let device: any GPUDevice
     private let queue = DispatchQueue(label: "ImmersiveMap.GroundReliefOcclusion", qos: .utility)
     private let lock = NSLock()
     private var currentKey: Key
@@ -32,7 +32,7 @@ final class GroundReliefOcclusionScheduler: @unchecked Sendable {
     private var generation: UInt64 = 0
     private var lastMilliseconds: Double = 0
 
-    init(device: MTLDevice, key: Key) {
+    init(device: any GPUDevice, key: Key) {
         self.device = device
         self.currentKey = key
         self.fallbackTexture = Self.makeTexture(device: device, bytes: [0], resolution: 1)
@@ -73,7 +73,7 @@ final class GroundReliefOcclusionScheduler: @unchecked Sendable {
 
     /// The occlusion of a tile just decoded, under the key of the moment,
     /// before the tile is in: on the load's own task.
-    func compute(tile: Tile, terrain: GroundReliefTile) -> (texture: MTLTexture?, key: Key) {
+    func compute(tile: Tile, terrain: GroundReliefTile) -> (texture: (any GPUTexture)?, key: Key) {
         let key = self.key
         return (compute(tile: tile, size: terrain.size, halves: terrain.halves, key: key), key)
     }
@@ -84,7 +84,7 @@ final class GroundReliefOcclusionScheduler: @unchecked Sendable {
     func recompute(_ tiles: [(tile: Tile, terrain: GroundReliefTile, halves: [UInt16])],
                    key: Key,
                    generation: UInt64,
-                   deliver: @escaping @Sendable (GroundReliefTile, MTLTexture?) -> Void) {
+                   deliver: @escaping @Sendable (GroundReliefTile, (any GPUTexture)?) -> Void) {
         queue.async { [weak self] in
             for entry in tiles {
                 guard let self, self.isCurrent(generation) else { return }
@@ -96,35 +96,31 @@ final class GroundReliefOcclusionScheduler: @unchecked Sendable {
 
     /// The occlusion of a tile's heights as a texture, nil under a key
     /// that computes nothing. Off the main thread.
-    private func compute(tile: Tile, size: Int, halves: [UInt16], key: Key) -> MTLTexture? {
+    private func compute(tile: Tile, size: Int, halves: [UInt16], key: Key) -> (any GPUTexture)? {
         guard key.computes else { return nil }
-        let started = CFAbsoluteTimeGetCurrent()
+        let started = ContinuousClock.now
         let bytes = GroundReliefOcclusion.compute(halves: halves,
                                                   size: size,
                                                   metresPerTexel: GroundReliefOcclusion.metresPerTexel(tile: tile, size: size),
                                                   key: key)
         let texture = Self.makeTexture(device: device, bytes: bytes, resolution: key.resolution)
-        let milliseconds = (CFAbsoluteTimeGetCurrent() - started) * 1000
+        let elapsed = started.duration(to: .now).components
+        let milliseconds = Double(elapsed.seconds) * 1000 + Double(elapsed.attoseconds) / 1e15
         lock.lock()
         lastMilliseconds = milliseconds
         lock.unlock()
         return texture
     }
 
-    private static func makeTexture(device: MTLDevice, bytes: [UInt8], resolution: Int) -> MTLTexture? {
+    private static func makeTexture(device: any GPUDevice, bytes: [UInt8], resolution: Int) -> (any GPUTexture)? {
         guard resolution > 0, bytes.count == resolution * resolution else { return nil }
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r8Unorm,
-                                                                  width: resolution,
-                                                                  height: resolution,
-                                                                  mipmapped: false)
-        descriptor.usage = .shaderRead
-        descriptor.storageMode = .shared
-        guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
+        var descriptor = GPUTextureDescriptor(format: .r8Unorm, width: resolution, height: resolution)
+        descriptor.storage = .shared
+        guard let texture = device.makeTexture(descriptor) else { return nil }
         bytes.withUnsafeBytes { pointer in
-            texture.replace(region: MTLRegionMake2D(0, 0, resolution, resolution),
-                            mipmapLevel: 0,
-                            withBytes: pointer.baseAddress!,
-                            bytesPerRow: resolution)
+            texture.replace(x: 0, y: 0, width: resolution, height: resolution,
+                            mipmapLevel: 0, slice: 0,
+                            bytes: pointer.baseAddress!, bytesPerRow: resolution)
         }
         return texture
     }

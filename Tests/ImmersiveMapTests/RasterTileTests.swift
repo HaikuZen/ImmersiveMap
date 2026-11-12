@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import simd
 import XCTest
@@ -71,7 +72,7 @@ final class RasterTileTests: XCTestCase {
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r16Float, width: 512, height: 512, mipmapped: false)
         let texture = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
-        let terrain = GroundReliefTile(texture: texture, size: 512, halves: Array(repeating: 0, count: 512 * 512),
+        let terrain = GroundReliefTile(texture: MetalTexture(texture, format: .r16Float), size: 512, halves: Array(repeating: 0, count: 512 * 512),
                                        heightRange: 0 ... 0)
         func relief(scale: Float) -> GroundRelief {
             GroundRelief(terrain: terrain, origin: .zero, scale: scale, strength: 1)

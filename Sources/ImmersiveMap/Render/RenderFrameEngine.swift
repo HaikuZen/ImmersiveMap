@@ -507,7 +507,7 @@ final class RenderFrameEngine {
                             viewport: cameraFrameState.viewport,
                             cameraMatrices: cameraMatrices,
                             cameraEye: cameraEye,
-                            commandBuffer: commandBuffer,
+                            gpuCommandBuffer: commandBuffer.map(MetalCommandBuffer.init),
                             services: services,
                             mapCameraState: cameraFrameState.mapCameraState,
                             animatedZoom: animatedZoomValue,

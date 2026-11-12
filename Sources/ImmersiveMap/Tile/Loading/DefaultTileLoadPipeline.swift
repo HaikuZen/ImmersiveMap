@@ -20,9 +20,9 @@ final class DefaultTileLoadPipeline: TileLoadPipeline {
     // archive's source revision, nil when nothing is reported.
     private let archiveDepths: (depths: TileArchiveDepths, sourceRevision: UInt64)?
     private let archiveDepthCheck = OSAllocatedUnfairLock(initialState: false)
-    private weak var tileRenderStore: TileRenderStore?
+    private weak var tileRenderStore: (any TileMaterializing)?
 
-    convenience init(tileRenderStore: TileRenderStore,
+    convenience init(tileRenderStore: any TileMaterializing,
                      config: ImmersiveMapSettings,
                      preparedTileCacheIdentity: PreparedTileCacheIdentity,
                      geometryTransport: any PreparedTileGeometryTransporting) {
@@ -39,7 +39,7 @@ final class DefaultTileLoadPipeline: TileLoadPipeline {
                   archiveDepths: (.shared, preparedTileCacheIdentity.tileSourceRevision))
     }
 
-    init(tileRenderStore: TileRenderStore?,
+    init(tileRenderStore: (any TileMaterializing)?,
          preparedTileDiskCaching: PreparedTileDiskCaching?,
          tileDownloader: TileDownloader,
          archiveVersion: TileArchiveVersion? = nil,

@@ -57,6 +57,7 @@ package final class RecordingBuffer: GPUBuffer, @unchecked Sendable {
     }
 
     package let length: Int
+    package var allocatedSize: Int { length }
     package var label: String?
 
     package func contents() -> UnsafeMutableRawPointer {
@@ -86,6 +87,8 @@ package final class RecordingTexture: GPUTexture {
     package var arrayLength: Int { descriptor.arrayLength }
     package var format: GPUPixelFormat { descriptor.format }
     package var type: GPUTextureType { descriptor.type }
+    /// Its texels' bytes, four a texel: the recording GPU keeps none.
+    package var allocatedSize: Int { width * height * arrayLength * 4 }
 
     package func replace(x: Int, y: Int, width: Int, height: Int,
                          mipmapLevel _: Int, slice: Int,

@@ -30,7 +30,7 @@ final class HiddenBuildingIndexBuffersTests: XCTestCase {
         let extruded = TileBuffers.Extruded(vertices: nil,
                                             indices: TileBufferView(gpuBuffer: MetalBuffer(buffer), offset: offset, count: indices.count),
                                             styles: nil,
-                                            indexType: .uint16,
+                                            gpuIndexType: .uint16,
                                             buildingRanges: [TileBuildingRange(featureID: 1, indexStart: 0, indexCount: 3),
                                                              TileBuildingRange(featureID: 2, indexStart: 3, indexCount: 6),
                                                              TileBuildingRange(featureID: 3, indexStart: 9, indexCount: 3)])

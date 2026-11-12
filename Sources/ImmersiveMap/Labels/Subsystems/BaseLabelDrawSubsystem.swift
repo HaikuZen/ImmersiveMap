@@ -74,7 +74,7 @@ final class BaseLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
                                            screenMatrix: frameContext.cameraMatrices.screen,
                                            screenScale: frameContext.screenScale,
                                            textRenderer: textRenderer,
-                                           poiSpriteAtlas: poiSpriteAtlas,
+                                           poiSpriteTexture: poiSpriteAtlas.texture,
                                            screenPositionsBuffer: screenPositionsBuffer,
                                            labelRuntimeMetaBuffer: labelRuntimeMetaBuffer,
                                            baseLabelsDrawBatches: baseLabelState.baseLabelsDrawBatches,

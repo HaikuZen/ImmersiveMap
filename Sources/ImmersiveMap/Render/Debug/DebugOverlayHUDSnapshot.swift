@@ -96,7 +96,7 @@ package struct DebugOverlayHUDSnapshot: Equatable {
             return nil
         }
 
-        let coordinateLines = DebugOverlayRenderer.makeCoordinateTextLines(zoom: zoom,
+        let coordinateLines = DebugOverlayTextLines.makeCoordinateTextLines(zoom: zoom,
                                                                            latitude: latitude,
                                                                            longitude: longitude)
         let tileLoadingStatus = content.contains(.tiles) ? tileLoadingStatus : nil
@@ -104,7 +104,7 @@ package struct DebugOverlayHUDSnapshot: Equatable {
             coordinateLines: DebugOverlayCoordinateLines(zoom: coordinateLines.zoom,
                                                         latLon: coordinateLines.latLon),
             diagnosticsLines: content.contains(.stats)
-                ? DebugOverlayRenderer.makeOverlayDiagnosticsTextLines(cameraDebugLines: cameraDebugLines,
+                ? DebugOverlayTextLines.makeOverlayDiagnosticsTextLines(cameraDebugLines: cameraDebugLines,
                                                                        diagnostics: diagnostics)
                 : [],
             tileLoadingStatusLines: tileLoadingStatus?.lines ?? [],

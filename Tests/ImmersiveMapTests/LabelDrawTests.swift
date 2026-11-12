@@ -89,11 +89,10 @@ final class LabelDrawTests: XCTestCase {
         XCTAssertEqual(renderer.texture.width, 1)
     }
 
-    #if canImport(CoreGraphics)
     func testBaseLabelsDrawPOIsThenPlatesThenTextBindingEachStateOnce() throws {
         let device = RecordingGPUDevice()
         let renderer = try makeTextRenderer(device: device)
-        let atlas = PoiSpriteAtlas(device: device)
+        let poiTexture = try XCTUnwrap(device.makeTexture(GPUTextureDescriptor(format: .bgra8Unorm, width: 64, height: 64)))
         let screenPositions = try XCTUnwrap(device.makeBuffer(length: 64, storage: .shared))
         let runtimeMeta = try XCTUnwrap(device.makeBuffer(length: 64, storage: .shared))
         let tileVertices = try view(device, count: 12)
@@ -110,7 +109,7 @@ final class LabelDrawTests: XCTestCase {
                                            screenMatrix: matrix_identity_float4x4,
                                            screenScale: .reference,
                                            textRenderer: renderer,
-                                           poiSpriteAtlas: atlas,
+                                           poiSpriteTexture: poiTexture,
                                            screenPositionsBuffer: screenPositions,
                                            labelRuntimeMetaBuffer: runtimeMeta,
                                            baseLabelsDrawBatches: [batch])
@@ -127,11 +126,10 @@ final class LabelDrawTests: XCTestCase {
             if case let .setFragmentTexture(name, 0) = command { return name }
             return nil
         }
-        XCTAssertEqual(textures, [name(atlas.texture), name(renderer.texture), name(renderer.thinTexture)])
+        XCTAssertEqual(textures, [name(poiTexture), name(renderer.texture), name(renderer.thinTexture)])
         let shifts = encoder.commands.filter { if case .setVertexBytes(_, 3) = $0 { return true } else { return false } }
         XCTAssertEqual(shifts.count, 1, "The shift is bound once for the tile's runs")
     }
-    #endif
 
     func testRoadLabelsBindTheSceneDepthAndEachLabelsBuffers() throws {
         let device = RecordingGPUDevice()

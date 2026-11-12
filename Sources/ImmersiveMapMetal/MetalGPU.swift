@@ -31,6 +31,10 @@ package final class MetalBuffer: GPUBuffer, @unchecked Sendable {
 
     package var length: Int { buffer.length }
 
+    /// The iOS Simulator's GPU reports 0 for every buffer: the requested
+    /// length is the honest lower bound there.
+    package var allocatedSize: Int { buffer.allocatedSize > 0 ? buffer.allocatedSize : buffer.length }
+
     package var label: String? {
         get { buffer.label }
         set { buffer.label = newValue }
@@ -55,6 +59,7 @@ package final class MetalTexture: GPUTexture {
     package var width: Int { texture.width }
     package var height: Int { texture.height }
     package var arrayLength: Int { texture.arrayLength }
+    package var allocatedSize: Int { texture.allocatedSize }
 
     package var type: GPUTextureType {
         switch texture.textureType {

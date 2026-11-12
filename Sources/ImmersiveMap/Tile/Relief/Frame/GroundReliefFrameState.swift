@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -106,7 +108,7 @@ final class GroundReliefFrameState {
     static func make(settings: ImmersiveMapSettings,
                      hillshade: ImmersiveMapHillshade,
                      occlusion: ImmersiveMapTerrainOcclusion = ImmersiveMapTerrainOcclusion(),
-                     device: MTLDevice) -> GroundReliefFrameState? {
+                     device: any GPUDevice) -> GroundReliefFrameState? {
         let relief = settings.tiles.groundRelief
         guard relief.isEnabled else {
             return nil
@@ -173,7 +175,7 @@ final class GroundReliefFrameState {
     /// buffer, nil with nothing to write.
     @discardableResult
     func beginFrame(commandQueue: MTLCommandQueue) -> MTLCommandBuffer? {
-        store.applyPendingWelds(commandQueue: commandQueue)
+        store.applyPendingWelds(commandQueue: MetalCommandQueue(commandQueue))?.metalCommandBuffer
     }
 
     /// The wanted terrain tiles still on their way

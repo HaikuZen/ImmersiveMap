@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import PortableFoundation
 
 
 /// Immutable after init: created by the factory in a background task and,

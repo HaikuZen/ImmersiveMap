@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import ImmersiveMapGPU
 
 struct TileBuffers {
     // Views are nil for empty layers (a tile without bridges/tunnels has
@@ -16,8 +16,10 @@ struct TileBuffers {
         /// edge threshold), lockstep with `styles`; see `TileLineStyle`.
         let lineStyles: TileBufferView?
         /// Element width of `indices`: layers within the 16-bit vertex range
-        /// are narrowed at build time, oversized ones stay 32-bit.
-        let indexType: MTLIndexType
+        /// are narrowed at build time, oversized ones stay 32-bit. The
+        /// drawers still on Metal read it as `indexType`
+        /// (`TileBuffers+Metal.swift`).
+        let gpuIndexType: GPUIndexType
         /// Ground only: the index buffer's per-style runs in paint order,
         /// what the sphere drawer layers the ground by. Empty elsewhere.
         let styleRuns: [GroundStyleRun]
@@ -40,7 +42,7 @@ struct TileBuffers {
              styles: TileBufferView?,
              styleZoomFade: TileBufferView?,
              lineStyles: TileBufferView?,
-             indexType: MTLIndexType,
+             indexType: GPUIndexType,
              styleRuns: [GroundStyleRun] = [],
              roadStyles: RoadLayerStyles = .empty,
              roadEdgeLineIndexStart: Int? = nil) {
@@ -49,7 +51,7 @@ struct TileBuffers {
             self.styles = styles
             self.styleZoomFade = styleZoomFade
             self.lineStyles = lineStyles
-            self.indexType = indexType
+            self.gpuIndexType = indexType
             self.styleRuns = styleRuns
             self.roadStyles = roadStyles
             self.roadEdgeLineIndexStart = roadEdgeLineIndexStart
@@ -68,8 +70,8 @@ struct TileBuffers {
         let vertices: TileBufferView?
         let indices: TileBufferView?
         let styles: TileBufferView?
-        /// Element width of `indices`; see `GeometryLayer.indexType`.
-        let indexType: MTLIndexType
+        /// Element width of `indices`; see `GeometryLayer.gpuIndexType`.
+        let gpuIndexType: GPUIndexType
         /// Each building's place in `indices`, sorted by feature id, see
         /// `TileBuildingRange`.
         var buildingRanges: [TileBuildingRange] = []
@@ -145,7 +147,7 @@ struct TileBuffers {
     /// The tile's single backing allocation: every view above points into it.
     /// nil only for a tile with no GPU content at all. The working-set store
     /// reads the tile's resident byte size from it.
-    let backingBuffer: MTLBuffer?
+    let gpuBackingBuffer: (any GPUBuffer)?
     let ground: GeometryLayer
     let roads: RoadStructureBuckets<RoadGeometryPhases<GeometryLayer>>
     let bridgeOverlay: GeometryLayer

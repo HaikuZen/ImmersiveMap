@@ -160,6 +160,16 @@ jobs:
       - name: Test
         run: swift test --build-system native
 
+      # The engine's files that build everywhere (PortableEngineExclusions.txt
+      # lists the rest), compiled on their own: a change that brings an
+      # Apple-only name into one of them fails here. Not yet in the
+      # WebAssembly job, whose networking and threading stand-ins are still
+      # to come.
+      - name: Build the portable engine
+        env:
+          IMMERSIVE_MAP_ENGINE: "1"
+        run: swift build --build-system native --target ImmersiveMap --scratch-path .build-engine
+
       # The slim build (the one meant for a browser) has its own geometry
       # types and lock, and keeps only the tests that run without Foundation.
       - name: Test the slim build

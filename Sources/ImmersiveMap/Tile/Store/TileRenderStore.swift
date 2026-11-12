@@ -7,7 +7,7 @@ import MetalKit
 /// Thread-safe (`@unchecked Sendable`): references are assigned during wiring
 /// before loads start, `workingSet` is internally synchronized and mutated
 /// only through main-actor hops.
-final class TileRenderStore: @unchecked Sendable {
+final class TileRenderStore: TileMaterializing, @unchecked Sendable {
     struct TileRequestResult {
         let readyTilesCount: Int
         let requestedTilesCount: Int

@@ -10,7 +10,7 @@ import PortableFoundation
 /// subsystem, runtime controller, renderer, parser, cache or public API of a
 /// domain folder lives here.
 func performOnMain(_ block: @escaping () -> Void) {
-    if Thread.isMainThread {
+    if isOnMainThread {
         block()
     } else {
         // The block is handed over to the main thread and runs there

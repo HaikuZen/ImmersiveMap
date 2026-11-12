@@ -53,7 +53,7 @@ final class FrameCameraStateResolver {
         self.cameraPoseResolver = RenderCameraPoseResolver()
         self.screenMatrix = ScreenMatrix()
         self.presentationSettings = settings.presentation
-        RendererSetup.configureCamera(cameraStateController)
+        Self.configureInitialCamera(cameraStateController)
         requestRenderCameraUpdate()
     }
 
@@ -220,5 +220,10 @@ final class FrameCameraStateResolver {
 
     private func requestRenderCameraUpdate() {
         cameraPoseResolver.requestUpdate()
+    }
+
+    /// Where a new camera starts, before the view's own position is applied.
+    static func configureInitialCamera(_ cameraStateController: CameraStateController) {
+        cameraStateController.setLatLonDeg(latDeg: 55.751244, lonDeg: 37.618423)
     }
 }

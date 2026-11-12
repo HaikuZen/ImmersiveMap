@@ -21,8 +21,8 @@ final class ImmersiveMapHostRuntime {
     private var currentMarkerContent: MarkerViewContent?
     private var powerStateObservers: NotificationObserverBag?
     /// Watches for the archive's depth turning out other than the one the
-    /// map was planned by (`TileArchiveDepths.didChange`).
-    private var archiveDepthObserver: NotificationObserverBag?
+    /// map was planned by (`TileArchiveDepths.observeChanges`).
+    private var archiveDepthObserver: TileArchiveDepths.ChangeObservation?
     /// The build of the shared resources the renderer waits for, while the
     /// process has none for the settings' sample count yet; see
     /// `createRenderer`.
@@ -60,16 +60,10 @@ final class ImmersiveMapHostRuntime {
     /// was planned by, the settings are applied again with it, and the
     /// planner rebuilds what the depth decides.
     private func subscribeToArchiveDepthChanges() {
-        archiveDepthObserver = NotificationObserverBag(observers: [
-            NotificationCenter.default.addObserver(forName: TileArchiveDepths.didChange,
-                                                   object: nil,
-                                                   queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    self.applySettings(self.runtimeGraph.cameraRuntime.currentSettings)
-                }
-            }
-        ])
+        archiveDepthObserver = TileArchiveDepths.observeChanges { [weak self] _ in
+            guard let self else { return }
+            self.applySettings(self.runtimeGraph.cameraRuntime.currentSettings)
+        }
     }
 
     /// Thermal pressure and Low Power Mode cap the display-link rates for the

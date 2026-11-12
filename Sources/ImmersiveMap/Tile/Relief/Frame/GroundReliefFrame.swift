@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The ground relief of one frame, as everything of the frame reads it:
@@ -98,7 +98,7 @@ struct GroundReliefFrame {
     var heightRangeMetres: ClosedRange<Float>? { store.heightRangeMetres }
 
     /// What a draw samples for a tile whose occlusion is not computed.
-    var occlusionFallbackTexture: MTLTexture? { store.occlusionFallbackTexture }
+    var gpuOcclusionFallbackTexture: (any GPUTexture)? { store.occlusionFallbackTexture }
 
     /// The zoom of the camera's terrain map (`GroundReliefStore.cameraTerrainZoom`).
     var cameraTerrainZoom: Int { store.cameraTerrainZoom }

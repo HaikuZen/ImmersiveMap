@@ -34,7 +34,7 @@ struct SceneModelAnchor {
 /// shear).
 enum SceneModelAnchorMath {
     static func resolveAnchor(presented: PresentedSceneModel,
-                              bounds: SceneModelMesh.Bounds,
+                              bounds: SceneModelBounds,
                               constants: GeoScreenProjectionMath.FrameConstants) -> SceneModelAnchor {
         let frame = GeoSurfaceFrameMath.resolve(basis: presented.projectionBasis, constants: constants)
 
