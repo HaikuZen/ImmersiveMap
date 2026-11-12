@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -208,7 +209,7 @@ final class SurfaceLabelRenderSubsystem: RenderSubsystem {
                                                   haloSoftness: style.haloSoftness)
         encoder.setVertexBytes(&drawUniform, length: MemoryLayout<SurfaceLabelDrawUniform>.stride, index: 4)
         encoder.setFragmentBytes(&drawUniform, length: MemoryLayout<SurfaceLabelDrawUniform>.stride, index: 0)
-        encoder.setFragmentTexture(style.weight == .thin ? textRenderer.thinTexture : textRenderer.texture, index: 0)
+        encoder.setFragmentTexture((style.weight == .thin ? textRenderer.thinTexture : textRenderer.texture).metalTexture, index: 0)
         encoder.setVertexBuffer(vertices.buffer, offset: vertices.offset, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: record.vertexStart, vertexCount: record.vertexCount)
     }
