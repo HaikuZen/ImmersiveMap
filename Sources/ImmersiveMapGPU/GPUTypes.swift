@@ -8,7 +8,8 @@
 // asks for it can be found.
 
 /// A texel format. The engine draws into `bgra8Unorm` and
-/// `depth32FloatStencil8`, samples the rest, and reads the scene models'
+/// `depth32FloatStencil8`, the shadow map into `depth16Unorm` (WebGPU's
+/// `depth16unorm`), samples the rest, and reads the scene models'
 /// textures as ASTC, which WebGPU has as an optional feature only
 /// (`GPUDeviceFeatures.astc`).
 package enum GPUPixelFormat: Hashable, Sendable {
@@ -17,6 +18,7 @@ package enum GPUPixelFormat: Hashable, Sendable {
     case r8Unorm
     case r16Float
     case depth32FloatStencil8
+    case depth16Unorm
     /// ASTC, low dynamic range, by its block's width and height in texels.
     case astc(blockWidth: Int, blockHeight: Int)
 }

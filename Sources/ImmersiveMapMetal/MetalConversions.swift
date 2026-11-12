@@ -16,6 +16,7 @@ extension GPUPixelFormat {
         case .r8Unorm: return .r8Unorm
         case .r16Float: return .r16Float
         case .depth32FloatStencil8: return .depth32Float_stencil8
+        case .depth16Unorm: return .depth16Unorm
         case let .astc(blockWidth, blockHeight):
             switch (blockWidth, blockHeight) {
             case (4, 4): return .astc_4x4_ldr
@@ -40,6 +41,7 @@ extension GPUPixelFormat {
         case .r8Unorm: self = .r8Unorm
         case .r16Float: self = .r16Float
         case .depth32Float_stencil8: self = .depth32FloatStencil8
+        case .depth16Unorm: self = .depth16Unorm
         case .astc_4x4_ldr: self = .astc(blockWidth: 4, blockHeight: 4)
         case .astc_5x5_ldr: self = .astc(blockWidth: 5, blockHeight: 5)
         case .astc_6x6_ldr: self = .astc(blockWidth: 6, blockHeight: 6)

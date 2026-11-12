@@ -67,7 +67,7 @@ enum RenderGraphFactory {
                                                                     shadowFallbackTexture: context.shadowFallbackTexture,
                                                                     groundFlatteningFromTileZoom: settings.tiles.resolvedGroundFlatteningFromTileZoom)
         let groundShadowMaskSubsystem = GroundShadowMaskRenderSubsystem(pipeline: context.groundShadowMaskPipeline,
-                                                                        depthDisabledState: context.depthDisabledState,
+                                                                        depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
                                                                         shadowMapTextureProvider: shadowMapTextureProvider)
         let placementStencilSubsystem = PlacementStencilRenderSubsystem(device: context.metalContext.device,
                                                                         pipeline: context.placementStencilPipeline,

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// Format of the shadow map: one square depth texture array with a slice
 /// per cascade (`ShadowCascadeSlot`), each slice written by its own caster
@@ -30,7 +30,7 @@ enum ShadowCascadeAtlas {
     /// with depth clamping, so the extra depth32Float precision bought nothing
     /// while doubling the map's memory and the bandwidth of every
     /// `sample_compare`.
-    static let depthPixelFormat: MTLPixelFormat = .depth16Unorm
+    static let depthFormat: GPUPixelFormat = .depth16Unorm
     /// Slices of the map: one per cascade.
     static let sliceCount = ShadowCascadeSlot.allCases.count
 }

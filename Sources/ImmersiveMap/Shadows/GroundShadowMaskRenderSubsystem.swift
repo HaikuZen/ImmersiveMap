@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -13,11 +15,12 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
     let name: String = "GroundShadowMask"
 
     private let pipeline: GroundShadowMaskPipeline
-    private let depthDisabledState: MTLDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
+    /// The render core's shadow map, still a Metal texture.
     private let shadowMapTextureProvider: () -> MTLTexture?
 
     init(pipeline: GroundShadowMaskPipeline,
-         depthDisabledState: MTLDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
          shadowMapTextureProvider: @escaping () -> MTLTexture?) {
         self.pipeline = pipeline
         self.depthDisabledState = depthDisabledState
@@ -36,22 +39,37 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
             return
         }
 
-        pipeline.select(renderEncoder: encoder)
-        encoder.setDepthStencilState(depthDisabledState)
-        encoder.setCullMode(.none)
         // The pass rasterizes at the mask's own size; the shader maps its
         // pixel back through that size, so the rays land on the same ground
         // points the drawable's pixels would.
         let maskSize = GroundShadowMaskPipeline.maskSize(for: frameContext.drawSize)
-        var maskUniform = GroundShadowMaskUniform(
+        let maskUniform = GroundShadowMaskUniform(
             projectionView: frameContext.cameraMatrices.projectionView,
             viewportSize: SIMD2<Float>(Float(maskSize.width), Float(maskSize.height))
         )
-        var shadowUniform = shadowState.shadowUniform
-        encoder.setFragmentBytes(&maskUniform, length: MemoryLayout<GroundShadowMaskUniform>.stride, index: 0)
-        encoder.setFragmentBytes(&shadowUniform, length: MemoryLayout<ShadowUniform>.stride, index: 1)
-        encoder.setFragmentTexture(shadowMapTexture, index: 0)
-        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        Self.encodeMask(encoder: MetalRenderEncoder(encoder),
+                        pipeline: pipeline,
+                        depthDisabledState: depthDisabledState,
+                        maskUniform: maskUniform,
+                        shadowUniform: shadowState.shadowUniform,
+                        shadowMap: MetalTexture(shadowMapTexture, format: ShadowCascadeAtlas.depthFormat))
+    }
+
+    /// The mask's one draw: a fullscreen triangle that reads the cascades
+    /// once per mask pixel. Internal so tests can record it.
+    static func encodeMask(encoder: any GPURenderEncoder,
+                           pipeline: GroundShadowMaskPipeline,
+                           depthDisabledState: any GPUDepthStencilState,
+                           maskUniform: GroundShadowMaskUniform,
+                           shadowUniform: ShadowUniform,
+                           shadowMap: any GPUTexture) {
+        pipeline.select(renderEncoder: encoder)
+        encoder.setDepthStencilState(depthDisabledState)
+        encoder.setCullMode(.none)
+        encoder.setFragmentValue(maskUniform, index: 0)
+        encoder.setFragmentValue(shadowUniform, index: 1)
+        encoder.setFragmentTexture(shadowMap, index: 0)
+        encoder.draw(.triangle, vertexStart: 0, vertexCount: 3)
     }
 
     func handleMemoryWarning() {}

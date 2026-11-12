@@ -489,7 +489,7 @@ final class SharedRenderResources {
                                           library: library,
                                           sampleCount: sampleCount,
                                           readsGroundShadowMask: true) },
-            { groundShadowMaskPipeline = GroundShadowMaskPipeline(metalDevice: device, library: library) },
+            { groundShadowMaskPipeline = GroundShadowMaskPipeline(device: gpuDevice) },
             { rasterTilePipeline = RasterTilePipeline(metalDevice: device,
                                                       pixelFormat: pixelFormat,
                                                       library: library,

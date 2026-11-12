@@ -13,6 +13,8 @@ final class MetalBackendTests: XCTestCase {
     func testTheValuesMapToMetals() {
         XCTAssertEqual(GPUPixelFormat.bgra8Unorm.metal, .bgra8Unorm)
         XCTAssertEqual(GPUPixelFormat.depth32FloatStencil8.metal, .depth32Float_stencil8)
+        XCTAssertEqual(GPUPixelFormat.depth16Unorm.metal, .depth16Unorm)
+        XCTAssertEqual(GPUPixelFormat(metal: .depth16Unorm), .depth16Unorm)
         XCTAssertEqual(GPUPixelFormat.r16Float.metal, .r16Float)
         XCTAssertEqual(GPUPixelFormat.astc(blockWidth: 8, blockHeight: 8).metal, .astc_8x8_ldr)
         XCTAssertEqual(GPUPixelFormat.astc(blockWidth: 7, blockHeight: 3).metal, .invalid)
