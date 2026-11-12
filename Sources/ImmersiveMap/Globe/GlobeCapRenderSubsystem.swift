@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import Metal
 
 /// The polar caps: the sphere beyond the Mercator edge, drawn after the tile
@@ -33,7 +34,7 @@ final class GlobeCapRenderSubsystem: RenderSubsystem {
         }
 
         encoder.setDepthStencilState(globeCapDepthState)
-        globeCapRenderer.draw(renderEncoder: encoder,
+        globeCapRenderer.draw(renderEncoder: MetalRenderEncoder(encoder),
                               globeFrame: GlobeFrameConstantsUniform.make(globe: frameContext.globeRenderUniform,
                                                                           cameraMatrix: frameContext.cameraUniform.matrix),
                               globe: frameContext.globeRenderUniform,
