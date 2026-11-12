@@ -12,7 +12,7 @@ import Metal
 extension GPUBuffer {
     package var metalBuffer: MTLBuffer {
         guard let buffer = self as? MetalBuffer else {
-            preconditionFailure("\(type(of: self)) is not a Metal backend's buffer")
+            preconditionFailure("\(Swift.type(of: self)) is not a Metal backend's buffer")
         }
         return buffer.buffer
     }
@@ -21,7 +21,7 @@ extension GPUBuffer {
 extension GPUTexture {
     package var metalTexture: MTLTexture {
         guard let texture = self as? MetalTexture else {
-            preconditionFailure("\(type(of: self)) is not a Metal backend's texture")
+            preconditionFailure("\(Swift.type(of: self)) is not a Metal backend's texture")
         }
         return texture.texture
     }
@@ -30,7 +30,7 @@ extension GPUTexture {
 extension GPURenderPipeline {
     package var metalPipeline: MTLRenderPipelineState {
         guard let pipeline = self as? MetalRenderPipeline else {
-            preconditionFailure("\(type(of: self)) is not a Metal backend's pipeline")
+            preconditionFailure("\(Swift.type(of: self)) is not a Metal backend's pipeline")
         }
         return pipeline.pipeline
     }
@@ -39,8 +39,17 @@ extension GPURenderPipeline {
 extension GPUDepthStencilState {
     package var metalState: MTLDepthStencilState {
         guard let state = self as? MetalDepthStencilState else {
-            preconditionFailure("\(type(of: self)) is not a Metal backend's depth stencil state")
+            preconditionFailure("\(Swift.type(of: self)) is not a Metal backend's depth stencil state")
         }
         return state.state
+    }
+}
+
+extension GPUCommandBuffer {
+    package var metalCommandBuffer: MTLCommandBuffer {
+        guard let commandBuffer = self as? MetalCommandBuffer else {
+            preconditionFailure("\(Swift.type(of: self)) is not a Metal backend's command buffer")
+        }
+        return commandBuffer.commandBuffer
     }
 }
