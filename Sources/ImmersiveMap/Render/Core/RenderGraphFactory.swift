@@ -69,15 +69,16 @@ enum RenderGraphFactory {
         let groundShadowMaskSubsystem = GroundShadowMaskRenderSubsystem(pipeline: context.groundShadowMaskPipeline,
                                                                         depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
                                                                         shadowMapTextureProvider: shadowMapTextureProvider)
-        let placementStencilSubsystem = PlacementStencilRenderSubsystem(device: context.metalContext.device,
+        let placementStencilSubsystem = PlacementStencilRenderSubsystem(device: context.gpuDevice,
                                                                         pipeline: context.placementStencilPipeline,
-                                                                        placementStencilWriteState: context.placementStencilWriteState,
-                                                                        placementDepthWriteState: context.placementDepthWriteState,
-                                                                        placementStencilReliefWriteState: context.placementStencilReliefWriteState,
-                                                                        placementDepthResetState: context.placementDepthResetState,
-                                                                        depthDisabledState: context.depthDisabledState,
+                                                                        placementStencilWriteState: MetalDepthStencilState(context.placementStencilWriteState),
+                                                                        placementDepthWriteState: MetalDepthStencilState(context.placementDepthWriteState),
+                                                                        placementStencilReliefWriteState: MetalDepthStencilState(context.placementStencilReliefWriteState),
+                                                                        placementDepthResetState: MetalDepthStencilState(context.placementDepthResetState),
+                                                                        depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
                                                                         groundFlattening: settings.tiles.groundFlattening)
         let rasterTileSubsystem = RasterTileRenderSubsystem(device: context.metalContext.device,
+                                                            gpuDevice: context.gpuDevice,
                                                             pipeline: context.rasterTilePipeline,
                                                             settings: settings.tiles.rasterization,
                                                             groundOwnerState: context.groundOwnerState,
@@ -109,7 +110,7 @@ enum RenderGraphFactory {
                                                   store: context.layerMeshStore,
                                                   pipeline: context.layerPipeline,
                                                   depthDisabledState: MetalDepthStencilState(context.depthDisabledState))
-        let reliefShadowCasterSubsystem = GroundReliefShadowCasterSubsystem(device: context.metalContext.device,
+        let reliefShadowCasterSubsystem = GroundReliefShadowCasterSubsystem(device: context.gpuDevice,
                                                                             pipeline: context.rasterTilePipeline,
                                                                             depthState: context.extrudedDepthState,
                                                                             groundFlattening: settings.tiles.groundFlattening)

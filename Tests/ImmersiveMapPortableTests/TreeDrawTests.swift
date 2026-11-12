@@ -22,27 +22,8 @@ final class TreeDrawTests: XCTestCase {
         return try await TreeModelMesh.make(contents: contents, data: data, fileURL: Self.modelURL, device: device)
     }
 
-    private static func emptyLayer() -> TileBuffers.GeometryLayer {
-        TileBuffers.GeometryLayer(vertices: nil, indices: nil, styles: nil, styleZoomFade: nil, lineStyles: nil, indexType: .uint16)
-    }
-
-    /// A tile with `count` trees in one buffer.
     private func makePlacement(device: RecordingGPUDevice, tile: Tile, count: Int) throws -> PlaceTile {
-        let instances = (0 ..< count).map { TreeInstance(position: SIMD2(Float($0) * 100, 50), height: 40, rotation: 0, tint: 0.5) }
-        let buffer = try XCTUnwrap(device.makeBuffer(instances, storage: .shared))
-        let ground = Self.emptyLayer()
-        let phases = RoadGeometryPhases(shadow: ground, casing: ground, fill: ground, detail: ground, overlay: ground)
-        var buffers = TileBuffers(gpuBackingBuffer: buffer,
-                                  ground: ground,
-                                  roads: RoadStructureBuckets(tunnel: phases, ground: phases, automobileGround: phases, bridge: phases),
-                                  bridgeOverlay: ground,
-                                  extruded: TileBuffers.Extruded(vertices: nil, indices: nil, styles: nil, gpuIndexType: .uint16),
-                                  textLabels: TileBuffers.TextLabelSet(placementInputs: [], labelsByStyleRuns: [], poiIconRuns: []),
-                                  roadLabels: TileBuffers.RoadLabels(pathInputs: [], pathRanges: [], pathLabels: [], labelStyle: nil,
-                                                                     localGlyphVertices: nil, glyphBounds: [], glyphBoundRanges: [],
-                                                                     sizes: [], anchorRanges: [], anchors: []))
-        buffers.trees = TileBufferView(gpuBuffer: buffer, offset: 0, count: count)
-        return PlaceTile(metalTile: MetalTile(tile: tile, tileBuffers: buffers), placeIn: VisibleTile(tile: tile))
+        try TestTiles.placement(device: device, source: tile, trees: count)
     }
 
     private func states(_ device: RecordingGPUDevice) throws -> (test: any GPUDepthStencilState, disabled: any GPUDepthStencilState) {

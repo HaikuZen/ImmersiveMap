@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// Mirror of `GroundReliefUniform` in GroundRelief.h (vertex and fragment
@@ -82,23 +82,33 @@ struct GroundReliefUniform {
                      over tile: Tile,
                      frame: GroundReliefFrame,
                      renderMapSize: Double,
-                     encoder: MTLRenderCommandEncoder) {
-        let unitsPerMetre = frame.worldUnitsPerMetre
+                     encoder: any GPURenderEncoder) {
         let shading = shading ?? relief
-        var uniform = GroundReliefUniform(relief: relief,
-                                          shading: shading,
-                                          worldUnitsPerMetre: unitsPerMetre,
-                                          datumMetres: frame.datumMetres,
-                                          terrainSideMetres: terrainSideMetres(of: shading,
-                                                                               over: tile,
-                                                                               worldUnitsPerMetre: unitsPerMetre,
-                                                                               renderMapSize: renderMapSize),
-                                          hillshade: frame.hillshade,
-                                          occlusion: frame.occlusionUniform)
-        encoder.setVertexTexture(relief.texture, index: 0)
-        encoder.setVertexBytes(&uniform, length: MemoryLayout<GroundReliefUniform>.stride, index: 9)
-        encoder.setFragmentTexture(shading.texture, index: 3)
-        encoder.setFragmentTexture(shading.occlusion ?? frame.occlusionFallbackTexture, index: 4)
-        encoder.setFragmentBytes(&uniform, length: MemoryLayout<GroundReliefUniform>.stride, index: 9)
+        let uniform = make(relief, shading: shading, over: tile, frame: frame, renderMapSize: renderMapSize)
+        encoder.setVertexTexture(relief.terrain.gpuTexture, index: 0)
+        encoder.setVertexValue(uniform, index: 9)
+        encoder.setFragmentTexture(shading.terrain.gpuTexture, index: 3)
+        encoder.setFragmentTexture(shading.gpuOcclusion ?? frame.gpuOcclusionFallbackTexture, index: 4)
+        encoder.setFragmentValue(uniform, index: 9)
+    }
+
+    /// The uniform `bind` sends, for the relief and the terrain it is shaded
+    /// by over `tile`.
+    static func make(_ relief: GroundRelief,
+                     shading: GroundRelief,
+                     over tile: Tile,
+                     frame: GroundReliefFrame,
+                     renderMapSize: Double) -> GroundReliefUniform {
+        let unitsPerMetre = frame.worldUnitsPerMetre
+        return GroundReliefUniform(relief: relief,
+                                   shading: shading,
+                                   worldUnitsPerMetre: unitsPerMetre,
+                                   datumMetres: frame.datumMetres,
+                                   terrainSideMetres: terrainSideMetres(of: shading,
+                                                                        over: tile,
+                                                                        worldUnitsPerMetre: unitsPerMetre,
+                                                                        renderMapSize: renderMapSize),
+                                   hillshade: frame.hillshade,
+                                   occlusion: frame.occlusionUniform)
     }
 }

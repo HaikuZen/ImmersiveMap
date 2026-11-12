@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
 import Metal
 import simd
 
@@ -56,7 +57,8 @@ final class GroundReliefShadowCasterSubsystem: RenderSubsystem {
     private let depthState: MTLDepthStencilState
     private let groundFlattening: ImmersiveMapSettings.TileSettings.GroundFlatteningSettings
 
-    init(device: MTLDevice,
+    /// `device` makes the grids (`RasterTileGrid`), on the GPU interface.
+    init(device: any GPUDevice,
          pipeline: RasterTilePipeline,
          depthState: MTLDepthStencilState,
          groundFlattening: ImmersiveMapSettings.TileSettings.GroundFlatteningSettings) {

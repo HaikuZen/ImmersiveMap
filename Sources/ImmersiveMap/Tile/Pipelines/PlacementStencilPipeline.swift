@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// The placement prepass pipelines (`PlacementStencilRenderSubsystem`):
 /// the raster tile's grid through the raster tile's vertex functions
@@ -10,35 +10,35 @@ import Metal
 /// attachment's write mask empty, so the draws touch nothing but the
 /// stencil, where they write the planner's marks before the ground draws.
 final class PlacementStencilPipeline {
-    let flatPipelineState: MTLRenderPipelineState
+    let flatPipelineState: any GPURenderPipeline
     /// The grid raised by the terrain bound at vertex texture 0 and buffer
     /// 9, as the raster tile's relief draw binds it.
-    let flatReliefPipelineState: MTLRenderPipelineState
-    let spherePurePipelineState: MTLRenderPipelineState
-    let sphereMorphPipelineState: MTLRenderPipelineState
+    let flatReliefPipelineState: any GPURenderPipeline
+    let spherePurePipelineState: any GPURenderPipeline
+    let sphereMorphPipelineState: any GPURenderPipeline
     /// The screen at the far plane, depth only: puts the depth the
     /// relief's marks were tested against back to the cleared far plane
     /// before the ground draws (`placementDepthResetVertexShader`).
-    let depthResetPipelineState: MTLRenderPipelineState
+    let depthResetPipelineState: any GPURenderPipeline
 
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int = 1) {
-        func state(label: String, vertex: String, relief: Bool = false) -> MTLRenderPipelineState {
-            let descriptor = MTLRenderPipelineDescriptor()
+        func state(label: String, vertex: String, relief: Bool = false) -> any GPURenderPipeline {
+            // Function constant 0 raises the grid by the relief.
+            var color = GPUColorTarget(format: pixelFormat)
+            color.writesColor = false
+            var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: vertex, constants: [0: .bool(relief)]),
+                                                         fragmentFunction: nil,
+                                                         colorTargets: [color])
             descriptor.label = label
-            let values = MTLFunctionConstantValues()
-            var reliefValue = relief
-            values.setConstantValue(&reliefValue, type: .bool, index: 0)
-            descriptor.vertexFunction = try! library.makeFunction(name: vertex, constantValues: values)
-            descriptor.fragmentFunction = nil
-            descriptor.rasterSampleCount = sampleCount
-            descriptor.colorAttachments[0].pixelFormat = pixelFormat
-            descriptor.colorAttachments[0].writeMask = []
-            descriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-            descriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-            return try! metalDevice.makeRenderPipelineState(descriptor: descriptor)
+            descriptor.depthStencilFormat = .depth32FloatStencil8
+            descriptor.sampleCount = sampleCount
+            do {
+                return try device.makeRenderPipeline(descriptor)
+            } catch {
+                fatalError("Failed to create the placement stencil pipeline: \(error)")
+            }
         }
         flatPipelineState = state(label: "PlacementStencilFlat", vertex: "tileRasterFlatVertexShader")
         flatReliefPipelineState = state(label: "PlacementStencilFlatRelief", vertex: "tileRasterFlatVertexShader", relief: true)

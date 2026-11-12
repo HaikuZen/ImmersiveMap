@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
 import Metal
 import simd
 
@@ -112,7 +113,9 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
     /// alpha off between two draws, under anything the eye sees.
     static let fadeSteps: Float = 64
 
+    /// `gpuDevice` makes the grids (`RasterTileGrid`), on the GPU interface.
     init(device: MTLDevice,
+         gpuDevice: any GPUDevice,
          pipeline: RasterTilePipeline,
          settings: ImmersiveMapSettings.TileSettings.RasterizationSettings,
          groundOwnerState: MTLDepthStencilState,
@@ -127,7 +130,7 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         self.device = device
         self.pipeline = pipeline
         self.groundFlattening = groundFlattening
-        self.grid = RasterTileGrid(device: device)
+        self.grid = RasterTileGrid(device: gpuDevice)
         let descriptor = MTLSamplerDescriptor()
         descriptor.minFilter = .linear
         descriptor.magFilter = .linear
