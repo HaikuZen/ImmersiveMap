@@ -10,8 +10,7 @@ import XCTest
 /// them, so a tile's labels are built wherever the tile is prepared.
 final class TextLayoutTests: XCTestCase {
     private func makeLayout() throws -> TextLayout {
-        let location = try ImmersiveMapResourceBundle.location()
-        return TextLayout(resource: { location.url(forResource: $0, withExtension: $1) })
+        TextLayout(resource: TestResources.url)
     }
 
     func testTheAtlasesLoadThroughThePortableResourceLookup() throws {

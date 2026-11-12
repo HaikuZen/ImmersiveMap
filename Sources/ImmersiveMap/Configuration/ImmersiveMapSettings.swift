@@ -631,7 +631,9 @@ public struct ImmersiveMapSettings: Equatable, Sendable {
         }
 
         public struct CacheSettings: Equatable, Sendable {
-            public static let defaultPreparedDiskCacheSizeInBytes: Int = 2 * 1_024 * 1_024 * 1_024
+            /// `Int64`: 2 GiB and more do not fit `Int` where it is 32 bits
+            /// (WebAssembly).
+            public static let defaultPreparedDiskCacheSizeInBytes: Int64 = 2 * 1_024 * 1_024 * 1_024
 
             public var clearDiskCachesOnLaunch: Bool
             /// On-disk cache of parsed/tessellated tiles: the layer every tile
@@ -651,13 +653,13 @@ public struct ImmersiveMapSettings: Equatable, Sendable {
             /// in GPU memory only while a frame draws them, so this quota
             /// decides how much of a revisited area comes back without a
             /// re-download and re-parse.
-            public var preparedDiskCacheSizeInBytes: Int
+            public var preparedDiskCacheSizeInBytes: Int64
 
             public init(clearDiskCachesOnLaunch: Bool = false,
                         preparedTileCacheEnabled: Bool = true,
                         preparedDiskCompressionEnabled: Bool = true,
                         preparedDiskTimeToLive: TimeInterval,
-                        preparedDiskCacheSizeInBytes: Int = CacheSettings.defaultPreparedDiskCacheSizeInBytes) {
+                        preparedDiskCacheSizeInBytes: Int64 = CacheSettings.defaultPreparedDiskCacheSizeInBytes) {
                 self.clearDiskCachesOnLaunch = clearDiskCachesOnLaunch
                 self.preparedTileCacheEnabled = preparedTileCacheEnabled
                 self.preparedDiskCompressionEnabled = preparedDiskCompressionEnabled
@@ -2798,7 +2800,7 @@ public extension ImmersiveMapSettings {
                       preparedTileCacheEnabled: Bool? = nil,
                       preparedDiskCompressionEnabled: Bool? = nil,
                       preparedDiskTimeToLive: TimeInterval? = nil,
-                      preparedDiskCacheSizeInBytes: Int? = nil) -> ImmersiveMapSettings {
+                      preparedDiskCacheSizeInBytes: Int64? = nil) -> ImmersiveMapSettings {
         var settings = self
         if let clearDiskCachesOnLaunch {
             settings.tiles.cache.clearDiskCachesOnLaunch = clearDiskCachesOnLaunch

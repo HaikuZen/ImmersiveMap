@@ -109,6 +109,13 @@ package final class PMTilesArchiveClient: @unchecked Sendable {
                                          session: session)
     }
 
+    #else
+    /// What a client fetches with where there is no `URLSession` until the
+    /// host gives it a fetcher of its own (the browser's `fetch`): every
+    /// request fails, as with no network.
+    package struct NoNetwork: Error {}
+
+    package static let noNetwork: RangeFetcher = { _, _ in throw NoNetwork() }
     #endif
 
     /// The test seam, and the way in for a platform without `URLSession`: a

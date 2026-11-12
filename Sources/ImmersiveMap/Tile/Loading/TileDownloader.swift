@@ -122,13 +122,21 @@ class TileDownloader: @unchecked Sendable {
     private let archive: PMTilesArchiveClient
 
     init(config: ImmersiveMapSettings) {
-        let configuration = Self.makeSessionConfiguration(maxConcurrentFetches: config.tiles.network.maxConcurrentFetches)
         let network = config.tiles.network
         // Nothing is fetched here: the client reads the archive header on
         // the first tile, so building a downloader touches no network.
+        #if canImport(Darwin) || canImport(FoundationNetworking)
+        let configuration = Self.makeSessionConfiguration(maxConcurrentFetches: network.maxConcurrentFetches)
         archive = PMTilesArchiveClient(archiveURL: network.tileArchiveURL,
                                        requestHeaders: network.tileRequestHeaders,
                                        session: URLSession(configuration: configuration))
+        #else
+        // No `URLSession` (WebAssembly): the host's fetcher comes with the
+        // browser host, until then the tiles do not arrive.
+        archive = PMTilesArchiveClient(archiveURL: network.tileArchiveURL,
+                                       requestHeaders: network.tileRequestHeaders,
+                                       fetchRange: PMTilesArchiveClient.noNetwork)
+        #endif
     }
 
     /// The test seam: a client over whatever fetcher the test wants.
@@ -136,6 +144,7 @@ class TileDownloader: @unchecked Sendable {
         self.archive = archive
     }
 
+    #if canImport(Darwin) || canImport(FoundationNetworking)
     static func makeSessionConfiguration(maxConcurrentFetches: Int = 5) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.default
         // The loader dispatches up to maxConcurrentFetches tile requests at
@@ -158,6 +167,7 @@ class TileDownloader: @unchecked Sendable {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         return configuration
     }
+    #endif
 
     /// The ETag the host gives the archive, nil for a host that sends none
     /// and for an archive read from disk. Throws when the archive cannot be

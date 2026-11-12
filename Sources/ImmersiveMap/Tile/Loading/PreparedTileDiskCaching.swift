@@ -133,7 +133,7 @@ final class PreparedTileDiskIOCoordinator: @unchecked Sendable {
     // well. The most recently initialized map view owns the current policy;
     // operations from older instances never restore stale limits.
     private var policy = Policy(
-        byteQuota: Int64(ImmersiveMapSettings.TileSettings.CacheSettings.defaultPreparedDiskCacheSizeInBytes),
+        byteQuota: ImmersiveMapSettings.TileSettings.CacheSettings.defaultPreparedDiskCacheSizeInBytes,
         timeToLive: 7 * 24 * 60 * 60
     )
     // Pruning sweeps the whole index (and sorts it when over quota), so writes
@@ -333,7 +333,7 @@ final class PreparedTileDiskIOCoordinator: @unchecked Sendable {
     func writeFile(_ data: Data, to url: URL) throws {
         try fileManager.createDirectory(at: url.deletingLastPathComponent(),
                                         withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        try data.writeReplacing(to: url)
 
         let modificationDate = Date()
         try? fileManager.setAttributes([.modificationDate: modificationDate], ofItemAtPath: url.path)
@@ -1060,7 +1060,7 @@ final class PreparedTileDiskCaching {
 
         let coordinator = ioCoordinator
         let clearOnLaunch = config.tiles.cache.clearDiskCachesOnLaunch
-        let quota = Int64(max(0, config.tiles.cache.preparedDiskCacheSizeInBytes))
+        let quota = max(0, config.tiles.cache.preparedDiskCacheSizeInBytes)
         let timeToLive = config.tiles.cache.preparedDiskTimeToLive
         self.availabilityIndex = coordinator.availabilityIndex(forDirectory: currentDirectory,
                                                                timeToLive: timeToLive)

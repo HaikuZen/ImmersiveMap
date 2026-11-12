@@ -69,6 +69,7 @@ final class ModelTileSource: @unchecked Sendable {
                                                         qos: .utility)
 
     convenience init(archiveURL: URL, settings: ImmersiveMapSettings.ModelArchiveSettings, clearsDiskCache: Bool) {
+        #if canImport(Darwin) || canImport(FoundationNetworking)
         let configuration = URLSessionConfiguration.ephemeral
         // A model tile that stops arriving for 30 s has failed for the
         // frame's purposes: the map's building stands meanwhile, and the
@@ -83,6 +84,15 @@ final class ModelTileSource: @unchecked Sendable {
                                                 tileType: .unknown),
                   diskCacheSizeInBytes: settings.diskCacheSizeInBytes,
                   clearsDiskCache: clearsDiskCache)
+        #else
+        // No `URLSession` (WebAssembly): until the host's fetcher, nothing.
+        self.init(archive: PMTilesArchiveClient(archiveURL: archiveURL,
+                                                requestHeaders: settings.requestHeaders,
+                                                tileType: .unknown,
+                                                fetchRange: PMTilesArchiveClient.noNetwork),
+                  diskCacheSizeInBytes: settings.diskCacheSizeInBytes,
+                  clearsDiskCache: clearsDiskCache)
+        #endif
     }
 
     /// The test seam: a client over whatever fetcher the test wants, and a
@@ -189,8 +199,7 @@ final class ModelTileSource: @unchecked Sendable {
         Self.maintenanceQueue.async {
             let fileManager = FileManager.default
             try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-            try? Data(name.utf8).write(to: directory.appendingPathComponent(Self.currentVersionFileName),
-                                       options: .atomic)
+            try? Data(name.utf8).writeReplacing(to: directory.appendingPathComponent(Self.currentVersionFileName))
             for entry in (try? fileManager.contentsOfDirectory(atPath: directory.path)) ?? []
             where entry != name && entry != Self.currentVersionFileName {
                 try? fileManager.removeItem(at: directory.appendingPathComponent(entry))
@@ -202,7 +211,7 @@ final class ModelTileSource: @unchecked Sendable {
         guard diskCacheSizeInBytes > 0 else { return }
         do {
             try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: fileURL, options: .atomic)
+            try data.writeReplacing(to: fileURL)
         } catch {
             // The cache is an optimisation: a tile that could not be kept
             // is asked from the archive again.

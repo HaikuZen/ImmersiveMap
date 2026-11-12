@@ -1113,7 +1113,7 @@ public extension ImmersiveMapView {
                       preparedTileCacheEnabled: Bool? = nil,
                       preparedDiskCompressionEnabled: Bool? = nil,
                       preparedDiskTimeToLive: TimeInterval? = nil,
-                      preparedDiskCacheSizeInBytes: Int? = nil) -> ImmersiveMapView {
+                      preparedDiskCacheSizeInBytes: Int64? = nil) -> ImmersiveMapView {
         var view = self
         view.settings = view.settings.tileSettings(clearDiskCachesOnLaunch: clearDiskCachesOnLaunch,
                                                    preparedTileCacheEnabled: preparedTileCacheEnabled,

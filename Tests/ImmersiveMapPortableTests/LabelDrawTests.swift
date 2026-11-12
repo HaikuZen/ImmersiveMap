@@ -12,10 +12,7 @@ import XCTest
 /// picture: the labels are judged in the app.
 final class LabelDrawTests: XCTestCase {
     private func makeTextRenderer(device: RecordingGPUDevice) throws -> TextRenderer {
-        let location = try ImmersiveMapResourceBundle.location()
-        return TextRenderer(device: device,
-                            resource: { location.url(forResource: $0, withExtension: $1) },
-                            sampleCount: 4)
+        TextRenderer(device: device, resource: TestResources.url, sampleCount: 4)
     }
 
     private func style(weight: LabelFontWeight) -> LabelTextStyle {

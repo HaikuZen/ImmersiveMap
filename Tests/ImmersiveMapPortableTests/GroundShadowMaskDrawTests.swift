@@ -40,7 +40,7 @@ final class GroundShadowMaskDrawTests: XCTestCase {
         shadow.eye = SIMD3<Float>(1, 2, 3)
         let encoder = RecordingRenderEncoder()
 
-        GroundShadowMaskRenderSubsystem.encodeMask(encoder: encoder,
+        GroundShadowMaskDrawing.encodeMask(encoder: encoder,
                                                    pipeline: pipeline,
                                                    depthDisabledState: disabled,
                                                    maskUniform: GroundShadowMaskUniform(projectionView: matrix_identity_float4x4,

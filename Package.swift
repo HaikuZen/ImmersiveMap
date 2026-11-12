@@ -124,6 +124,13 @@ var targets: [Target] = [
         name: "ImmersiveMapGPUTests",
         dependencies: ["ImmersiveMapGPU", "ImmersiveMapGPUTestSupport"]
     ),
+    // The engine's tests that need no Metal, no Apple framework and no
+    // picture (the drawing recorded by ImmersiveMapGPUTestSupport, the text
+    // layout), run on every platform the engine builds for.
+    .testTarget(
+        name: "ImmersiveMapPortableTests",
+        dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport"]
+    ),
     // Holds PortableEngineExclusions.txt to the engine's own imports.
     .testTarget(
         name: "PortableEngineLayoutTests"
@@ -170,12 +177,8 @@ func portableEngineExclusions() -> [String] {
         .filter { $0.isEmpty == false && $0.hasPrefix("#") == false }
 }
 
-// The engine in the portable package: asked for with IMMERSIVE_MAP_ENGINE=1
-// (CI's Linux job does) until it builds for WebAssembly too, whose
-// networking and threading stand-ins are still to come, then always.
-let portableEngine = portable && Context.environment["IMMERSIVE_MAP_ENGINE"] == "1"
-
-if portableEngine {
+// The engine in the portable package: its files that build everywhere.
+if portable {
     targets += [
         .target(
             name: "ImmersiveMap",

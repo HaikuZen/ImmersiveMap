@@ -107,7 +107,7 @@ final class LayerDrawTests: XCTestCase {
         let mesh = try makeMesh(device: device)
         let disabled = try XCTUnwrap(device.makeDepthStencilState(GPUDepthStencilDescriptor()))
         let encoder = RecordingRenderEncoder()
-        LayerRenderSubsystem.drawLayers([(mesh, false)],
+        LayerDrawing.drawLayers([(mesh, false)],
                                         pipeline: pipeline,
                                         surface: .flat,
                                         placements: { _ in [self.draw(1), self.draw(2)] },
@@ -150,7 +150,7 @@ final class LayerDrawTests: XCTestCase {
         let device = RecordingGPUDevice()
         let pipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 1)
         let encoder = RecordingRenderEncoder()
-        LayerRenderSubsystem.drawLayers([(try makeMesh(device: device), true)],
+        LayerDrawing.drawLayers([(try makeMesh(device: device), true)],
                                         pipeline: pipeline,
                                         surface: .sphere,
                                         placements: { _ in [self.draw(0)] },
@@ -165,7 +165,7 @@ final class LayerDrawTests: XCTestCase {
         let device = RecordingGPUDevice()
         let pipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 1)
         let encoder = RecordingRenderEncoder()
-        LayerRenderSubsystem.drawLayers([(try makeMesh(device: device), false)],
+        LayerDrawing.drawLayers([(try makeMesh(device: device), false)],
                                         pipeline: pipeline,
                                         surface: .flat,
                                         placements: { _ in [] },

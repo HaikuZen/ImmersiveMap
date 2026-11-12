@@ -95,9 +95,16 @@ final class OverviewTileSource: @unchecked Sendable {
     /// An overview read from the archive at the URL, on disk or over the
     /// network: the tests write their own.
     init(archiveURL: URL) {
+        #if canImport(Darwin) || canImport(FoundationNetworking)
         archive = PMTilesArchiveClient(archiveURL: archiveURL,
                                        requestHeaders: [:],
                                        session: .shared)
+        #else
+        // No `URLSession` (WebAssembly): until the host's fetcher, nothing.
+        archive = PMTilesArchiveClient(archiveURL: archiveURL,
+                                       requestHeaders: [:],
+                                       fetchRange: PMTilesArchiveClient.noNetwork)
+        #endif
     }
 
     /// The overview's bytes for the tile, decompressed, or nil: a tile zoom
