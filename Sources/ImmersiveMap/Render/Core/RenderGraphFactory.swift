@@ -100,9 +100,9 @@ enum RenderGraphFactory {
         let treeSubsystem = TreeRenderSubsystem(modelStore: context.treeModelStore,
                                                 pipeline: context.treePipeline,
                                                 palette: context.treePalette,
-                                                stencilTestState: context.extrudedStencilTestState,
-                                                groundDepthState: context.groundDepthState,
-                                                depthDisabledState: context.depthDisabledState,
+                                                stencilTestState: MetalDepthStencilState(context.extrudedStencilTestState),
+                                                groundDepthState: MetalDepthStencilState(context.groundDepthState),
+                                                depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
                                                 settings: settings.scene.trees,
                                                 riseSeconds: settings.scene.extrusion.riseSeconds)
         let layerSubsystem = LayerRenderSubsystem(source: context.layerSource,

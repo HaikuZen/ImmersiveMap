@@ -1,63 +1,55 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import ImmersiveMapGPU
 
 /// The trees of the flat map (Trees.metal): the tree model drawn once per
 /// instance of a tile, opaque, straight into the world pass as the
 /// buildings are, and their shadows, a soft disc under each on the
 /// ground, blended over it after the roads.
-class TreePipeline {
-    let pipelineState: MTLRenderPipelineState
+final class TreePipeline {
+    let pipelineState: any GPURenderPipeline
     /// The shadow discs: a quad per instance from the vertex index, no
     /// vertex buffer, multiplied into the ground (the colour it writes is
     /// the darkening, `shadowColorMultiplier`).
-    let shadowPipelineState: MTLRenderPipelineState
+    let shadowPipelineState: any GPURenderPipeline
 
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int = 1) {
         // The 20-byte vertex of the model file (`TreeModelContents`): the
         // position in metres, the normal as signed bytes with a padding
         // byte, the shading as four bytes.
-        let vertexDescriptor = MTLVertexDescriptor()
-        vertexDescriptor.attributes[0].format = .float3
-        vertexDescriptor.attributes[0].offset = 0
-        vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.attributes[1].format = .char4Normalized
-        vertexDescriptor.attributes[1].offset = 12
-        vertexDescriptor.attributes[1].bufferIndex = 0
-        vertexDescriptor.attributes[2].format = .uchar4Normalized
-        vertexDescriptor.attributes[2].offset = 16
-        vertexDescriptor.attributes[2].bufferIndex = 0
-        vertexDescriptor.layouts[0].stride = TreeModelContents.vertexStride
-        vertexDescriptor.layouts[0].stepFunction = .perVertex
+        var layout = GPUVertexLayout()
+        layout.attributes[0] = GPUVertexAttribute(format: .float3, offset: 0, bufferIndex: 0)
+        layout.attributes[1] = GPUVertexAttribute(format: .char4Normalized, offset: 12, bufferIndex: 0)
+        layout.attributes[2] = GPUVertexAttribute(format: .uchar4Normalized, offset: 16, bufferIndex: 0)
+        layout.strides[0] = TreeModelContents.vertexStride
 
-        let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.vertexFunction = library.makeFunction(name: "treeVertexShader")
-        pipelineDescriptor.fragmentFunction = library.makeFunction(name: "treeFragmentShader")
-        pipelineDescriptor.vertexDescriptor = vertexDescriptor
-        pipelineDescriptor.rasterSampleCount = sampleCount
-        pipelineDescriptor.colorAttachments[0].pixelFormat = pixelFormat
-        pipelineDescriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        pipelineDescriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-        self.pipelineState = try! metalDevice.makeRenderPipelineState(descriptor: pipelineDescriptor)
+        var trees = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "treeVertexShader"),
+                                                fragmentFunction: GPUShaderFunction(name: "treeFragmentShader"),
+                                                colorTargets: [GPUColorTarget(format: pixelFormat)])
+        trees.label = "Trees"
+        trees.vertexLayout = layout
+        trees.depthStencilFormat = .depth32FloatStencil8
+        trees.sampleCount = sampleCount
 
-        let shadowDescriptor = MTLRenderPipelineDescriptor()
-        shadowDescriptor.vertexFunction = library.makeFunction(name: "treeShadowVertexShader")
-        shadowDescriptor.fragmentFunction = library.makeFunction(name: "treeShadowFragmentShader")
-        shadowDescriptor.rasterSampleCount = sampleCount
-        shadowDescriptor.colorAttachments[0].pixelFormat = pixelFormat
-        shadowDescriptor.colorAttachments[0].isBlendingEnabled = true
-        shadowDescriptor.colorAttachments[0].rgbBlendOperation = .add
-        shadowDescriptor.colorAttachments[0].sourceRGBBlendFactor = .destinationColor
-        shadowDescriptor.colorAttachments[0].destinationRGBBlendFactor = .zero
-        shadowDescriptor.colorAttachments[0].alphaBlendOperation = .add
-        shadowDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .zero
-        shadowDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .one
-        shadowDescriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        shadowDescriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-        self.shadowPipelineState = try! metalDevice.makeRenderPipelineState(descriptor: shadowDescriptor)
+        // Multiplied into the ground: the colour is the destination's
+        // times the source's, the alpha the destination's.
+        var shadowColor = GPUColorTarget(format: pixelFormat)
+        shadowColor.blend = (color: GPUBlendComponent(source: .destinationColor, destination: .zero),
+                             alpha: GPUBlendComponent(source: .zero, destination: .one))
+        var shadows = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "treeShadowVertexShader"),
+                                                  fragmentFunction: GPUShaderFunction(name: "treeShadowFragmentShader"),
+                                                  colorTargets: [shadowColor])
+        shadows.label = "TreeShadows"
+        shadows.depthStencilFormat = .depth32FloatStencil8
+        shadows.sampleCount = sampleCount
+        do {
+            pipelineState = try device.makeRenderPipeline(trees)
+            shadowPipelineState = try device.makeRenderPipeline(shadows)
+        } catch {
+            fatalError("Failed to create the tree pipelines: \(error)")
+        }
     }
 }

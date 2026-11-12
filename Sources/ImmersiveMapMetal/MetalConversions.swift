@@ -135,6 +135,7 @@ extension GPUVertexFormat {
         case .short: return .short
         case .short3: return .short3
         case .char3Normalized: return .char3Normalized
+        case .char4Normalized: return .char4Normalized
         case .ushort2Normalized: return .ushort2Normalized
         case .uchar4Normalized: return .uchar4Normalized
         }

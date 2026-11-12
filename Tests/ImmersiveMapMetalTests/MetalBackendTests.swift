@@ -22,6 +22,7 @@ final class MetalBackendTests: XCTestCase {
         XCTAssertEqual(GPUStencilOperation.incrementWrap.metal, .incrementWrap)
         XCTAssertEqual(GPUBlendFactor.oneMinusSourceAlpha.metal, .oneMinusSourceAlpha)
         XCTAssertEqual(GPUVertexFormat.char3Normalized.metal, .char3Normalized)
+        XCTAssertEqual(GPUVertexFormat.char4Normalized.metal, .char4Normalized)
         XCTAssertEqual(GPUPrimitiveTopology.triangleStrip.metal, .triangleStrip)
         XCTAssertEqual(GPUPrimitiveTopology.triangleStrip.metalClass, .triangle)
         XCTAssertEqual(GPUIndexType.uint16.metal, .uint16)

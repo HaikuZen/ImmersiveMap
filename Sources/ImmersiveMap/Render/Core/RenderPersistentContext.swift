@@ -225,7 +225,8 @@ final class RenderPersistentContext {
         self.treePipeline = shared.treePipeline
         self.treePalette = styleRuntime.treePalette
         self.labelOpacity = styleRuntime.labelOpacity
-        self.treeModelStore = TreeModelStore(device: metal.device)
+        self.treeModelStore = TreeModelStore(device: shared.gpuDevice,
+                                             fileLoader: TreeModelMesh.metalFileLoader(device: metal.device))
         self.treeModelStore.eventSink = eventSink
         self.layerSource = layerSource
         self.layerPipeline = shared.layerPipeline

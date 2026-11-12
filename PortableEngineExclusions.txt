@@ -108,13 +108,11 @@ Tile/Buffers/TileBuffers+Metal.swift
 Tile/Drawers/BuildingExtrusionDrawer.swift
 Tile/Drawers/FlatMapSurfaceDrawer.swift
 Tile/Drawers/HiddenBuildingIndexBuffers.swift
-Tile/Drawers/TreeDrawer.swift
 Tile/Loading/ImmersiveMapNeedsTile.swift
 Tile/Overview/Resources
 Tile/Pipelines/ExtrudedTilePipeline.swift
 Tile/Pipelines/PlacementStencilPipeline.swift
 Tile/Pipelines/TilePipeline.swift
-Tile/Pipelines/TreePipeline.swift
 Tile/Projection/FlatTileOriginCalculator.swift
 Tile/Raster/RasterTileGrid.swift
 Tile/Raster/RasterTilePipeline.swift
@@ -139,7 +137,7 @@ Tile/Subsystems/TileProjectionIndexSubsystem.swift
 Tile/Subsystems/TileWorkingSetSubsystem.swift
 Tile/Subsystems/TreeRenderSubsystem.swift
 Tile/Trees/Resources
-Tile/Trees/TreeModel.swift
+Tile/Trees/TreeModelMesh+Metal.swift
 UI
 Utils/MetalIOCommandQueues.swift
 Utils/PlatformGraphics.swift
