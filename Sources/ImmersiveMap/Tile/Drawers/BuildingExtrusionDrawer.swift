@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 enum BuildingExtrusionDrawer {
@@ -25,21 +25,21 @@ enum BuildingExtrusionDrawer {
     /// through the relief's fade, and `liftDatumMetres`, the terrain
     /// under the point the camera looks at in the same metres
     /// (`GroundReliefFrame.datumMetres`), which the lifts are drawn from.
-    static func drawBuildings(renderEncoder: MTLRenderCommandEncoder,
+    static func drawBuildings(renderEncoder: any GPURenderEncoder,
                               cameraUniform: CameraUniform,
-                              shadowBinding: ShadowReceiverBinding,
+                              shadowUniform: ShadowUniform,
+                              shadowMap: any GPUTexture,
                               placeTilesContext: PlaceTilesContext,
                               indexBuffers: HiddenBuildingIndexBuffers,
                               flatRenderState: FlatRenderState,
                               heightScales: [Float] = [],
-                              liftBuffers: [MTLBuffer?] = [],
+                              liftBuffers: [(any GPUBuffer)?] = [],
                               liftDatumMetres: Float = 0,
                               liftStrength: Float = 1,
                               liftUnitsPerMetre: Float = 0,
                               extrudedTilePipeline: ExtrudedTilePipeline,
-                              extrudedStencilTestState: MTLDepthStencilState,
-                              depthDisabledState: MTLDepthStencilState) {
-        var cameraUniformValue = cameraUniform
+                              extrudedStencilTestState: any GPUDepthStencilState,
+                              depthDisabledState: any GPUDepthStencilState) {
         // The walls and lids are wound clockwise on purpose (the exterior
         // ring is forced clockwise in BuildingExtrusionMeshBuilder and the
         // lids match it), so their front face is Metal's
@@ -50,11 +50,10 @@ enum BuildingExtrusionDrawer {
 
         extrudedTilePipeline.selectPipeline(renderEncoder: renderEncoder)
         renderEncoder.setDepthStencilState(extrudedStencilTestState)
-        renderEncoder.setVertexBytes(&cameraUniformValue, length: MemoryLayout<CameraUniform>.stride, index: 1)
+        renderEncoder.setVertexValue(cameraUniform, index: 1)
 
-        var shadowUniformValue = shadowBinding.uniform
-        renderEncoder.setFragmentBytes(&shadowUniformValue, length: MemoryLayout<ShadowUniform>.stride, index: 5)
-        renderEncoder.setFragmentTexture(shadowBinding.texture, index: 0)
+        renderEncoder.setFragmentValue(shadowUniform, index: 5)
+        renderEncoder.setFragmentTexture(shadowMap, index: 0)
 
         // World-units-per-meter along z for the depth-cue vertical gradient.
         // Local vertex z = meters * 2^(tileZoom - anchorZoom) and the model
@@ -63,8 +62,8 @@ enum BuildingExtrusionDrawer {
         // the default style extrusionAnchorZoom of 16; a style with a custom
         // anchor shifts the gradient proportionally, which is only a tonal
         // cue).
-        var metersToWorldZ = Float(flatRenderState.renderMapSize / (4096.0 * 65536.0))
-        renderEncoder.setFragmentBytes(&metersToWorldZ, length: MemoryLayout<Float>.stride, index: 6)
+        let metersToWorldZ = Float(flatRenderState.renderMapSize / (4096.0 * 65536.0))
+        renderEncoder.setFragmentValue(metersToWorldZ, index: 6)
 
         drawExtrudedSources(renderEncoder: renderEncoder,
                             placeTilesContext: placeTilesContext,
@@ -90,24 +89,24 @@ enum BuildingExtrusionDrawer {
     /// texel footprint (ShadowFrameStateResolver), which keeps shadows
     /// attached to building bases. Depth clamp (pancaking) keeps casters
     /// taller than the fitted near plane instead of clipping them away.
-    static func drawShadowCasters(renderEncoder: MTLRenderCommandEncoder,
+    static func drawShadowCasters(renderEncoder: any GPURenderEncoder,
                                   lightProjectionView: matrix_float4x4,
                                   placeTilesContext: PlaceTilesContext,
                                   indexBuffers: HiddenBuildingIndexBuffers,
                                   flatRenderState: FlatRenderState,
                                   heightScales: [Float] = [],
-                                  liftBuffers: [MTLBuffer?] = [],
+                                  liftBuffers: [(any GPUBuffer)?] = [],
                                   liftDatumMetres: Float = 0,
                                   liftStrength: Float = 1,
                                   liftUnitsPerMetre: Float = 0,
                                   extrudedTilePipeline: ExtrudedTilePipeline,
-                                  extrudedDepthState: MTLDepthStencilState) {
+                                  extrudedDepthState: any GPUDepthStencilState) {
         renderEncoder.setCullMode(.none)
         extrudedTilePipeline.selectShadowPipeline(renderEncoder: renderEncoder)
         renderEncoder.setDepthStencilState(extrudedDepthState)
         renderEncoder.setDepthClipMode(.clamp)
-        var castersValue = ShadowCasterUniform(lightProjectionView: lightProjectionView)
-        renderEncoder.setVertexBytes(&castersValue, length: MemoryLayout<ShadowCasterUniform>.stride, index: 1)
+        let castersValue = ShadowCasterUniform(lightProjectionView: lightProjectionView)
+        renderEncoder.setVertexValue(castersValue, index: 1)
         drawClippedCasterGeometry(renderEncoder: renderEncoder,
                                   placeTilesContext: placeTilesContext,
                                   indexBuffers: indexBuffers,
@@ -124,12 +123,12 @@ enum BuildingExtrusionDrawer {
     /// World-pass building draws, one per placement, whole, with back-face
     /// culling on. The buildings a model stands in for are left out of
     /// each tile's draw (`indexBuffers`).
-    private static func drawExtrudedSources(renderEncoder: MTLRenderCommandEncoder,
+    private static func drawExtrudedSources(renderEncoder: any GPURenderEncoder,
                                             placeTilesContext: PlaceTilesContext,
                                             indexBuffers: HiddenBuildingIndexBuffers,
                                             flatRenderState: FlatRenderState,
                                             heightScales: [Float],
-                                            liftBuffers: [MTLBuffer?],
+                                            liftBuffers: [(any GPUBuffer)?],
                                             liftDatumMetres: Float,
                                             liftStrength: Float,
                                             liftUnitsPerMetre: Float,
@@ -168,21 +167,21 @@ enum BuildingExtrusionDrawer {
             let scale = originAndSize.z / 4096.0
 
 
-            renderEncoder.setVertexBuffer(extrudedVertices.buffer, offset: extrudedVertices.offset, index: 0)
-            renderEncoder.setVertexBuffer(extrudedStyles.buffer, offset: extrudedStyles.offset, index: 2)
+            renderEncoder.setVertexBuffer(extrudedVertices.gpuBuffer, offset: extrudedVertices.offset, index: 0)
+            renderEncoder.setVertexBuffer(extrudedStyles.gpuBuffer, offset: extrudedStyles.offset, index: 2)
             // The surface mask bit the state writes where the building lands;
             // the priority below it is not tested any more (the building
             // coverage never overlaps), it only keeps the reference shaped
             // like every other tile pass's.
-            renderEncoder.setStencilReferenceValue(TileSourceStencilPriority.reference(sourceZoom: tile.z)
+            renderEncoder.setStencilReference(TileSourceStencilPriority.reference(sourceZoom: tile.z)
                                                    | TileSourceStencilPriority.surfaceMaskBit)
 
-            var modelMatrix = Matrix.translationMatrix(
+            let modelMatrix = Matrix.translationMatrix(
                 x: originAndSize.x,
                 y: originAndSize.y,
                 z: 0
             ) * Matrix.scaleMatrix(sx: scale, sy: scale, sz: scale * heightScale)
-            renderEncoder.setVertexBytes(&modelMatrix, length: MemoryLayout<matrix_float4x4>.stride, index: 3)
+            renderEncoder.setVertexValue(modelMatrix, index: 3)
 
             drawIndices(of: metalTile,
                         quarters: placeTile.quarters,
@@ -197,14 +196,14 @@ enum BuildingExtrusionDrawer {
     /// by this frame, one for every tile as for the ground
     /// (`GroundReliefFrame.worldUnitsPerMetre`), the datum the lifts are
     /// drawn from, and the frame's strength.
-    private static func bindLifts(_ liftBuffer: MTLBuffer,
+    private static func bindLifts(_ liftBuffer: any GPUBuffer,
                                   unitsPerMetre: Float,
                                   datumMetres: Float,
                                   strength: Float,
-                                  renderEncoder: MTLRenderCommandEncoder) {
-        var lift = BuildingLiftUniform(unitsPerMetre: unitsPerMetre, datumMetres: datumMetres, strength: strength)
+                                  renderEncoder: any GPURenderEncoder) {
+        let lift = BuildingLiftUniform(unitsPerMetre: unitsPerMetre, datumMetres: datumMetres, strength: strength)
         renderEncoder.setVertexBuffer(liftBuffer, offset: 0, index: 4)
-        renderEncoder.setVertexBytes(&lift, length: MemoryLayout<BuildingLiftUniform>.stride, index: 5)
+        renderEncoder.setVertexValue(lift, index: 5)
     }
 
     /// The tile's buildings in the quarters the placement draws
@@ -216,15 +215,15 @@ enum BuildingExtrusionDrawer {
                                     quarters: UInt8,
                                     indices: TileBufferView,
                                     indexBuffers: HiddenBuildingIndexBuffers,
-                                    renderEncoder: MTLRenderCommandEncoder) {
+                                    renderEncoder: any GPURenderEncoder) {
         let extruded = metalTile.tileBuffers.extruded
-        let indexByteCount = extruded.indexType == .uint16 ? MemoryLayout<UInt16>.stride : MemoryLayout<UInt32>.stride
-        let buffer: MTLBuffer
+        let indexByteCount = extruded.gpuIndexType.byteCount
+        let buffer: any GPUBuffer
         let offset: Int
         let runs: [Range<Int>]
         switch indexBuffers.indices(of: metalTile) {
         case .whole:
-            buffer = indices.buffer
+            buffer = indices.gpuBuffer
             offset = indices.offset
             runs = TileQuarters.runs(starts: extruded.quarterIndexStarts, whole: 0..<indices.count, mask: quarters)
         case .working(let working, let indexCount, let quarterStarts):
@@ -235,22 +234,22 @@ enum BuildingExtrusionDrawer {
             return
         }
         for run in runs {
-            renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                indexCount: run.count,
-                                                indexType: extruded.indexType,
-                                                indexBuffer: buffer,
-                                                indexBufferOffset: offset + run.lowerBound * indexByteCount)
+            renderEncoder.drawIndexed(.triangle,
+                                      indexCount: run.count,
+                                      indexType: extruded.gpuIndexType,
+                                      indexBuffer: buffer,
+                                      indexBufferOffset: offset + run.lowerBound * indexByteCount)
         }
     }
 
     /// Shadow-caster draws: per placement, exactly what the world pass
     /// draws of it: a building the frame leaves out casts no shadow either.
-    private static func drawClippedCasterGeometry(renderEncoder: MTLRenderCommandEncoder,
+    private static func drawClippedCasterGeometry(renderEncoder: any GPURenderEncoder,
                                                   placeTilesContext: PlaceTilesContext,
                                                   indexBuffers: HiddenBuildingIndexBuffers,
                                                   flatRenderState: FlatRenderState,
                                                   heightScales: [Float],
-                                                  liftBuffers: [MTLBuffer?],
+                                                  liftBuffers: [(any GPUBuffer)?],
                                                   liftDatumMetres: Float,
                                                   liftStrength: Float,
                                                   liftUnitsPerMetre: Float,
@@ -286,15 +285,15 @@ enum BuildingExtrusionDrawer {
                                                                              renderMapSize: flatRenderState.renderMapSize)
             let scale = originAndSize.z / 4096.0
 
-            renderEncoder.setVertexBuffer(extrudedVertices.buffer, offset: extrudedVertices.offset, index: 0)
-            renderEncoder.setVertexBuffer(extrudedStyles.buffer, offset: extrudedStyles.offset, index: 2)
+            renderEncoder.setVertexBuffer(extrudedVertices.gpuBuffer, offset: extrudedVertices.offset, index: 0)
+            renderEncoder.setVertexBuffer(extrudedStyles.gpuBuffer, offset: extrudedStyles.offset, index: 2)
 
-            var modelMatrix = Matrix.translationMatrix(
+            let modelMatrix = Matrix.translationMatrix(
                 x: originAndSize.x,
                 y: originAndSize.y,
                 z: 0
             ) * Matrix.scaleMatrix(sx: scale, sy: scale, sz: scale * heightScale)
-            renderEncoder.setVertexBytes(&modelMatrix, length: MemoryLayout<matrix_float4x4>.stride, index: 3)
+            renderEncoder.setVertexValue(modelMatrix, index: 3)
 
             drawIndices(of: metalTile,
                         quarters: placeTile.quarters,

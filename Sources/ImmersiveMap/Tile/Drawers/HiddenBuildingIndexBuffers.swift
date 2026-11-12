@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// The index buffers the map's buildings draw from while models stand in
 /// for some of them.
@@ -31,7 +31,7 @@ final class HiddenBuildingIndexBuffers {
         /// volumes start in it, the count last, for a tile that keeps its
         /// buildings by quarters (`TileBuffers.Extruded.quarterIndexStarts`),
         /// empty for one kept whole.
-        case working(buffer: MTLBuffer, indexCount: Int, quarterStarts: [Int])
+        case working(buffer: any GPUBuffer, indexCount: Int, quarterStarts: [Int])
         /// Nothing: every building of the tile is hidden, or the working
         /// buffer could not be allocated.
         case none
@@ -66,6 +66,12 @@ final class HiddenBuildingIndexBuffers {
     /// generation is checked again before it answers.
     private var generation: UInt64 = 0
     private var entries: [ObjectIdentifier: Entry] = [:]
+    /// Makes the working buffers.
+    private let device: any GPUDevice
+
+    init(device: any GPUDevice) {
+        self.device = device
+    }
 
     /// Takes the buildings the frame leaves out. Called once before a
     /// pass draws its tiles: the comparison is the only work a frame with
@@ -111,7 +117,7 @@ final class HiddenBuildingIndexBuffers {
             entries[key] = entry
             return known.indices
         }
-        let indices = Self.makeIndices(of: extruded, runs: runs, tile: tile.tile)
+        let indices = Self.makeIndices(of: extruded, runs: runs, tile: tile.tile, device: device)
         entries[key] = Entry(tile: tile, generation: generation, runs: runs, indices: indices)
         sweepIfNeeded()
         return indices
@@ -119,7 +125,8 @@ final class HiddenBuildingIndexBuffers {
 
     private static func makeIndices(of extruded: TileBuffers.Extruded,
                                     runs: [Range<Int>]?,
-                                    tile: Tile) -> Indices {
+                                    tile: Tile,
+                                    device: any GPUDevice) -> Indices {
         guard let runs else {
             return .whole
         }
@@ -127,16 +134,15 @@ final class HiddenBuildingIndexBuffers {
         guard layout.indexCount > 0, let source = extruded.indices else {
             return .none
         }
-        let indexByteCount = extruded.indexType == .uint16 ? MemoryLayout<UInt16>.stride : MemoryLayout<UInt32>.stride
+        let indexByteCount = extruded.gpuIndexType.byteCount
         // Without the buffer the tile's buildings are not drawn: there is
         // no second way to draw them.
-        guard let buffer = source.buffer.device.makeBuffer(length: layout.indexCount * indexByteCount,
-                                                           options: .storageModeShared) else {
+        guard let buffer = device.makeBuffer(length: layout.indexCount * indexByteCount, storage: .shared) else {
             return .none
         }
         copy(layout: layout,
              indexByteCount: indexByteCount,
-             from: source.buffer.contents() + source.offset,
+             from: source.gpuBuffer.contents() + source.offset,
              to: buffer.contents())
         buffer.label = "Buildings \(tile.z)/\(tile.x)/\(tile.y) without the replaced"
         return .working(buffer: buffer, indexCount: layout.indexCount, quarterStarts: layout.quarterStarts)

@@ -1,34 +1,21 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import ImmersiveMapGPU
 
-class ExtrudedTilePipeline {
-    /// Opaque building geometry, straight into the world pass.
-    let pipelineState: MTLRenderPipelineState
-    /// Depth-only replay of the same geometry from the light's camera into the
-    /// shadow map. No color attachments and no fragment stage: the placeIn
-    /// clip rides on the vertex stage's clip distances.
-    let shadowPipelineState: MTLRenderPipelineState
-    /// The same two with the ground relief (TileExtruded.metal,
-    /// kExtrudedRelief): each building lifted by its tile's lifts in
-    /// metres at vertex buffer 4, times the world units a metre spans at
-    /// vertex buffer 5, for the tiles whose terrain is in.
-    let reliefPipelineState: MTLRenderPipelineState
-    let reliefShadowPipelineState: MTLRenderPipelineState
+final class ExtrudedTilePipeline {
+    let pipelineState: any GPURenderPipeline
+    let shadowPipelineState: any GPURenderPipeline
+    let reliefPipelineState: any GPURenderPipeline
+    let reliefShadowPipelineState: any GPURenderPipeline
 
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int = 1) {
-        func function(_ name: String, relief: Bool) -> MTLFunction {
-            let values = MTLFunctionConstantValues()
-            var reliefValue = relief
-            values.setConstantValue(&reliefValue, type: .bool, index: 0)
-            return try! library.makeFunction(name: name, constantValues: values)
+        // Function constant 0 lifts the buildings by the relief.
+        func function(_ name: String, relief: Bool) -> GPUShaderFunction {
+            GPUShaderFunction(name: name, constants: [0: .bool(relief)])
         }
-        let vertexFunction = function("tileExtrudedVertexShader", relief: false)
-        let fragmentFunction = library.makeFunction(name: "tileExtrudedFragmentShader")
 
         // The 12-byte layout of ExtrudedVertexIn: quantized positions fed
         // as raw Int16 triples (the fetch converts integer formats to float
@@ -36,56 +23,51 @@ class ExtrudedTilePipeline {
         // scale), normals as char3Normalized, the style index, and two
         // bytes of padding to the stride Metal requires.
         assert(MemoryLayout<ExtrudedVertexIn>.stride == 12,
-               "The vertex descriptor mirrors ExtrudedVertexIn byte for byte")
-        let vertexDescriptor = MTLVertexDescriptor()
-        vertexDescriptor.attributes[0].format = .short3
-        vertexDescriptor.attributes[0].offset = 0
-        vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.attributes[1].format = .char3Normalized
-        vertexDescriptor.attributes[1].offset = 6
-        vertexDescriptor.attributes[1].bufferIndex = 0
-        vertexDescriptor.attributes[2].format = .uchar
-        vertexDescriptor.attributes[2].offset = 9
-        vertexDescriptor.attributes[2].bufferIndex = 0
-        vertexDescriptor.attributes[3].format = .ushort
-        vertexDescriptor.attributes[3].offset = 10
-        vertexDescriptor.attributes[3].bufferIndex = 0
-        vertexDescriptor.layouts[0].stride = MemoryLayout<ExtrudedVertexIn>.stride
-        vertexDescriptor.layouts[0].stepFunction = .perVertex
+               "The vertex layout mirrors ExtrudedVertexIn byte for byte")
+        var layout = GPUVertexLayout()
+        layout.attributes[0] = GPUVertexAttribute(format: .short3, offset: 0, bufferIndex: 0)
+        layout.attributes[1] = GPUVertexAttribute(format: .char3Normalized, offset: 6, bufferIndex: 0)
+        layout.attributes[2] = GPUVertexAttribute(format: .uchar, offset: 9, bufferIndex: 0)
+        layout.attributes[3] = GPUVertexAttribute(format: .ushort, offset: 10, bufferIndex: 0)
+        layout.strides[0] = MemoryLayout<ExtrudedVertexIn>.stride
 
-        let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.vertexFunction = vertexFunction
-        pipelineDescriptor.fragmentFunction = fragmentFunction
-        pipelineDescriptor.vertexDescriptor = vertexDescriptor
-        pipelineDescriptor.rasterSampleCount = sampleCount
-        pipelineDescriptor.colorAttachments[0].pixelFormat = pixelFormat
-        pipelineDescriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        pipelineDescriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-
-        let shadowDescriptor = MTLRenderPipelineDescriptor()
-        shadowDescriptor.vertexFunction = function("tileExtrudedShadowVertexShader", relief: false)
-        shadowDescriptor.fragmentFunction = nil
-        shadowDescriptor.vertexDescriptor = vertexDescriptor
-        shadowDescriptor.rasterSampleCount = 1
-        shadowDescriptor.depthAttachmentPixelFormat = ShadowCascadeAtlas.depthPixelFormat
-        // The caster pass writes a plain 2D depth attachment: one shadow
-        // window, so no instancing and no [[render_target_array_index]].
-        shadowDescriptor.inputPrimitiveTopology = .triangle
-
-        self.pipelineState = try! metalDevice.makeRenderPipelineState(descriptor: pipelineDescriptor)
-        self.shadowPipelineState = try! metalDevice.makeRenderPipelineState(descriptor: shadowDescriptor)
-        pipelineDescriptor.vertexFunction = function("tileExtrudedVertexShader", relief: true)
-        self.reliefPipelineState = try! metalDevice.makeRenderPipelineState(descriptor: pipelineDescriptor)
-        shadowDescriptor.vertexFunction = function("tileExtrudedShadowVertexShader", relief: true)
-        self.reliefShadowPipelineState = try! metalDevice.makeRenderPipelineState(descriptor: shadowDescriptor)
+        func buildings(relief: Bool) -> GPURenderPipelineDescriptor {
+            var descriptor = GPURenderPipelineDescriptor(vertexFunction: function("tileExtrudedVertexShader", relief: relief),
+                                                         fragmentFunction: GPUShaderFunction(name: "tileExtrudedFragmentShader"),
+                                                         colorTargets: [GPUColorTarget(format: pixelFormat)])
+            descriptor.label = relief ? "ExtrudedTilesRelief" : "ExtrudedTiles"
+            descriptor.vertexLayout = layout
+            descriptor.depthStencilFormat = .depth32FloatStencil8
+            descriptor.sampleCount = sampleCount
+            return descriptor
+        }
+        // The caster pass writes a plain 2D depth attachment, one shadow
+        // window: no colour, no fragment function, one sample.
+        func casters(relief: Bool) -> GPURenderPipelineDescriptor {
+            var descriptor = GPURenderPipelineDescriptor(vertexFunction: function("tileExtrudedShadowVertexShader", relief: relief),
+                                                         fragmentFunction: nil,
+                                                         colorTargets: [])
+            descriptor.label = relief ? "ExtrudedTileCastersRelief" : "ExtrudedTileCasters"
+            descriptor.vertexLayout = layout
+            descriptor.depthStencilFormat = ShadowCascadeAtlas.depthFormat
+            descriptor.sampleCount = 1
+            return descriptor
+        }
+        do {
+            pipelineState = try device.makeRenderPipeline(buildings(relief: false))
+            shadowPipelineState = try device.makeRenderPipeline(casters(relief: false))
+            reliefPipelineState = try device.makeRenderPipeline(buildings(relief: true))
+            reliefShadowPipelineState = try device.makeRenderPipeline(casters(relief: true))
+        } catch {
+            fatalError("Failed to create the building pipelines: \(error)")
+        }
     }
 
-    /// `relief` for a tile whose lifts are bound at vertex buffer 4.
-    func selectPipeline(renderEncoder: MTLRenderCommandEncoder, relief: Bool = false) {
-        renderEncoder.setRenderPipelineState(relief ? reliefPipelineState : pipelineState)
+    func selectPipeline(renderEncoder: any GPURenderEncoder, relief: Bool = false) {
+        renderEncoder.setPipeline(relief ? reliefPipelineState : pipelineState)
     }
 
-    func selectShadowPipeline(renderEncoder: MTLRenderCommandEncoder, relief: Bool = false) {
-        renderEncoder.setRenderPipelineState(relief ? reliefShadowPipelineState : shadowPipelineState)
+    func selectShadowPipeline(renderEncoder: any GPURenderEncoder, relief: Bool = false) {
+        renderEncoder.setPipeline(relief ? reliefShadowPipelineState : shadowPipelineState)
     }
 }

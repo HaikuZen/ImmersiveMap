@@ -14,14 +14,14 @@ enum TestTiles {
         TileBuffers.GeometryLayer(vertices: nil, indices: nil, styles: nil, styleZoomFade: nil, lineStyles: nil, indexType: .uint16)
     }
 
-    static func buffers(backing: (any GPUBuffer)?) -> TileBuffers {
+    static func buffers(backing: (any GPUBuffer)?, extruded: TileBuffers.Extruded? = nil) -> TileBuffers {
         let ground = emptyLayer()
         let phases = RoadGeometryPhases(shadow: ground, casing: ground, fill: ground, detail: ground, overlay: ground)
         return TileBuffers(gpuBackingBuffer: backing,
                            ground: ground,
                            roads: RoadStructureBuckets(tunnel: phases, ground: phases, automobileGround: phases, bridge: phases),
                            bridgeOverlay: ground,
-                           extruded: TileBuffers.Extruded(vertices: nil, indices: nil, styles: nil, gpuIndexType: .uint16),
+                           extruded: extruded ?? TileBuffers.Extruded(vertices: nil, indices: nil, styles: nil, gpuIndexType: .uint16),
                            textLabels: TileBuffers.TextLabelSet(placementInputs: [], labelsByStyleRuns: [], poiIconRuns: []),
                            roadLabels: TileBuffers.RoadLabels(pathInputs: [], pathRanges: [], pathLabels: [], labelStyle: nil,
                                                               localGlyphVertices: nil, glyphBounds: [], glyphBoundRanges: [],
