@@ -1,10 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 import simd
 
 /// The ground relief's state across frames, which the frame engine sets
@@ -174,8 +172,8 @@ final class GroundReliefFrameState {
     /// (`GroundReliefStore.applyPendingWelds`). Returns the welds' command
     /// buffer, nil with nothing to write.
     @discardableResult
-    func beginFrame(commandQueue: MTLCommandQueue) -> MTLCommandBuffer? {
-        store.applyPendingWelds(commandQueue: MetalCommandQueue(commandQueue))?.metalCommandBuffer
+    func beginFrame(commandQueue: any GPUCommandQueue) -> (any GPUCommandBuffer)? {
+        store.applyPendingWelds(commandQueue: commandQueue)
     }
 
     /// The wanted terrain tiles still on their way

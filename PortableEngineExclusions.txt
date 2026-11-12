@@ -110,11 +110,10 @@ Tile/Overview/Resources
 Tile/Pipelines/TilePipeline.swift
 Tile/Projection/FlatTileOriginCalculator.swift
 Tile/Raster/RasterTileGrid+Metal.swift
-Tile/Raster/RasterTilePipeline.swift
 Tile/Raster/RasterTileRenderSubsystem.swift
-Tile/Raster/RasterTileTexture.swift
+Tile/Raster/RasterTileTexture+Metal.swift
 Tile/Relief/Frame/GroundReliefFrame+Metal.swift
-Tile/Relief/Frame/GroundReliefFrameState.swift
+Tile/Relief/Frame/GroundReliefFrameState+Metal.swift
 Tile/Relief/Frame/GroundReliefShadowCasterSubsystem.swift
 Tile/Relief/Frame/GroundReliefUniform+Metal.swift
 Tile/Relief/Lifts/GroundRelief+Metal.swift

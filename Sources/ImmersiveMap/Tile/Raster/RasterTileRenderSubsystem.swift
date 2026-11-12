@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -311,7 +312,7 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         descriptor.colorAttachments[0].storeAction = .multisampleResolve
         guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
         encoder.label = "RasterTiles \(drawn.count)"
-        encoder.setRenderPipelineState(pipeline.bakePipelineState)
+        encoder.setRenderPipelineState(pipeline.bakePipelineState.metalPipeline)
         encoder.setCullMode(.none)
         var fade = TileOverviewFadeUniform(pixelsPerPoint: 1, cameraZoom: Float(frameContext.planningZoom))
         var windows: [(index: Int, origin: MTLOrigin)] = []
@@ -465,7 +466,7 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
                             sampler: MTLSamplerState) {
         encoder.pushDebugGroup("ground.rasterTiles")
         beginDraws(encoder: encoder, sampler: sampler)
-        encoder.setRenderPipelineState(pipeline.flatPipelineState)
+        encoder.setRenderPipelineState(pipeline.flatPipelineState.metalPipeline)
         encoder.setDepthStencilState(groundOwnerState)
         var cameraUniform = frameContext.cameraUniform
         encoder.setVertexBytes(&cameraUniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
@@ -507,7 +508,7 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
                 guard let mesh = grid.mesh(forTileZoom: tile.z, atLeast: cells) else { continue }
                 if (relief != nil) != selectedRelief {
                     selectedRelief = relief != nil
-                    encoder.setRenderPipelineState(selectedRelief ? pipeline.flatReliefPipelineState : pipeline.flatPipelineState)
+                    encoder.setRenderPipelineState((selectedRelief ? pipeline.flatReliefPipelineState : pipeline.flatPipelineState).metalPipeline)
                 }
                 if let relief, let groundRelief {
                     GroundReliefUniform.bind(relief,
@@ -560,7 +561,7 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
                                                             transition: globe.transition)
         encoder.pushDebugGroup("ground.rasterTiles")
         beginDraws(encoder: encoder, sampler: sampler, globeLight: GlobeLightUniform.resolve(frameContext: frameContext))
-        encoder.setRenderPipelineState(pureSphere ? pipeline.spherePurePipelineState : pipeline.sphereMorphPipelineState)
+        encoder.setRenderPipelineState((pureSphere ? pipeline.spherePurePipelineState : pipeline.sphereMorphPipelineState).metalPipeline)
         encoder.setDepthStencilState(sphereOpaqueOwnerState)
         var cameraUniform = frameContext.cameraUniform
         var globeValue = globe

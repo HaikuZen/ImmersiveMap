@@ -113,7 +113,7 @@ enum RenderGraphFactory {
                                                   depthDisabledState: MetalDepthStencilState(context.depthDisabledState))
         let reliefShadowCasterSubsystem = GroundReliefShadowCasterSubsystem(device: context.gpuDevice,
                                                                             pipeline: context.rasterTilePipeline,
-                                                                            depthState: context.extrudedDepthState,
+                                                                            depthState: MetalDepthStencilState(context.extrudedDepthState),
                                                                             groundFlattening: settings.tiles.groundFlattening)
         let starfieldSubsystem = StarfieldRenderSubsystem(starfieldRenderer: context.starfieldRenderer,
                                                           skyBackdropDepthState: context.skyBackdropDepthState,

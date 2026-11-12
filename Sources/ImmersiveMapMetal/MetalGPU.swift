@@ -397,17 +397,7 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
         metal.vertexFunction = try function(descriptor.vertexFunction)
         metal.fragmentFunction = try descriptor.fragmentFunction.map(function)
         if let layout = descriptor.vertexLayout {
-            let vertexDescriptor = MTLVertexDescriptor()
-            for (index, attribute) in layout.attributes {
-                vertexDescriptor.attributes[index].format = attribute.format.metal
-                vertexDescriptor.attributes[index].offset = attribute.offset
-                vertexDescriptor.attributes[index].bufferIndex = attribute.bufferIndex
-            }
-            for (index, stride) in layout.strides {
-                vertexDescriptor.layouts[index].stride = stride
-                vertexDescriptor.layouts[index].stepFunction = .perVertex
-            }
-            metal.vertexDescriptor = vertexDescriptor
+            metal.vertexDescriptor = layout.metal
         }
         for (index, target) in descriptor.colorTargets.enumerated() {
             let color = metal.colorAttachments[index]!

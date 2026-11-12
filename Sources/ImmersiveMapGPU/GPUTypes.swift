@@ -165,9 +165,13 @@ package enum GPUVertexFormat: Hashable, Sendable {
     case float, float2, float3, float4
     case int
     case uchar
+    /// WebGPU's `sint8`.
+    case char
     case ushort
     case short
     case short3
+    /// WebGPU's `snorm8x2`.
+    case char2Normalized
     case char3Normalized
     /// WebGPU's `snorm8x4`.
     case char4Normalized

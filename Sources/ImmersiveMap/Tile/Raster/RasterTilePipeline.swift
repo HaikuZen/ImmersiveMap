@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// The pipelines of the raster tiles (TileRaster.metal): the bake, which
 /// draws a tile's fills into its window of the frame's atlas when its
@@ -13,81 +13,75 @@ final class RasterTilePipeline {
     /// mip chain is made from them.
     static let bakeSampleCount = 4
 
-    let bakePipelineState: MTLRenderPipelineState
-    let flatPipelineState: MTLRenderPipelineState
+    let bakePipelineState: any GPURenderPipeline
+    let flatPipelineState: any GPURenderPipeline
     /// The plane's draw on the ground relief (TileRaster.metal,
     /// kTileRasterRelief): the grid raised by the terrain bound at vertex
     /// texture 0 and buffer 9.
-    let flatReliefPipelineState: MTLRenderPipelineState
-    let spherePurePipelineState: MTLRenderPipelineState
-    let sphereMorphPipelineState: MTLRenderPipelineState
-    /// The ground relief as a shadow caster (`GroundReliefShadowCasterSubsystem`):
+    let flatReliefPipelineState: any GPURenderPipeline
+    let spherePurePipelineState: any GPURenderPipeline
+    let sphereMorphPipelineState: any GPURenderPipeline
+    /// The ground relief as a shadow caster (`GroundReliefShadowCasterDrawing`):
     /// the grid raised by the terrain, from the light, depth only into the
     /// shadow map, as the buildings' caster pass draws.
-    let reliefShadowPipelineState: MTLRenderPipelineState
+    let reliefShadowPipelineState: any GPURenderPipeline
 
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int = 1) {
-        let bake = MTLRenderPipelineDescriptor()
+        var bake = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "tileRasterBakeVertexShader"),
+                                               fragmentFunction: GPUShaderFunction(name: "tileRasterBakeFragmentShader"),
+                                               colorTargets: [])
         bake.label = "RasterTileBake"
-        bake.vertexFunction = library.makeFunction(name: "tileRasterBakeVertexShader")
-        bake.fragmentFunction = library.makeFunction(name: "tileRasterBakeFragmentShader")
-        bake.vertexDescriptor = TilePipeline.makeVertexDescriptor()
-        bake.rasterSampleCount = Self.bakeSampleCount
-        bake.colorAttachments[0].pixelFormat = RasterTileTexture.pixelFormat
+        bake.vertexLayout = TileVertexIn.gpuVertexLayout
+        bake.sampleCount = Self.bakeSampleCount
         // The fills in buffer order, each over what is under it, the way
         // the vector ground layers them.
-        bake.colorAttachments[0].isBlendingEnabled = true
-        bake.colorAttachments[0].rgbBlendOperation = .add
-        bake.colorAttachments[0].alphaBlendOperation = .add
-        bake.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        bake.colorAttachments[0].sourceAlphaBlendFactor = .one
-        bake.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        bake.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        bakePipelineState = try! metalDevice.makeRenderPipelineState(descriptor: bake)
+        var bakeTarget = GPUColorTarget(format: RasterTileTexture.format)
+        bakeTarget.blend = (color: GPUBlendComponent(source: .sourceAlpha, destination: .oneMinusSourceAlpha),
+                            alpha: GPUBlendComponent(source: .one, destination: .oneMinusSourceAlpha))
+        bake.colorTargets = [bakeTarget]
 
         // The draws: opaque, in the world pass, through the ground's depth
         // and stencil.
-        func drawState(label: String, vertex: String, fragment: String, relief: Bool = false) -> MTLRenderPipelineState {
-            let descriptor = MTLRenderPipelineDescriptor()
+        func draw(label: String, vertex: String, fragment: String, relief: Bool = false) -> GPURenderPipelineDescriptor {
+            // The fragment takes the constant too: the relief's samples the
+            // shadow cascades at its raised point (TileRaster.metal).
+            var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: vertex, constants: [0: .bool(relief)]),
+                                                         fragmentFunction: GPUShaderFunction(name: fragment, constants: [0: .bool(relief)]),
+                                                         colorTargets: [GPUColorTarget(format: pixelFormat)])
             descriptor.label = label
-            let values = MTLFunctionConstantValues()
-            var reliefValue = relief
-            values.setConstantValue(&reliefValue, type: .bool, index: 0)
-            descriptor.vertexFunction = try! library.makeFunction(name: vertex, constantValues: values)
-            // The fragment too: the relief's samples the shadow cascades
-            // at its raised point (TileRaster.metal).
-            descriptor.fragmentFunction = try! library.makeFunction(name: fragment, constantValues: values)
-            descriptor.rasterSampleCount = sampleCount
-            descriptor.colorAttachments[0].pixelFormat = pixelFormat
-            descriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-            descriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-            return try! metalDevice.makeRenderPipelineState(descriptor: descriptor)
+            descriptor.depthStencilFormat = .depth32FloatStencil8
+            descriptor.sampleCount = sampleCount
+            return descriptor
         }
-        flatPipelineState = drawState(label: "RasterTileFlat",
-                                      vertex: "tileRasterFlatVertexShader",
-                                      fragment: "tileRasterFlatFragmentShader")
-        flatReliefPipelineState = drawState(label: "RasterTileFlatRelief",
-                                            vertex: "tileRasterFlatVertexShader",
-                                            fragment: "tileRasterFlatFragmentShader",
-                                            relief: true)
-        spherePurePipelineState = drawState(label: "RasterTileSpherePure",
-                                            vertex: "tileRasterSpherePureVertexShader",
-                                            fragment: "tileRasterSphereFragmentShader")
-        sphereMorphPipelineState = drawState(label: "RasterTileSphereMorph",
-                                             vertex: "tileRasterSphereMorphVertexShader",
-                                             fragment: "tileRasterSphereFragmentShader")
 
-        let shadow = MTLRenderPipelineDescriptor()
-        shadow.label = "RasterTileReliefShadow"
-        shadow.vertexFunction = library.makeFunction(name: "tileRasterReliefShadowVertexShader")
-        shadow.fragmentFunction = nil
-        shadow.rasterSampleCount = 1
-        shadow.depthAttachmentPixelFormat = ShadowCascadeAtlas.depthPixelFormat
         // A plain 2D depth attachment, as the buildings' caster pass.
-        shadow.inputPrimitiveTopology = .triangle
-        reliefShadowPipelineState = try! metalDevice.makeRenderPipelineState(descriptor: shadow)
+        var shadow = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "tileRasterReliefShadowVertexShader"),
+                                                 fragmentFunction: nil,
+                                                 colorTargets: [])
+        shadow.label = "RasterTileReliefShadow"
+        shadow.depthStencilFormat = ShadowCascadeAtlas.depthFormat
+        shadow.sampleCount = 1
+
+        do {
+            bakePipelineState = try device.makeRenderPipeline(bake)
+            flatPipelineState = try device.makeRenderPipeline(draw(label: "RasterTileFlat",
+                                                                   vertex: "tileRasterFlatVertexShader",
+                                                                   fragment: "tileRasterFlatFragmentShader"))
+            flatReliefPipelineState = try device.makeRenderPipeline(draw(label: "RasterTileFlatRelief",
+                                                                         vertex: "tileRasterFlatVertexShader",
+                                                                         fragment: "tileRasterFlatFragmentShader",
+                                                                         relief: true))
+            spherePurePipelineState = try device.makeRenderPipeline(draw(label: "RasterTileSpherePure",
+                                                                         vertex: "tileRasterSpherePureVertexShader",
+                                                                         fragment: "tileRasterSphereFragmentShader"))
+            sphereMorphPipelineState = try device.makeRenderPipeline(draw(label: "RasterTileSphereMorph",
+                                                                          vertex: "tileRasterSphereMorphVertexShader",
+                                                                          fragment: "tileRasterSphereFragmentShader"))
+            reliefShadowPipelineState = try device.makeRenderPipeline(shadow)
+        } catch {
+            fatalError("Failed to create the raster tile pipelines: \(error)")
+        }
     }
 }

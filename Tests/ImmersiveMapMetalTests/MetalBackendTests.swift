@@ -21,6 +21,8 @@ final class MetalBackendTests: XCTestCase {
         XCTAssertEqual(GPUCompareFunction.lessEqual.metal, .lessEqual)
         XCTAssertEqual(GPUStencilOperation.incrementWrap.metal, .incrementWrap)
         XCTAssertEqual(GPUBlendFactor.oneMinusSourceAlpha.metal, .oneMinusSourceAlpha)
+        XCTAssertEqual(GPUVertexFormat.char.metal, .char)
+        XCTAssertEqual(GPUVertexFormat.char2Normalized.metal, .char2Normalized)
         XCTAssertEqual(GPUVertexFormat.char3Normalized.metal, .char3Normalized)
         XCTAssertEqual(GPUVertexFormat.char4Normalized.metal, .char4Normalized)
         XCTAssertEqual(GPUPrimitiveTopology.triangleStrip.metal, .triangleStrip)

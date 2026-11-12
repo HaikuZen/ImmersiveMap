@@ -4,13 +4,13 @@
 import simd
 
 /// One ground/road geometry vertex as the tile shaders consume it. The memory
-/// layout is a binding contract shared by three parties: `TilePipeline`'s
-/// vertex descriptor (attribute offsets and stride), the arena image format
-/// (span strides, see `TileArenaImageMath`), and the parser that emits the
+/// layout is a binding contract shared by three parties: the vertex layout
+/// `TileVertexIn.gpuVertexLayout` (attribute offsets and stride), the arena
+/// image format (span strides, see `TileArenaImageMath`), and the parser that emits the
 /// vertices. Changing the layout is therefore a shader change and a
 /// prepared-cache format change (bump `PreparedTileDiskCaching.preparedFormatVersion`).
 /// One vertex of a ground, road or bridge layer, 16 bytes as the vertex
-/// descriptor in `TilePipeline` reads it. The position is float render
+/// layout in `TileVertexLayout.swift` reads it. The position is float render
 /// space (x east, y up, tile units): what the tessellators and the ground
 /// flattener produce, unrounded, so two triangles that share an edge share
 /// it exactly and the mesh is watertight at any zoom.

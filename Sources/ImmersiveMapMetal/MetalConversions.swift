@@ -131,14 +131,33 @@ extension GPUVertexFormat {
         case .float4: return .float4
         case .int: return .int
         case .uchar: return .uchar
+        case .char: return .char
         case .ushort: return .ushort
         case .short: return .short
         case .short3: return .short3
+        case .char2Normalized: return .char2Normalized
         case .char3Normalized: return .char3Normalized
         case .char4Normalized: return .char4Normalized
         case .ushort2Normalized: return .ushort2Normalized
         case .uchar4Normalized: return .uchar4Normalized
         }
+    }
+}
+
+extension GPUVertexLayout {
+    /// The layout as Metal's descriptor, every buffer stepped per vertex.
+    package var metal: MTLVertexDescriptor {
+        let descriptor = MTLVertexDescriptor()
+        for (index, attribute) in attributes {
+            descriptor.attributes[index].format = attribute.format.metal
+            descriptor.attributes[index].offset = attribute.offset
+            descriptor.attributes[index].bufferIndex = attribute.bufferIndex
+        }
+        for (index, stride) in strides {
+            descriptor.layouts[index].stride = stride
+            descriptor.layouts[index].stepFunction = .perVertex
+        }
+        return descriptor
     }
 }
 

@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapMetal
 import MetalKit
 
 class TilePipeline {
@@ -343,26 +344,7 @@ class TilePipeline {
     /// The tile vertex format (`TileVertexIn`, `VertexIn` in TileShading.h)
     /// at buffer 0, for every pipeline that reads a tile's vertices.
     static func makeVertexDescriptor() -> MTLVertexDescriptor {
-        let vertexDescriptor = MTLVertexDescriptor()
-        vertexDescriptor.attributes[0].format = .float2
-        vertexDescriptor.attributes[0].offset = MemoryLayout<TileVertexIn>.offset(of: \.position)!
-        vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.attributes[1].format = .uchar
-        vertexDescriptor.attributes[1].offset = MemoryLayout<TileVertexIn>.offset(of: \.styleIndex)!
-        vertexDescriptor.attributes[1].bufferIndex = 0
-        vertexDescriptor.attributes[2].format = .char
-        vertexDescriptor.attributes[2].offset = MemoryLayout<TileVertexIn>.offset(of: \.lineDistance)!
-        vertexDescriptor.attributes[2].bufferIndex = 0
-        vertexDescriptor.attributes[3].format = .short
-        vertexDescriptor.attributes[3].offset = MemoryLayout<TileVertexIn>.offset(of: \.lineParameter)!
-        vertexDescriptor.attributes[3].bufferIndex = 0
-        // The deferred ribbons' extrusion direction, snorm to a unit float2.
-        vertexDescriptor.attributes[4].format = .char2Normalized
-        vertexDescriptor.attributes[4].offset = MemoryLayout<TileVertexIn>.offset(of: \.normal)!
-        vertexDescriptor.attributes[4].bufferIndex = 0
-        vertexDescriptor.layouts[0].stride = MemoryLayout<TileVertexIn>.stride
-        vertexDescriptor.layouts[0].stepFunction = .perVertex
-        return vertexDescriptor
+        TileVertexIn.gpuVertexLayout.metal
     }
 
     func selectPipeline(renderEncoder: MTLRenderCommandEncoder) {
