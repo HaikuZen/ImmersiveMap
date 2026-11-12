@@ -144,10 +144,7 @@ final class LayerRenderSubsystem: RenderSubsystem {
                                             indexCount: chunk.fillIndexCount,
                                             indexType: .uint32,
                                             indexBuffer: indices,
-                                            indexBufferOffset: chunk.fillIndexStart * MemoryLayout<UInt32>.stride,
-                                            instanceCount: 1,
-                                            baseVertex: 0,
-                                            baseInstance: 0)
+                                            indexBufferOffset: chunk.fillIndexStart * MemoryLayout<UInt32>.stride)
                     }
                 }
             }
@@ -162,10 +159,7 @@ final class LayerRenderSubsystem: RenderSubsystem {
                                             indexCount: chunk.lineIndexCount,
                                             indexType: .uint32,
                                             indexBuffer: indices,
-                                            indexBufferOffset: chunk.lineIndexStart * MemoryLayout<UInt32>.stride,
-                                            instanceCount: 1,
-                                            baseVertex: 0,
-                                            baseInstance: 0)
+                                            indexBufferOffset: chunk.lineIndexStart * MemoryLayout<UInt32>.stride)
                     }
                 }
             }

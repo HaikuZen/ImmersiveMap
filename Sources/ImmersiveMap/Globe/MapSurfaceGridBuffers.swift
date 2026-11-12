@@ -17,10 +17,7 @@ struct MapSurfaceGridBuffers {
                              vertices: [Vertex],
                              indices: [UInt32]) -> MapSurfaceGridBuffers {
         func buffer<Element>(_ values: [Element]) -> any GPUBuffer {
-            let buffer = values.withUnsafeBytes { bytes in
-                device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, storage: .shared)
-            }
-            guard let buffer else {
+            guard let buffer = device.makeBuffer(values, storage: .shared) else {
                 fatalError("Failed to allocate a map surface grid buffer")
             }
             return buffer

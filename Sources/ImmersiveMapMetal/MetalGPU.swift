@@ -285,15 +285,15 @@ package final class MetalCommandQueue: GPUCommandQueue {
 }
 
 /// The GPU interface over a Metal device and the shader library its
-/// pipelines' functions come from. A device made without a library makes
-/// buffers, textures and states, and refuses pipelines. Unchecked
+/// pipelines' functions come from. The engine makes one, with its shader
+/// library, and hands it to every feature (`SharedRenderResources.gpuDevice`). Unchecked
 /// Sendable: it holds the device and the library and changes neither, and
 /// Metal makes both safe to use from any thread.
 package final class MetalDevice: GPUDevice, @unchecked Sendable {
     package let device: MTLDevice
-    package let library: MTLLibrary?
+    package let library: MTLLibrary
 
-    package init(device: MTLDevice, library: MTLLibrary?) {
+    package init(device: MTLDevice, library: MTLLibrary) {
         self.device = device
         self.library = library
     }
@@ -423,7 +423,10 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
             }
         }
         metal.rasterSampleCount = descriptor.sampleCount
-        metal.inputPrimitiveTopology = descriptor.topology.metalClass
+        // Left unset, as the engine's Metal pipelines always had it: Metal
+        // needs the class only for layered rendering, and a pipeline that
+        // states one refuses draws of the other classes. WebGPU takes the
+        // topology itself from `descriptor.topology`.
         do {
             return MetalRenderPipeline(try device.makeRenderPipelineState(descriptor: metal))
         } catch {
@@ -432,9 +435,6 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
     }
 
     private func function(_ shader: GPUShaderFunction) throws -> MTLFunction {
-        guard let library else {
-            throw GPUError.missingFunction("\(shader.name): the device was made without a shader library")
-        }
         guard shader.constants.isEmpty == false else {
             guard let function = library.makeFunction(name: shader.name) else {
                 throw GPUError.missingFunction(shader.name)

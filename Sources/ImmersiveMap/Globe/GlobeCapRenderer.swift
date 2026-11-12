@@ -121,10 +121,7 @@ final class GlobeCapRenderer {
                                   indexCount: northCapBuffers.indicesCount,
                                   indexType: northCapBuffers.indexType,
                                   indexBuffer: northCapBuffers.indicesBuffer,
-                                  indexBufferOffset: 0,
-                                  instanceCount: 1,
-                                  baseVertex: 0,
-                                  baseInstance: 0)
+                                  indexBufferOffset: 0)
     }
 
     private func drawSouthCap(renderEncoder: any GPURenderEncoder) {
@@ -134,9 +131,6 @@ final class GlobeCapRenderer {
                                   indexCount: southCapBuffers.indicesCount,
                                   indexType: southCapBuffers.indexType,
                                   indexBuffer: southCapBuffers.indicesBuffer,
-                                  indexBufferOffset: 0,
-                                  instanceCount: 1,
-                                  baseVertex: 0,
-                                  baseInstance: 0)
+                                  indexBufferOffset: 0)
     }
 }

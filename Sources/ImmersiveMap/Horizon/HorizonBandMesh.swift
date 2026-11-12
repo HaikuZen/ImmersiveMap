@@ -42,13 +42,8 @@ struct HorizonBandMesh {
                 indices.append(contentsOf: [a, b, c, a, c, d])
             }
         }
-        let vertexBuffer = vertices.withUnsafeBytes { bytes in
-            device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, storage: .shared)
-        }
-        let indexBuffer = indices.withUnsafeBytes { bytes in
-            device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, storage: .shared)
-        }
-        guard let vertexBuffer, let indexBuffer else {
+        guard let vertexBuffer = device.makeBuffer(vertices, storage: .shared),
+              let indexBuffer = device.makeBuffer(indices, storage: .shared) else {
             return nil
         }
         vertexBuffer.label = "HorizonBandVertices"

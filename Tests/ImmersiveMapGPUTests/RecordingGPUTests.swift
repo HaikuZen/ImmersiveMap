@@ -60,6 +60,38 @@ struct RecordingGPUTests {
         ])
     }
 
+    @Test func aValueWithNoTailPaddingIsPassedAsItsOwnBytes() {
+        var sent: [UInt8] = []
+        let value = SIMD4<Float>(1, 2, 3, 4)
+        withGPUConstantBytes(of: value) { bytes, length in
+            sent = Array(UnsafeRawBufferPointer(start: bytes, count: length))
+        }
+        #expect(sent.count == MemoryLayout<SIMD4<Float>>.stride)
+        #expect(sent == withUnsafeBytes(of: value) { Array($0) })
+    }
+
+    @Test func anArrayIsUploadedAsItsElementsAndNothingIsMadeForNone() throws {
+        let device = RecordingGPUDevice()
+        let buffer = try #require(device.makeBuffer([7, 8, 9] as [UInt16], storage: .shared) as? RecordingBuffer)
+        #expect(buffer.length == 3 * MemoryLayout<UInt16>.stride)
+        #expect(buffer.values(as: UInt16.self) == [7, 8, 9])
+        #expect(device.makeBuffer([Float](), storage: .shared) == nil)
+        #expect(device.buffers.count == 1)
+    }
+
+    @Test func theShortDrawsAreOneInstanceFromTheStart() throws {
+        let device = RecordingGPUDevice()
+        let indices = try #require(device.makeBuffer([0, 1, 2] as [UInt32], storage: .shared))
+        let encoder = RecordingRenderEncoder()
+        encoder.draw(.triangle, vertexStart: 3, vertexCount: 6)
+        encoder.drawIndexed(.triangle, indexCount: 3, indexType: .uint32, indexBuffer: indices, indexBufferOffset: 4)
+        #expect(encoder.commands == [
+            .draw(.triangle, vertexStart: 3, vertexCount: 6, instanceCount: 1, baseInstance: 0),
+            .drawIndexed(.triangle, indexCount: 3, indexType: .uint32, indexBuffer: "buffer 0", indexBufferOffset: 4,
+                         instanceCount: 1, baseVertex: 0, baseInstance: 0),
+        ])
+    }
+
     @Test func aCommittedBufferHasCompleted() throws {
         let queue = try #require(RecordingGPUDevice().makeCommandQueue())
         let commandBuffer = try #require(queue.makeCommandBuffer() as? RecordingCommandBuffer)

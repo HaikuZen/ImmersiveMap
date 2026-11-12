@@ -20,10 +20,7 @@ final class LayerMesh: @unchecked Sendable {
 
     init?(key: LayerMeshKey, data: LayerMeshData, device: any GPUDevice) {
         func buffer<Element>(_ values: [Element], label: String) -> (any GPUBuffer)? {
-            guard values.isEmpty == false else { return nil }
-            let buffer = values.withUnsafeBytes { bytes in
-                device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, storage: .shared)
-            }
+            let buffer = device.makeBuffer(values, storage: .shared)
             buffer?.label = label
             return buffer
         }

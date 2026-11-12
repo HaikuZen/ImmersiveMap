@@ -67,11 +67,7 @@ final class StarfieldRenderer {
                        twinklePhase: star.twinklePhase,
                        halo: star.halo)
         }
-        return vertices.withUnsafeBytes { bytes in
-            device.makeBuffer(bytes: bytes.baseAddress!,
-                              length: MemoryLayout<StarVertex>.stride * vertices.count,
-                              storage: .shared)
-        }
+        return device.makeBuffer(vertices, storage: .shared)
     }
 
     func draw(renderEncoder: any GPURenderEncoder,
@@ -115,6 +111,6 @@ final class StarfieldRenderer {
         renderEncoder.setVertexValue(globe, index: 2)
         renderEncoder.setVertexValue(params, index: 3)
         renderEncoder.setFragmentValue(nowTime, index: 0)
-        renderEncoder.draw(.point, vertexStart: 0, vertexCount: verticesCount, instanceCount: 1, baseInstance: 0)
+        renderEncoder.draw(.point, vertexStart: 0, vertexCount: verticesCount)
     }
 }

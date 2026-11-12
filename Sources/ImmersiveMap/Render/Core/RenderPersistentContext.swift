@@ -176,7 +176,7 @@ final class RenderPersistentContext {
         self.fxaaPipeline = shared.fxaaPipeline
         // The starfield renderer bakes the star-generation settings, so it
         // stays per renderer; only its pipeline is shared.
-        self.starfieldRenderer = StarfieldRenderer(device: MetalDevice(device: metal.device, library: nil),
+        self.starfieldRenderer = StarfieldRenderer(device: shared.gpuDevice,
                                                    pipeline: shared.starfieldPipeline,
                                                    config: config.scene.starfield)
 
@@ -226,7 +226,7 @@ final class RenderPersistentContext {
         self.treeModelStore.eventSink = eventSink
         self.layerSource = layerSource
         self.layerPipeline = shared.layerPipeline
-        self.layerMeshStore = LayerMeshStore(device: MetalDevice(device: metal.device, library: nil))
+        self.layerMeshStore = LayerMeshStore(device: shared.gpuDevice)
         self.layerMeshStore.eventSink = eventSink
 
         self.avatarSource = avatarSource

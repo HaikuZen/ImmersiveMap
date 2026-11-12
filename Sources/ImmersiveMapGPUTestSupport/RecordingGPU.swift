@@ -279,11 +279,11 @@ package final class RecordingCommandQueue: GPUCommandQueue {
 /// A recording device. Its pipelines' functions are found in
 /// `shaderFunctions` when it is set, and any name is taken when it is nil.
 /// What it makes may be asked for from any thread, as a mesh build does,
-/// so its logs are kept under a lock. Set its properties before handing it
-/// to the code under test.
+/// so its logs are kept under a lock, and what it is made with never
+/// changes.
 package final class RecordingGPUDevice: GPUDevice, @unchecked Sendable {
-    package var features: GPUDeviceFeatures
-    package var shaderFunctions: Set<String>?
+    package let features: GPUDeviceFeatures
+    package let shaderFunctions: Set<String>?
     private let lock = Mutex(())
     private var bufferLog: [RecordingBuffer] = []
     private var textureLog: [RecordingTexture] = []

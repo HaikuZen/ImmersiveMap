@@ -84,9 +84,6 @@ final class HorizonRenderer {
                                   indexCount: mesh.indexCount,
                                   indexType: .uint16,
                                   indexBuffer: mesh.indexBuffer,
-                                  indexBufferOffset: 0,
-                                  instanceCount: 1,
-                                  baseVertex: 0,
-                                  baseInstance: 0)
+                                  indexBufferOffset: 0)
     }
 }

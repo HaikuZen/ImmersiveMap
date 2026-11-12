@@ -37,6 +37,9 @@ import Metal
 final class SharedRenderResources {
     let device: MTLDevice
     let library: MTLLibrary
+    /// The device and library as the GPU interface, the one every feature
+    /// that draws through it makes its resources with.
+    let gpuDevice: MetalDevice
     let renderSampleCount: Int
     /// The one color format the engine renders in; `RendererSetup` stamps it
     /// onto every view's layer.
@@ -268,6 +271,7 @@ final class SharedRenderResources {
     private struct Built: @unchecked Sendable {
         let device: MTLDevice
         let library: MTLLibrary
+        let gpuDevice: MetalDevice
         let renderSampleCount: Int
         let extrudedDepthState: MTLDepthStencilState
         let labelDepthState: MTLDepthStencilState
@@ -299,13 +303,16 @@ final class SharedRenderResources {
         // from it whichever library the shaders come from.
         let resourceBundle = try ImmersiveMapResourceBundle.bundle()
         let library = try RendererSetup.makeLibrary(metalDevice: device, bundle: resourceBundle)
+        let gpuDevice = MetalDevice(device: device, library: library)
         let compiled = Self.makeConcurrentlyCompiledResources(device: device,
                                                               library: library,
+                                                              gpuDevice: gpuDevice,
                                                               resourceBundle: resourceBundle,
                                                               pixelFormat: .bgra8Unorm,
                                                               sampleCount: renderSampleCount)
         return Built(device: device,
                      library: library,
+                     gpuDevice: gpuDevice,
                      renderSampleCount: renderSampleCount,
                      extrudedDepthState: device.makeDepthStencilState(descriptor: Self.makeSceneDepthDescriptor())!,
                      labelDepthState: device.makeDepthStencilState(descriptor: Self.makeSceneDepthDescriptor())!,
@@ -338,6 +345,7 @@ final class SharedRenderResources {
     private init(built: Built) {
         self.device = built.device
         self.library = built.library
+        self.gpuDevice = built.gpuDevice
         self.renderSampleCount = built.renderSampleCount
         self.extrudedDepthState = built.extrudedDepthState
         self.labelDepthState = built.labelDepthState
@@ -423,10 +431,16 @@ final class SharedRenderResources {
     private nonisolated static func makeConcurrentlyCompiledResources(
         device: MTLDevice,
         library: MTLLibrary,
+        gpuDevice: MetalDevice,
         resourceBundle: Bundle,
         pixelFormat: MTLPixelFormat,
         sampleCount: Int
     ) -> ConcurrentlyCompiledResources {
+        // Converted once, before the jobs: a format the GPU interface does
+        // not name stops here, saying which, rather than in a worker.
+        guard let gpuPixelFormat = GPUPixelFormat(metal: pixelFormat) else {
+            fatalError("The GPU interface has no name for the color format \(pixelFormat.rawValue)")
+        }
         var polygonPipeline: PolygonsPipeline?
         var tilePipeline: TilePipeline?
         var globeVectorSurfacePipeline: TilePipeline?
@@ -459,8 +473,8 @@ final class SharedRenderResources {
                                                              library: library,
                                                              resourceBundle: resourceBundle,
                                                              sampleCount: 1) },
-            { globeCap = GlobeCapRenderer.SharedResources.make(device: MetalDevice(device: device, library: library),
-                                                               pixelFormat: GPUPixelFormat(metal: pixelFormat)!,
+            { globeCap = GlobeCapRenderer.SharedResources.make(device: gpuDevice,
+                                                               pixelFormat: gpuPixelFormat,
                                                                sampleCount: sampleCount,
                                                                maxLatitude: WebMercatorMath.maxLatitudeRadians) },
             { extrudedTilePipeline = ExtrudedTilePipeline(metalDevice: device,
@@ -492,11 +506,11 @@ final class SharedRenderResources {
             { fxaaPipeline = FXAAPipeline(metalDevice: device,
                                           pixelFormat: pixelFormat,
                                           library: library) },
-            { starfieldPipeline = StarfieldPipeline(device: MetalDevice(device: device, library: library),
-                                                    pixelFormat: GPUPixelFormat(metal: pixelFormat)!,
+            { starfieldPipeline = StarfieldPipeline(device: gpuDevice,
+                                                    pixelFormat: gpuPixelFormat,
                                                     sampleCount: sampleCount) },
-            { horizonPipeline = HorizonPipeline(device: MetalDevice(device: device, library: library),
-                                                pixelFormat: GPUPixelFormat(metal: pixelFormat)!,
+            { horizonPipeline = HorizonPipeline(device: gpuDevice,
+                                                pixelFormat: gpuPixelFormat,
                                                 sampleCount: sampleCount) },
             { sceneModelPipeline = SceneModelPipeline(metalDevice: device,
                                                       pixelFormat: pixelFormat,
@@ -514,8 +528,8 @@ final class SharedRenderResources {
                                           pixelFormat: pixelFormat,
                                           library: library,
                                           sampleCount: sampleCount) },
-            { layerPipeline = LayerPipeline(device: MetalDevice(device: device, library: library),
-                                            pixelFormat: GPUPixelFormat(metal: pixelFormat)!,
+            { layerPipeline = LayerPipeline(device: gpuDevice,
+                                            pixelFormat: gpuPixelFormat,
                                             sampleCount: sampleCount) }
         ]
         DispatchQueue.concurrentPerform(iterations: jobs.count) { jobs[$0]() }
