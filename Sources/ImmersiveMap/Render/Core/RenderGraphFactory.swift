@@ -130,8 +130,8 @@ enum RenderGraphFactory {
                                                                             debugOverlayControls: debugOverlayControls)
         let surfaceLabelSubsystem = SurfaceLabelRenderSubsystem(pipeline: context.surfaceLabelPipeline,
                                                                 textRenderer: context.textRenderer,
-                                                                depthState: context.groundDepthState,
-                                                                depthDisabledState: context.depthDisabledState)
+                                                                depthState: MetalDepthStencilState(context.groundDepthState),
+                                                                depthDisabledState: MetalDepthStencilState(context.depthDisabledState))
         let globeCapSubsystem = GlobeCapRenderSubsystem(globeCapDepthState: context.globeCapDepthState,
                                                         depthDisabledState: context.depthDisabledState,
                                                         globeCapRenderer: context.globeCapRenderer)

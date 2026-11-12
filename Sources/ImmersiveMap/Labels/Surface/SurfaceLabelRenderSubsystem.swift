@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
 import ImmersiveMapMetal
 import Metal
 import simd
@@ -14,22 +15,16 @@ import simd
 final class SurfaceLabelRenderSubsystem: RenderSubsystem {
     let name: String = "SurfaceLabels"
 
-    private struct DrawItem {
-        let metalTile: MetalTile
-        let worldWrap: Int8
-        let record: SurfaceLabelRecord
-    }
-
     private let pipeline: SurfaceLabelPipeline
     private let textRenderer: TextRenderer
-    private let depthState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
-    private var drawItems: [DrawItem] = []
+    private let depthState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
+    private var drawItems: [SurfaceLabelDrawing.Item] = []
 
     init(pipeline: SurfaceLabelPipeline,
          textRenderer: TextRenderer,
-         depthState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState) {
+         depthState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState) {
         self.pipeline = pipeline
         self.textRenderer = textRenderer
         self.depthState = depthState
@@ -58,11 +53,13 @@ final class SurfaceLabelRenderSubsystem: RenderSubsystem {
                                          worldWrap: $0.worldWrap)
         }
         let selected = SurfaceLabelSelection.select(sources: sources, cameraZoom: frameContext.planningZoom)
-        drawItems = selected.map { item in
+        drawItems = selected.compactMap { item in
             let source = sourceTiles[item.sourceIndex]
-            return DrawItem(metalTile: source.metalTile,
-                            worldWrap: source.worldWrap,
-                            record: sources[item.sourceIndex].labels[item.labelIndex])
+            guard let vertices = source.metalTile.tileBuffers.surfaceLabels.vertices else { return nil }
+            return SurfaceLabelDrawing.Item(tile: source.metalTile.tile,
+                                            worldWrap: source.worldWrap,
+                                            record: sources[item.sourceIndex].labels[item.labelIndex],
+                                            vertices: vertices)
         }
     }
 
@@ -70,20 +67,6 @@ final class SurfaceLabelRenderSubsystem: RenderSubsystem {
 
     func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
         guard layer == .surfaceLabels, drawItems.isEmpty == false else { return }
-
-        encoder.pushDebugGroup("surfaceLabels")
-        // Every glyph is counter-clockwise in render space, like the ground's
-        // triangles, and neither surface's projection mirrors: culling the
-        // back faces removes the far side of the planet, as for the ground.
-        encoder.setFrontFacing(.counterClockwise)
-        encoder.setCullMode(.back)
-        encoder.setDepthStencilState(depthState)
-
-        var cameraUniform = frameContext.cameraUniform
-        encoder.setVertexBytes(&cameraUniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        // The ground fog over the labels painted on the plane, as over the
-        // ground they lie on. Nothing on the globe.
-        GroundFogUniform.bind(GroundFogUniform.resolve(frameContext: frameContext), encoder: encoder)
 
         // Every tile at its own zoom has the same world size: the map's at
         // the frame's integer zoom over that zoom's tile count.
@@ -93,125 +76,33 @@ final class SurfaceLabelRenderSubsystem: RenderSubsystem {
             viewportHeightPoints: viewportHeightPoints,
             tileWorldSize: normalization.flatRenderMapSize / normalization.zoomScale
         )
-
-        let screen = SurfaceLabelScreen(
-            viewportSizePx: SIMD2<Float>(Float(frameContext.drawSize.width), Float(frameContext.drawSize.height)),
-            pixelsPerPoint: Float(frameContext.pixelsPerPoint),
-            labelOpacity: frameContext.services.labelOpacity
-        )
-
-        let surface: Surface
+        let surface: SurfaceLabelDrawing.Surface
         switch frameContext.renderSurfaceMode {
         case .flat:
-            encoder.setRenderPipelineState(pipeline.flatPipelineState)
             surface = .flat(frameContext.resolvedPresentation.flatRenderState)
         case .spherical:
             let globe = frameContext.globeRenderUniform
-            let pureSphere = GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
-                                                                transition: globe.transition)
-            encoder.setRenderPipelineState(pureSphere ? pipeline.spherePipelineState : pipeline.morphPipelineState)
-            var globeValue = globe
-            var globeFrame = GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: cameraUniform.matrix)
-            encoder.setVertexBytes(&globeValue, length: MemoryLayout<GlobeUniform>.stride, index: 8)
-            encoder.setVertexBytes(&globeFrame, length: MemoryLayout<GlobeFrameConstantsUniform>.stride, index: 10)
-            surface = .sphere(handover: frameContext.groundHandover)
+            surface = .sphere(globe: globe,
+                              pureSphere: GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
+                                                                             transition: globe.transition),
+                              handover: frameContext.groundHandover)
         }
-
-        // Every halo first, then every fill: where two names cross, the
-        // halo of one never covers the letters of the other.
-        for haloPass in [true, false] {
-            for item in drawItems {
-                draw(item,
-                     haloPass: haloPass,
-                     surface: surface,
-                     tileScreenPoints: tileScreenPoints,
-                     screen: screen,
-                     encoder: encoder)
-            }
-        }
-
-        encoder.setCullMode(.none)
-        encoder.setFrontFacing(.clockwise)
-        encoder.setDepthStencilState(depthDisabledState)
-        encoder.popDebugGroup()
-    }
-
-    private struct SurfaceLabelScreen {
-        let viewportSizePx: SIMD2<Float>
-        let pixelsPerPoint: Float
-        /// The frame's factor over the labels' own opacity
-        /// (`FrameContextServices.labelOpacity`).
-        let labelOpacity: LabelOpacityFrame
-    }
-
-    private enum Surface {
-        case flat(FlatRenderState)
-        /// The sphere, with how far the globe's look has been handed over
-        /// to the plane's (`FrameContext.groundHandover`).
-        case sphere(handover: Float)
-    }
-
-    private func draw(_ item: DrawItem,
-                      haloPass: Bool,
-                      surface: Surface,
-                      tileScreenPoints: Double,
-                      screen: SurfaceLabelScreen,
-                      encoder: MTLRenderCommandEncoder) {
-        let record = item.record
-        guard record.vertexCount > 0,
-              let vertices = item.metalTile.tileBuffers.surfaceLabels.vertices else { return }
-        let style = record.style
-        let atlasEmTexels = Float(textRenderer.atlasEmTexels(for: style.weight))
-        let haloAtlasTexels = style.haloEm * atlasEmTexels
-        if haloPass, haloAtlasTexels <= 0 {
-            return
-        }
-
-        let tile = item.metalTile.tile
-        switch surface {
-        case .flat(let flatRenderState):
-            let originAndSize = ImmersiveMapProjection.flatTileOriginAndSize(x: tile.x,
-                                                                             y: tile.y,
-                                                                             z: tile.z,
-                                                                             worldWrap: item.worldWrap,
-                                                                             flatRenderPan: flatRenderState.pan,
-                                                                             renderMapSize: flatRenderState.renderMapSize)
-            let scale = originAndSize.z / 4096.0
-            var modelMatrix = Matrix.translationMatrix(x: originAndSize.x, y: originAndSize.y, z: 0)
-                * Matrix.scaleMatrix(sx: scale, sy: scale, sz: 1)
-            encoder.setVertexBytes(&modelMatrix, length: MemoryLayout<matrix_float4x4>.stride, index: 3)
-        case .sphere:
-            var surfaceTile = GlobeSurfaceTileUniform(tile: tile)
-            encoder.setVertexBytes(&surfaceTile, length: MemoryLayout<GlobeSurfaceTileUniform>.stride, index: 9)
-        }
-
-        // The globe's look of the name handed over to the plane's with the
-        // air (LabelTextStyle.sphereFillColor), 1 on the plane.
-        let handover: Float
-        switch surface {
-        case .flat: handover = 1
-        case .sphere(let globeHandover): handover = globeHandover
-        }
-        // The label's own opacity under the frame's factor for its kind
-        // (`FrameContextServices.labelOpacity`).
-        let opacity = screen.labelOpacity.opacity(of: style)
-        var drawUniform = SurfaceLabelDrawUniform(fillColor: SIMD4<Float>(style.fillColor(atHandover: handover), opacity),
-                                                  strokeColor: SIMD4<Float>(style.strokeColor(atHandover: handover), opacity),
-                                                  haloAtlasTexels: haloAtlasTexels,
-                                                  depth: SurfaceLabelDepth.depth,
-                                                  haloPass: haloPass ? 1 : 0,
-                                                  tileUnitsPerPoint: SurfaceLabelScale.tileUnitsPerPoint(
-                                                      tileZoom: tile.z,
-                                                      referenceZoom: record.placement.referenceZoom,
-                                                      tileScreenPoints: tileScreenPoints),
-                                                  viewportSizePx: screen.viewportSizePx,
-                                                  pixelsPerPoint: screen.pixelsPerPoint,
-                                                  haloSoftness: style.haloSoftness)
-        encoder.setVertexBytes(&drawUniform, length: MemoryLayout<SurfaceLabelDrawUniform>.stride, index: 4)
-        encoder.setFragmentBytes(&drawUniform, length: MemoryLayout<SurfaceLabelDrawUniform>.stride, index: 0)
-        encoder.setFragmentTexture((style.weight == .thin ? textRenderer.thinTexture : textRenderer.texture).metalTexture, index: 0)
-        encoder.setVertexBuffer(vertices.buffer, offset: vertices.offset, index: 0)
-        encoder.drawPrimitives(type: .triangle, vertexStart: record.vertexStart, vertexCount: record.vertexCount)
+        let frame = SurfaceLabelDrawing.Frame(
+            cameraUniform: frameContext.cameraUniform,
+            groundFog: GroundFogUniform.resolve(frameContext: frameContext),
+            tileScreenPoints: tileScreenPoints,
+            viewportSizePx: SIMD2<Float>(Float(frameContext.drawSize.width), Float(frameContext.drawSize.height)),
+            pixelsPerPoint: Float(frameContext.pixelsPerPoint),
+            labelOpacity: frameContext.services.labelOpacity,
+            surface: surface
+        )
+        SurfaceLabelDrawing.draw(drawItems,
+                                 frame: frame,
+                                 pipeline: pipeline,
+                                 textRenderer: textRenderer,
+                                 depthState: depthState,
+                                 depthDisabledState: depthDisabledState,
+                                 encoder: MetalRenderEncoder(encoder))
     }
 
     func handleMemoryWarning() {}

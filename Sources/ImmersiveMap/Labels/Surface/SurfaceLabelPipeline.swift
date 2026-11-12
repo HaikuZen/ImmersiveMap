@@ -1,54 +1,52 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// The pipelines of the labels painted on the map (SurfaceLabel.metal): one
 /// per surface the ground is drawn on, all in the world pass's formats and
 /// sample count, blended like the ground.
 final class SurfaceLabelPipeline {
-    let flatPipelineState: MTLRenderPipelineState
-    let spherePipelineState: MTLRenderPipelineState
-    let morphPipelineState: MTLRenderPipelineState
+    let flatPipelineState: any GPURenderPipeline
+    let spherePipelineState: any GPURenderPipeline
+    let morphPipelineState: any GPURenderPipeline
 
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int) {
         // The baked vertices are `LabelVertex`: the anchor, the atlas uv and
         // the offset are all the stages read.
-        let vertexDescriptor = MTLVertexDescriptor()
-        vertexDescriptor.attributes[0].format = .float2
-        vertexDescriptor.attributes[0].offset = MemoryLayout<LabelVertex>.offset(of: \.position)!
-        vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.attributes[1].format = .float2
-        vertexDescriptor.attributes[1].offset = MemoryLayout<LabelVertex>.offset(of: \.uv)!
-        vertexDescriptor.attributes[1].bufferIndex = 0
+        var layout = GPUVertexLayout()
+        layout.attributes[0] = GPUVertexAttribute(format: .float2,
+                                                  offset: MemoryLayout<LabelVertex>.offset(of: \.position)!,
+                                                  bufferIndex: 0)
+        layout.attributes[1] = GPUVertexAttribute(format: .float2,
+                                                  offset: MemoryLayout<LabelVertex>.offset(of: \.uv)!,
+                                                  bufferIndex: 0)
         // The glyph's offset from the anchor in points (`TileSurfaceLabelsBuilder`).
-        vertexDescriptor.attributes[2].format = .float2
-        vertexDescriptor.attributes[2].offset = MemoryLayout<LabelVertex>.offset(of: \.spriteUV)!
-        vertexDescriptor.attributes[2].bufferIndex = 0
-        vertexDescriptor.layouts[0].stride = MemoryLayout<LabelVertex>.stride
-        vertexDescriptor.layouts[0].stepFunction = .perVertex
+        layout.attributes[2] = GPUVertexAttribute(format: .float2,
+                                                  offset: MemoryLayout<LabelVertex>.offset(of: \.spriteUV)!,
+                                                  bufferIndex: 0)
+        layout.strides[0] = MemoryLayout<LabelVertex>.stride
 
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.fragmentFunction = library.makeFunction(name: "surfaceLabelFragment")
-        descriptor.vertexDescriptor = vertexDescriptor
-        descriptor.rasterSampleCount = sampleCount
-        descriptor.colorAttachments[0].pixelFormat = pixelFormat
-        descriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        descriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-        descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].rgbBlendOperation = .add
-        descriptor.colorAttachments[0].alphaBlendOperation = .add
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        var color = GPUColorTarget(format: pixelFormat)
+        color.blend = (color: GPUBlendComponent(source: .sourceAlpha, destination: .oneMinusSourceAlpha),
+                       alpha: GPUBlendComponent(source: .one, destination: .oneMinusSourceAlpha))
 
-        func makeState(vertexFunction name: String) -> MTLRenderPipelineState {
-            descriptor.vertexFunction = library.makeFunction(name: name)
-            return try! metalDevice.makeRenderPipelineState(descriptor: descriptor)
+        func makeState(vertexFunction name: String) -> any GPURenderPipeline {
+            var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: name),
+                                                         fragmentFunction: GPUShaderFunction(name: "surfaceLabelFragment"),
+                                                         colorTargets: [color])
+            descriptor.label = name
+            descriptor.vertexLayout = layout
+            descriptor.depthStencilFormat = .depth32FloatStencil8
+            descriptor.sampleCount = sampleCount
+            do {
+                return try device.makeRenderPipeline(descriptor)
+            } catch {
+                fatalError("Failed to create the surface label pipeline: \(error)")
+            }
         }
         self.flatPipelineState = makeState(vertexFunction: "surfaceLabelFlatVertex")
         self.spherePipelineState = makeState(vertexFunction: "surfaceLabelSphereVertex")

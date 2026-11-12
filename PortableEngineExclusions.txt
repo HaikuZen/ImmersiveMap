@@ -46,7 +46,6 @@ Labels/Shaders
 Labels/Subsystems/BaseLabelDrawSubsystem.swift
 Labels/Subsystems/BaseLabelPrepareSubsystem.swift
 Labels/Subsystems/RoadLabelDrawSubsystem.swift
-Labels/Surface/SurfaceLabelPipeline.swift
 Labels/Surface/SurfaceLabelRenderSubsystem.swift
 Layers/LayerRenderSubsystem.swift
 Layers/Shaders
