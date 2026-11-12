@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import MetalKit
+import PortableFoundation
 
 // Business purpose:
 // Tile loading orchestrator for the current map frame.
@@ -134,7 +133,7 @@ final class ImmersiveMapNeedsTile: @unchecked Sendable {
     private let retryWakeScheduler: (TimeInterval, DispatchWorkItem) -> Void
     
     // Production initializer: assembles the standard pipeline (disk + network + parse into TileRenderStore).
-    convenience init(tileRenderStore: TileRenderStore,
+    convenience init(tileRenderStore: any TileMaterializing,
                      config: ImmersiveMapSettings,
                      preparedTileCacheIdentity: PreparedTileCacheIdentity,
                      geometryTransport: any PreparedTileGeometryTransporting,

@@ -115,6 +115,14 @@ public final class DispatchQueue: Sendable {
         Task { Self.running(self) { work() } }
     }
 
+    public func async(execute item: DispatchWorkItem) {
+        async { item.perform() }
+    }
+
+    public func asyncAfter(deadline: DispatchTime, execute item: DispatchWorkItem) {
+        asyncAfter(deadline: deadline) { item.perform() }
+    }
+
     public func asyncAfter(deadline: DispatchTime, execute work: @escaping @Sendable () -> Void) {
         let delay = deadline.uptimeNanoseconds &- DispatchTime.now().uptimeNanoseconds
         Task {
@@ -136,13 +144,53 @@ public final class DispatchQueue: Sendable {
     }
 
     /// The queue whose work runs now. One thread, so a plain variable.
-    nonisolated(unsafe) private static var current: DispatchQueue?
+    nonisolated(unsafe) fileprivate static var current: DispatchQueue?
 
     private static func running<T>(_ queue: DispatchQueue, _ work: () throws -> T) rethrows -> T {
         let outer = current
         current = queue
         defer { current = outer }
         return try work()
+    }
+}
+
+/// Work handed to a queue that can be cancelled before it runs: a
+/// cancelled item does nothing when its time comes.
+public final class DispatchWorkItem: @unchecked Sendable {
+    private let block: @Sendable () -> Void
+    public private(set) var isCancelled = false
+
+    public init(block: @escaping @Sendable () -> Void) {
+        self.block = block
+    }
+
+    public func perform() {
+        if isCancelled == false {
+            block()
+        }
+    }
+
+    public func cancel() {
+        isCancelled = true
+    }
+}
+
+/// What `dispatchPrecondition` asserts about the queue the caller runs on.
+public enum DispatchPredicate {
+    case onQueue(DispatchQueue)
+    case onQueueAsBarrier(DispatchQueue)
+    case notOnQueue(DispatchQueue)
+}
+
+/// Stops the program when the caller is not on the queue the condition
+/// names, or is on the one it excludes. The queue is the one whose work
+/// runs now (`sync`, `async`, `asyncAfter`).
+public func dispatchPrecondition(condition: @autoclosure () -> DispatchPredicate) {
+    switch condition() {
+    case .onQueue(let queue), .onQueueAsBarrier(let queue):
+        precondition(DispatchQueue.current === queue, "Not on the expected queue")
+    case .notOnQueue(let queue):
+        precondition(DispatchQueue.current !== queue, "On a queue the caller must not be on")
     }
 }
 

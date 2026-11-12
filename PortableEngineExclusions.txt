@@ -106,7 +106,6 @@ Text/Shaders
 Tile/Buffers/TileBufferView+Metal.swift
 Tile/Buffers/TileBuffers+Metal.swift
 Tile/Drawers/FlatMapSurfaceDrawer.swift
-Tile/Loading/ImmersiveMapNeedsTile.swift
 Tile/Overview/Resources
 Tile/Pipelines/TilePipeline.swift
 Tile/Projection/FlatTileOriginCalculator.swift
