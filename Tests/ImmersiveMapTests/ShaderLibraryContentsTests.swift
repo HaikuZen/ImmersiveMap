@@ -74,9 +74,12 @@ final class ShaderLibraryContentsTests: XCTestCase {
         return try matches(of: pattern, inFilesWithExtension: "metal")
     }
 
-    /// The names the Swift sources hand `makeFunction(name:)` as literals.
+    /// The names the Swift sources ask for as literals: by Metal's
+    /// `makeFunction(name:)`, and by the GPU interface's
+    /// `GPUShaderFunction(name:)` or a pipeline helper's `vertex:` and
+    /// `fragment:` arguments, where a feature moved onto it.
     private static func literalFunctionNames() throws -> Set<String> {
-        let pattern = try NSRegularExpression(pattern: #"makeFunction\(name:\s*"(\w+)""#)
+        let pattern = try NSRegularExpression(pattern: #"(?:makeFunction\(name:|GPUShaderFunction\(name:|\b(?:vertex|fragment):)\s*"(\w+)""#)
         return try matches(of: pattern, inFilesWithExtension: "swift")
     }
 

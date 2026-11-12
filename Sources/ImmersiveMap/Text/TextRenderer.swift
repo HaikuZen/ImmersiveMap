@@ -66,7 +66,7 @@ final class TextRenderer {
                                                        bufferIndex: 0)
         labelLayout.strides[0] = MemoryLayout<LabelVertex>.stride
 
-        func makePipeline(_ vertex: String, _ fragment: String, _ layout: GPUVertexLayout) -> any GPURenderPipeline {
+        func makePipeline(vertex: String, fragment: String, layout: GPUVertexLayout) -> any GPURenderPipeline {
             var color = GPUColorTarget(format: .bgra8Unorm)
             // Alpha blends with .one so glyph coverage accumulates on a transparent
             // destination; over an opaque one the result is unchanged.
@@ -85,11 +85,11 @@ final class TextRenderer {
                 fatalError("Pipeline creation failed: \(error)")
             }
         }
-        pipelineState = makePipeline("textVertex", "textFragment", textLayout)
-        labelPipelineState = makePipeline("labelTextVertex", "textFragment", labelLayout)
-        roadLabelPipelineState = makePipeline("roadLabelTextVertex", "roadTextFragment", labelLayout)
-        poiIconPipelineState = makePipeline("poiSpriteVertex", "poiSpriteFragment", labelLayout)
-        routeShieldPipelineState = makePipeline("poiSpriteVertex", "routeShieldFragment", labelLayout)
+        pipelineState = makePipeline(vertex: "textVertex", fragment: "textFragment", layout: textLayout)
+        labelPipelineState = makePipeline(vertex: "labelTextVertex", fragment: "textFragment", layout: labelLayout)
+        roadLabelPipelineState = makePipeline(vertex: "roadLabelTextVertex", fragment: "roadTextFragment", layout: labelLayout)
+        poiIconPipelineState = makePipeline(vertex: "poiSpriteVertex", fragment: "poiSpriteFragment", layout: labelLayout)
+        routeShieldPipelineState = makePipeline(vertex: "poiSpriteVertex", fragment: "routeShieldFragment", layout: labelLayout)
     }
 
     // The layout, for the callers that reach it through the renderer.
