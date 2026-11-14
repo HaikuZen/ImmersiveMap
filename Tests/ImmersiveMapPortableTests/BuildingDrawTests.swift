@@ -62,8 +62,16 @@ final class BuildingDrawTests: XCTestCase {
         let buildings = try XCTUnwrap(pipelines.first { $0.label == "ExtrudedTiles" })
         XCTAssertEqual(buildings.vertexFunction.constants, [0: .bool(false)])
         XCTAssertEqual(buildings.sampleCount, 4)
-        XCTAssertEqual(buildings.vertexLayout?.attributes[0], GPUVertexAttribute(format: .short3, offset: 0, bufferIndex: 0))
-        XCTAssertEqual(buildings.vertexLayout?.attributes[1], GPUVertexAttribute(format: .char3Normalized, offset: 6, bufferIndex: 0))
+        XCTAssertEqual(buildings.vertexLayout?.attributes[0], GPUVertexAttribute(format: .short3, offset: 4, bufferIndex: 0))
+        XCTAssertEqual(buildings.vertexLayout?.attributes[1], GPUVertexAttribute(format: .char3Normalized, offset: 0, bufferIndex: 0))
+        XCTAssertEqual(buildings.vertexLayout?.attributes[2], GPUVertexAttribute(format: .uchar, offset: 3, bufferIndex: 0))
+        XCTAssertEqual(buildings.vertexLayout?.attributes[3], GPUVertexAttribute(format: .ushort, offset: 10, bufferIndex: 0))
+        for attribute in try XCTUnwrap(buildings.vertexLayout).attributes.values {
+            let alignment = min(4, attribute.format.webGPUByteCount)
+            XCTAssertEqual(attribute.offset % alignment, 0, "WebGPU reads an attribute only at a multiple of 4 or of its size")
+            XCTAssertLessThanOrEqual(attribute.offset + attribute.format.webGPUByteCount, MemoryLayout<ExtrudedVertexIn>.stride,
+                                     "What WebGPU reads of the attribute lies inside the vertex")
+        }
         XCTAssertEqual(buildings.vertexLayout?.strides[0], MemoryLayout<ExtrudedVertexIn>.stride)
         let casters = try XCTUnwrap(pipelines.first { $0.label == "ExtrudedTileCastersRelief" })
         XCTAssertEqual(casters.vertexFunction.constants, [0: .bool(true)])

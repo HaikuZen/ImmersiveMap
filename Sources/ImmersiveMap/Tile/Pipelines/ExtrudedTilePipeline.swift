@@ -17,18 +17,27 @@ final class ExtrudedTilePipeline {
             GPUShaderFunction(name: name, constants: [0: .bool(relief)])
         }
 
-        // The 12-byte layout of ExtrudedVertexIn: quantized positions fed
-        // as raw Int16 triples (the fetch converts integer formats to float
-        // with the numeric value; the shader applies the inverse fixed-point
-        // scale), normals as char3Normalized, the style index, and two
-        // bytes of padding to the stride Metal requires.
+        // The 12-byte layout of ExtrudedVertexIn: normals as
+        // char3Normalized, the style index, quantized positions fed as raw
+        // Int16 triples (the fetch converts integer formats to float with
+        // the numeric value on Metal, and the WGSL converts them itself;
+        // the shader applies the inverse fixed-point scale), and the
+        // building's ordinal. The offsets are the struct's own.
         assert(MemoryLayout<ExtrudedVertexIn>.stride == 12,
                "The vertex layout mirrors ExtrudedVertexIn byte for byte")
         var layout = GPUVertexLayout()
-        layout.attributes[0] = GPUVertexAttribute(format: .short3, offset: 0, bufferIndex: 0)
-        layout.attributes[1] = GPUVertexAttribute(format: .char3Normalized, offset: 6, bufferIndex: 0)
-        layout.attributes[2] = GPUVertexAttribute(format: .uchar, offset: 9, bufferIndex: 0)
-        layout.attributes[3] = GPUVertexAttribute(format: .ushort, offset: 10, bufferIndex: 0)
+        layout.attributes[0] = GPUVertexAttribute(format: .short3,
+                                                  offset: MemoryLayout<ExtrudedVertexIn>.offset(of: \.positionX)!,
+                                                  bufferIndex: 0)
+        layout.attributes[1] = GPUVertexAttribute(format: .char3Normalized,
+                                                  offset: MemoryLayout<ExtrudedVertexIn>.offset(of: \.normalX)!,
+                                                  bufferIndex: 0)
+        layout.attributes[2] = GPUVertexAttribute(format: .uchar,
+                                                  offset: MemoryLayout<ExtrudedVertexIn>.offset(of: \.styleIndex)!,
+                                                  bufferIndex: 0)
+        layout.attributes[3] = GPUVertexAttribute(format: .ushort,
+                                                  offset: MemoryLayout<ExtrudedVertexIn>.offset(of: \.buildingOrdinal)!,
+                                                  bufferIndex: 0)
         layout.strides[0] = MemoryLayout<ExtrudedVertexIn>.stride
 
         func buildings(relief: Bool) -> GPURenderPipelineDescriptor {

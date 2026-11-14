@@ -1029,7 +1029,10 @@ final class PreparedTileDiskCaching {
     // keeps its corners there sharp, as at a tile's edge
     // (`BuildingExtrusionMeshBuilder.isBoundaryEdge`). A v165 zoom 14 tile
     // has walls and rounded corners along its quarters' edges.
-    static let preparedFormatVersion: UInt32 = 166
+    // 167: a building's vertex holds its normal and style before its
+    // position (`ExtrudedVertexIn`), so WebGPU can read every attribute. A
+    // v166 vertex starts with the position.
+    static let preparedFormatVersion: UInt32 = 167
 
     private let cacheDirectory: URL
     private let cacheIdentity: PreparedTileCacheIdentity
