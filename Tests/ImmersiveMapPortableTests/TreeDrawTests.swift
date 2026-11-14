@@ -94,16 +94,22 @@ final class TreeDrawTests: XCTestCase {
                         depthDisabledState: disabled)
 
         let level = mesh.contents.levels[1]
-        let draws = encoder.commands.compactMap { command -> Int? in
-            guard case let .drawIndexed(_, indexCount, indexType, _, offset, instanceCount, _, _) = command else { return nil }
+        let draws = encoder.commands.compactMap { command -> [Int]? in
+            guard case let .drawIndexed(_, indexCount, indexType, _, offset, instanceCount, _, baseInstance) = command else { return nil }
             XCTAssertEqual(indexCount, level.indexCount)
             XCTAssertEqual(indexType, .uint16)
             XCTAssertEqual(offset, level.indexOffset)
-            return instanceCount
+            return [instanceCount, baseInstance]
         }
-        XCTAssertEqual(draws, [4, 4], "One draw per run of instances")
-        let treesBuffer = try XCTUnwrap(placement.metalTile.tileBuffers.trees?.gpuBuffer as? RecordingBuffer)
-        XCTAssertTrue(encoder.commands.contains(.setVertexBuffer(treesBuffer.name, offset: 6 * MemoryLayout<TreeInstance>.stride, index: 4)))
+        XCTAssertEqual(draws, [[4, 0], [4, 6]], "One draw per run of instances, the run chosen by its first instance")
+        let trees = try XCTUnwrap(placement.metalTile.tileBuffers.trees)
+        let treesBuffer = try XCTUnwrap(trees.gpuBuffer as? RecordingBuffer)
+        let treeBindings = encoder.commands.filter { command in
+            if case let .setVertexBuffer(_, _, index) = command { return index == 4 }
+            return false
+        }
+        XCTAssertEqual(treeBindings, [.setVertexBuffer(treesBuffer.name, offset: trees.offset, index: 4)],
+                       "The trees bound once at their span, which WebGPU's 256-byte storage offsets allow, never inside it")
         XCTAssertTrue(encoder.commands.contains(.setStencilReference(TileSourceStencilPriority.reference(sourceZoom: 14)
                                                                          | TileSourceStencilPriority.surfaceMaskBit)))
         XCTAssertNotNil(encoder.vertexValue(at: 7, as: TreeFrameUniform.self))

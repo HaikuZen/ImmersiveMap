@@ -76,6 +76,7 @@ final class WGSLPipelineManifestTests: XCTestCase {
         _ = ExtrudedTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = TextRenderer(device: device, resource: TestResources.url, sampleCount: 4)
         _ = SurfaceLabelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        _ = TreePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         return device.pipelines
     }
 

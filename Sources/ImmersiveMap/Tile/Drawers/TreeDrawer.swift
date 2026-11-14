@@ -72,7 +72,7 @@ enum TreeDrawer {
         renderEncoder.setVertexValue(frameUniform, index: 7)
         renderEncoder.setFragmentValue(frameUniform, index: 7)
 
-        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, tile, instanceCount in
+        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, tile, instances in
             renderEncoder.setStencilReference(TileSourceStencilPriority.reference(sourceZoom: tile.z)
                                                    | TileSourceStencilPriority.surfaceMaskBit)
             renderEncoder.drawIndexed(.triangle,
@@ -80,9 +80,9 @@ enum TreeDrawer {
                                       indexType: .uint16,
                                       indexBuffer: mesh.buffer,
                                       indexBufferOffset: levelOfDetail.indexOffset,
-                                      instanceCount: instanceCount,
+                                      instanceCount: instances.count,
                                       baseVertex: 0,
-                                      baseInstance: 0)
+                                      baseInstance: instances.lowerBound)
         }
 
         renderEncoder.setCullMode(.none)
@@ -114,21 +114,26 @@ enum TreeDrawer {
         renderEncoder.setVertexValue(frameUniform, index: 7)
         renderEncoder.setFragmentValue(shadowUniform, index: 5)
 
-        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, _, instanceCount in
-            renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: 6, instanceCount: instanceCount, baseInstance: 0)
+        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, _, instances in
+            renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count,
+                               baseInstance: instances.lowerBound)
         }
 
         renderEncoder.setDepthStencilState(depthDisabledState)
     }
 
-    /// Binds each item's tile (its matrix at vertex buffer 3) and, for
-    /// each of its instance ranges, the trees of the range at vertex buffer
-    /// 4, and hands it to `draw` with the range's count.
+    /// Binds each item's tile (its matrix at vertex buffer 3) and its trees
+    /// at vertex buffer 4, at the span's own offset, and hands each of its
+    /// instance ranges to `draw`, which draws the range as the draw's first
+    /// instance and count. The shaders count the instance from the first
+    /// (`instance_id`, `instance_index`), and WebGPU binds a storage buffer
+    /// only at a multiple of 256, which a span is and a tree inside one
+    /// is not.
     private static func forEachTile(items: [Item],
                                     mesh: TreeModelMesh,
                                     flatRenderState: FlatRenderState,
                                     renderEncoder: any GPURenderEncoder,
-                                    _ draw: (Item, TileBufferView, Tile, Int) -> Void) {
+                                    _ draw: (Item, TileBufferView, Tile, Range<Int>) -> Void) {
         for item in items where item.instanceRanges.isEmpty == false {
             let metalTile = item.placement.metalTile
             guard let trees = metalTile.tileBuffers.trees else { continue }
@@ -146,13 +151,11 @@ enum TreeDrawer {
                     * Matrix.scaleMatrix(sx: scale, sy: scale, sz: scale),
                 heightScale: item.riseScale / mesh.contents.heightMetres)
             renderEncoder.setVertexValue(tileUniform, index: 3)
+            renderEncoder.setVertexBuffer(trees.gpuBuffer, offset: trees.offset, index: 4)
             for range in item.instanceRanges {
                 let clamped = range.clamped(to: 0..<trees.count)
                 guard clamped.isEmpty == false else { continue }
-                renderEncoder.setVertexBuffer(trees.gpuBuffer,
-                                              offset: trees.offset + clamped.lowerBound * MemoryLayout<TreeInstance>.stride,
-                                              index: 4)
-                draw(item, trees, tile, clamped.count)
+                draw(item, trees, tile, clamped)
             }
         }
     }

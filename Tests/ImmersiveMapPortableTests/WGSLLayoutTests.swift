@@ -204,6 +204,27 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheTreesMatchTheirSwiftTwins() throws {
+        let trees = "Tile/Shaders/Trees.wgsl"
+        try assertLayout("TreeInstance", in: trees, matches: TreeInstance.self, offsets: [
+            MemoryLayout<TreeInstance>.offset(of: \.position),
+            MemoryLayout<TreeInstance>.offset(of: \.height),
+            MemoryLayout<TreeInstance>.offset(of: \.packed),
+        ])
+        try assertLayout("TreeTile", in: trees, matches: TreeTileUniform.self, offsets: [
+            MemoryLayout<TreeTileUniform>.offset(of: \.modelMatrix),
+            MemoryLayout<TreeTileUniform>.offset(of: \.heightScale),
+            MemoryLayout<TreeTileUniform>.offset(of: \.padding),
+        ])
+        try assertLayout("TreeFrame", in: trees, matches: TreeFrameUniform.self, offsets: [
+            MemoryLayout<TreeFrameUniform>.offset(of: \.lightDirection),
+            MemoryLayout<TreeFrameUniform>.offset(of: \.crownColor),
+            MemoryLayout<TreeFrameUniform>.offset(of: \.crownShadeColor),
+            MemoryLayout<TreeFrameUniform>.offset(of: \.trunkColor),
+            MemoryLayout<TreeFrameUniform>.offset(of: \.crown),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.
