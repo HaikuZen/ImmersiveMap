@@ -175,6 +175,38 @@ jobs:
           IMMERSIVE_MAP_SLIM: "1"
         run: swift test --build-system native --scratch-path .build-slim
 
+  # The WGSL twins of the Metal shaders, compiled by Dawn (Chrome's WebGPU)
+  # in Node, and the ported features' pipelines built against them from
+  # Tools/WGSLCheck/pipelines.json (see CLAUDE.md, "WGSL shaders"). The
+  # runner has no GPU: Dawn draws on lavapipe, Mesa's software Vulkan
+  # driver, which has the two optional features the check asks for. The
+  # package runs without its install script, so none is run.
+  wgsl-check:
+    name: WGSL check (Dawn)
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Mesa's software Vulkan driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Dawn
+        working-directory: Tools/WGSLCheck
+        run: npm ci --ignore-scripts
+
+      - name: Check
+        run: node Tools/WGSLCheck/check.mjs
+
   # The same package for WebAssembly, its tests run by the toolchain's own
   # runtime (WasmKit, an interpreter, so the flattener's tests take minutes).
   # The test binary is given the checkout, for the Earcut fixtures, and /tmp,

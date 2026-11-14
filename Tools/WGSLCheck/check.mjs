@@ -35,6 +35,8 @@ if (missing.length > 0) {
     process.exit(2);
 }
 const device = await adapter.requestDevice({ requiredFeatures: wanted });
+const info = adapter.info ?? {};
+console.log(`adapter: ${[info.vendor, info.architecture, info.description].filter(Boolean).join(' ')}`);
 
 let errors = 0;
 const modules = new Map();
