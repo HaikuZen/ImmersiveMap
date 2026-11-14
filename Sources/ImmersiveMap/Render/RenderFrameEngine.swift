@@ -525,7 +525,7 @@ final class RenderFrameEngine {
         let resourceRegistry = renderGraph.resourceRegistry
         resourceRegistry.beginFrame(frameIndex: frameIndex)
         resourceRegistry.setPipeline(persistentContext.polygonPipeline.pipelineState, named: .polygonPipeline)
-        resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState, named: .tilePipeline)
+        resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState.metalPipeline, named: .tilePipeline)
         resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState.metalPipeline, named: .extrudedTilePipeline)
         resourceRegistry.setTexture(persistentContext.textRenderer.texture.metalTexture, named: .labelGlyphAtlas)
         resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture.metalTexture, named: .poiSpriteAtlas)
