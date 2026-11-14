@@ -564,6 +564,180 @@
         },
         "entryPoint" : "textVertex"
       }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFragment"
+      },
+      "label" : "surfaceLabelFlatVertex",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFlatVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFragment"
+      },
+      "label" : "surfaceLabelMorphVertex",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelMorphVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFragment"
+      },
+      "label" : "surfaceLabelSphereVertex",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelSphereVertex"
+      }
     }
   ]
 }

@@ -184,6 +184,26 @@ final class WGSLLayoutTests: XCTestCase {
                          ])
     }
 
+    func testTheSurfaceLabelsMatchTheirSwiftTwins() throws {
+        let surface = "Labels/Shaders/Surface/SurfaceLabel.wgsl"
+        try assertLayout("SurfaceLabelSphereTile", in: surface, matches: GlobeSurfaceTileUniform.self, offsets: [
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.uvOrigin),
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.uvScale),
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.referenceWorldX),
+        ])
+        try assertLayout("SurfaceLabelDraw", in: surface, matches: SurfaceLabelDrawUniform.self, offsets: [
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.fillColor),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.strokeColor),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.haloAtlasTexels),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.depth),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.haloPass),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.tileUnitsPerPoint),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.viewportSizePx),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.pixelsPerPoint),
+            MemoryLayout<SurfaceLabelDrawUniform>.offset(of: \.haloSoftness),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.
