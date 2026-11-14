@@ -88,13 +88,15 @@ enum WGSLSources {
             guard let open = afterKeyword.firstIndex(of: "{"), let close = afterKeyword.firstIndex(of: "}") else { break }
             let name = afterKeyword[..<open].trimmingCharacters(in: .whitespacesAndNewlines)
             let body = afterKeyword[afterKeyword.index(after: open) ..< close]
-            // A struct with a bool can never be in a uniform buffer, where
-            // WGSL has no bool: it is a shader's own value
-            // (ShadowCascadeBlend), with no Swift twin to hold it to.
-            let holdsBool = body.split(separator: ",").contains { member in
-                member.split(separator: ":").last?.trimmingCharacters(in: .whitespacesAndNewlines) == "bool"
+            // Only a struct that can be in a buffer has a Swift twin to hold
+            // it to. One with a bool cannot, WGSL having no bool in a buffer
+            // (ShadowCascadeBlend), and neither can a stage's inputs and
+            // outputs, whose members carry @location or @builtin (VertexIn).
+            let isShaderOwn = body.split(separator: ",").contains { member in
+                member.contains("@location") || member.contains("@builtin")
+                    || member.split(separator: ":").last?.trimmingCharacters(in: .whitespacesAndNewlines) == "bool"
             }
-            if holdsBool == false {
+            if isShaderOwn == false {
                 layouts[name] = try layout(of: body, known: layouts)
             }
             rest = afterKeyword[afterKeyword.index(after: close)...]

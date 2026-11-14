@@ -57,6 +57,11 @@ struct GlobeFrameConstants {
 
 // MARK: - Shadows
 
+// Grazing-wall cutoff for the geometric self-shadow test, in N.L. Mirrored
+// by ShadowFrameStateResolver.geometricCutoff{Start,End}.
+const kShadowGeometricCutoffStart = 0.18;
+const kShadowGeometricCutoffEnd = 0.35;
+
 // The slices of the shadow map, one per window. Mirrored by
 // ShadowCascadeSlot.swift.
 const kShadowNearSlice: u32 = 0u;
@@ -224,4 +229,64 @@ fn shadowMapVisibility(shadow: Shadow,
         farVisibility = shadowCascadeVisibility(shadow.far, shadowMap, shadowSampler, kShadowFarSlice, worldPos, normal);
     }
     return mix(farVisibility, nearVisibility, blend.nearWeight);
+}
+
+/// Shadow visibility factor in [1 - strength, 1], 1 fully lit, at a
+/// receiver whose (unnormalized) world normal is `surfaceNormal`, zero for
+/// one without (the ground). The normal is flipped toward the camera, a
+/// face turned from the sun is self-shadowed without a lookup, and the
+/// sample point is moved off the surface along the normal.
+/// RenderUniforms.h explains the three defences.
+fn sampleShadowFactor(shadow: Shadow,
+                      shadowMap: texture_depth_2d_array,
+                      shadowSampler: sampler_comparison,
+                      worldPos: vec3f,
+                      surfaceNormal: vec3f) -> f32 {
+    if (shadow.strength <= 0.0) {
+        return 1.0;
+    }
+    let blend = shadowCascadeBlend(shadow, worldPos.xy);
+    if (blend.fade <= 0.0) {
+        return 1.0;
+    }
+    let fade = blend.fade;
+
+    let normalLength = length(surfaceNormal);
+    let hasNormal = select(0.0, 1.0, normalLength > 1e-5);
+    var normal = surfaceNormal / max(normalLength, 1e-5);
+    // Two-sided flip with hysteresis.
+    let towardsCamera = shadow.eye - worldPos;
+    if (dot(normal, towardsCamera) < -0.05 * length(towardsCamera)) {
+        normal = -normal;
+    }
+    normal *= hasNormal;
+    var geometricVisibility = 1.0;
+    if (hasNormal > 0.0) {
+        geometricVisibility = smoothstep(kShadowGeometricCutoffStart, kShadowGeometricCutoffEnd,
+                                         dot(normal, shadow.lightDirection));
+    }
+
+    // A self-shadowed wall is lit by the sky, so it darkens to only a
+    // fraction of the strength. Cast shadows keep the full strength.
+    let selfShadowStrengthFraction = 0.35;
+    if (geometricVisibility <= 0.0) {
+        return 1.0 - selfShadowStrengthFraction * shadow.strength * fade;
+    }
+
+    let mapVisibility = shadowMapVisibility(shadow, shadowMap, shadowSampler, worldPos, normal, blend);
+
+    let selfShadowAmount = (1.0 - geometricVisibility) * selfShadowStrengthFraction;
+    let castShadowAmount = geometricVisibility * (1.0 - mapVisibility);
+    let shadowAmount = min(1.0, selfShadowAmount + castShadowAmount);
+    return 1.0 - shadowAmount * shadow.strength * fade;
+}
+
+/// The colour a shadow factor multiplies a surface by: white where lit,
+/// the darkened tint where fully shadowed.
+fn shadowColorMultiplier(shadow: Shadow, factor: f32) -> vec3f {
+    if (shadow.strength <= 0.0) {
+        return vec3f(1.0);
+    }
+    let amount = saturate((1.0 - factor) / shadow.strength);
+    return mix(vec3f(1.0), (1.0 - shadow.strength) * shadow.tint, amount);
 }

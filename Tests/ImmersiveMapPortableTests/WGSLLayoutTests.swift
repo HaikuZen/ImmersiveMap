@@ -101,6 +101,27 @@ final class WGSLLayoutTests: XCTestCase {
                          ])
     }
 
+    func testTheFogAndTheBuildingsMatchTheirSwiftTwins() throws {
+        try assertLayout("GroundFog", in: "Render/Shaders/Shared/GroundFog.wgsl", matches: GroundFogUniform.self, offsets: [
+            MemoryLayout<GroundFogUniform>.offset(of: \.colorAndDensity),
+            MemoryLayout<GroundFogUniform>.offset(of: \.eyeAndMetersPerUnit),
+            MemoryLayout<GroundFogUniform>.offset(of: \.parameters),
+            MemoryLayout<GroundFogUniform>.offset(of: \.skyColorAndGradient),
+            MemoryLayout<GroundFogUniform>.offset(of: \.startSoftness),
+        ])
+        let buildings = "Tile/Shaders/TileExtruded.wgsl"
+        try assertLayout("BuildingLift", in: buildings, matches: BuildingLiftUniform.self, offsets: [
+            MemoryLayout<BuildingLiftUniform>.offset(of: \.unitsPerMetre),
+            MemoryLayout<BuildingLiftUniform>.offset(of: \.datumMetres),
+            MemoryLayout<BuildingLiftUniform>.offset(of: \.strength),
+            MemoryLayout<BuildingLiftUniform>.offset(of: \.padding),
+        ])
+        // An element of the style table: its size is the array's stride.
+        try assertLayout("Style", in: buildings, matches: TilePolygonStyle.self, offsets: [
+            MemoryLayout<TilePolygonStyle>.offset(of: \.color),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.
