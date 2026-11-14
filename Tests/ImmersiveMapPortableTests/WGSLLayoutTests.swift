@@ -62,6 +62,45 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheShadowUniformsMatchTheirSwiftTwins() throws {
+        let shared = "Render/Shaders/Shared/RenderUniforms.wgsl"
+        typealias Cascade = ShadowCascadeUniform
+        try assertLayout("ShadowCascade", in: shared, matches: Cascade.self, offsets: [
+            MemoryLayout<Cascade>.offset(of: \.worldToShadowTexture),
+            MemoryLayout<Cascade>.offset(of: \.tentSpread),
+            MemoryLayout<Cascade>.offset(of: \.fadeStartDistance),
+            MemoryLayout<Cascade>.offset(of: \.depthBias),
+            MemoryLayout<Cascade>.offset(of: \.fadeEndDistance),
+            MemoryLayout<Cascade>.offset(of: \.uvMinimum),
+            MemoryLayout<Cascade>.offset(of: \.uvMaximum),
+            MemoryLayout<Cascade>.offset(of: \.normalOffsetWorld),
+            MemoryLayout<Cascade>.offset(of: \._padding0),
+            MemoryLayout<Cascade>.offset(of: \.texelSizeUV),
+        ])
+        try assertLayout("Shadow", in: shared, matches: ShadowUniform.self, offsets: [
+            MemoryLayout<ShadowUniform>.offset(of: \.near),
+            MemoryLayout<ShadowUniform>.offset(of: \.far),
+            MemoryLayout<ShadowUniform>.offset(of: \.eye),
+            MemoryLayout<ShadowUniform>.offset(of: \.strength),
+            MemoryLayout<ShadowUniform>.offset(of: \._padding0),
+            MemoryLayout<ShadowUniform>.offset(of: \._padding1),
+            MemoryLayout<ShadowUniform>.offset(of: \._padding2),
+            MemoryLayout<ShadowUniform>.offset(of: \.lightDirection),
+            MemoryLayout<ShadowUniform>.offset(of: \.tint),
+            MemoryLayout<ShadowUniform>.offset(of: \.fadeCenter),
+            MemoryLayout<ShadowUniform>.offset(of: \._padding3),
+        ])
+        try assertLayout("ShadowCasterMatrices", in: shared, matches: ShadowCasterUniform.self, offsets: [
+            MemoryLayout<ShadowCasterUniform>.offset(of: \.lightProjectionView),
+        ])
+        try assertLayout("GroundShadowMaskUniform", in: "Shadows/Shaders/GroundShadowMask.wgsl",
+                         matches: GroundShadowMaskUniform.self, offsets: [
+                             MemoryLayout<GroundShadowMaskUniform>.offset(of: \.inverseProjectionView),
+                             MemoryLayout<GroundShadowMaskUniform>.offset(of: \.viewportSize),
+                             MemoryLayout<GroundShadowMaskUniform>.offset(of: \._padding),
+                         ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.
