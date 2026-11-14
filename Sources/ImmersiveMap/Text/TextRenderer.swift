@@ -66,7 +66,9 @@ final class TextRenderer {
                                                        bufferIndex: 0)
         labelLayout.strides[0] = MemoryLayout<LabelVertex>.stride
 
-        func makePipeline(vertex: String, fragment: String, layout: GPUVertexLayout) -> any GPURenderPipeline {
+        // Each pipeline is named for what it draws: two share the POI quad's
+        // vertex function, and a capture or a check names the one at fault.
+        func makePipeline(label: String, vertex: String, fragment: String, layout: GPUVertexLayout) -> any GPURenderPipeline {
             var color = GPUColorTarget(format: .bgra8Unorm)
             // Alpha blends with .one so glyph coverage accumulates on a transparent
             // destination; over an opaque one the result is unchanged.
@@ -75,7 +77,7 @@ final class TextRenderer {
             var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: vertex),
                                                          fragmentFunction: GPUShaderFunction(name: fragment),
                                                          colorTargets: [color])
-            descriptor.label = vertex
+            descriptor.label = label
             descriptor.vertexLayout = layout
             descriptor.depthStencilFormat = .depth32FloatStencil8
             descriptor.sampleCount = sampleCount
@@ -85,11 +87,14 @@ final class TextRenderer {
                 fatalError("Pipeline creation failed: \(error)")
             }
         }
-        pipelineState = makePipeline(vertex: "textVertex", fragment: "textFragment", layout: textLayout)
-        labelPipelineState = makePipeline(vertex: "labelTextVertex", fragment: "textFragment", layout: labelLayout)
-        roadLabelPipelineState = makePipeline(vertex: "roadLabelTextVertex", fragment: "roadTextFragment", layout: labelLayout)
-        poiIconPipelineState = makePipeline(vertex: "poiSpriteVertex", fragment: "poiSpriteFragment", layout: labelLayout)
-        routeShieldPipelineState = makePipeline(vertex: "poiSpriteVertex", fragment: "routeShieldFragment", layout: labelLayout)
+        pipelineState = makePipeline(label: "Text", vertex: "textVertex", fragment: "textFragment", layout: textLayout)
+        labelPipelineState = makePipeline(label: "Labels", vertex: "labelTextVertex", fragment: "textFragment", layout: labelLayout)
+        roadLabelPipelineState = makePipeline(label: "RoadLabels", vertex: "roadLabelTextVertex", fragment: "roadTextFragment",
+                                              layout: labelLayout)
+        poiIconPipelineState = makePipeline(label: "PoiIcons", vertex: "poiSpriteVertex", fragment: "poiSpriteFragment",
+                                            layout: labelLayout)
+        routeShieldPipelineState = makePipeline(label: "RouteShields", vertex: "poiSpriteVertex", fragment: "routeShieldFragment",
+                                                layout: labelLayout)
     }
 
     // The layout, for the callers that reach it through the renderer.

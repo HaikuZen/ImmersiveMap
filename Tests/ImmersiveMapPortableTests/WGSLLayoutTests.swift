@@ -122,6 +122,68 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheLabelsMatchTheirSwiftTwins() throws {
+        let common = "Labels/Shaders/Shared/LabelTextCommon.wgsl"
+        try assertLayout("ScreenPointOutput", in: common, matches: ScreenPointOutput.self, offsets: [
+            MemoryLayout<ScreenPointOutput>.offset(of: \.position),
+            MemoryLayout<ScreenPointOutput>.offset(of: \.depth),
+            MemoryLayout<ScreenPointOutput>.offset(of: \.visible),
+            MemoryLayout<ScreenPointOutput>.offset(of: \.visibilityAlpha),
+        ])
+        try assertLayout("LabelRuntimeMeta", in: common, matches: LabelRuntimeMeta.self, offsets: [
+            MemoryLayout<LabelRuntimeMeta>.offset(of: \.fadeAlpha),
+            MemoryLayout<LabelRuntimeMeta>.offset(of: \.perspectiveScale),
+            MemoryLayout<LabelRuntimeMeta>.offset(of: \.labelSizePoints),
+        ])
+        try assertLayout("RoadLabelSceneDepthUniforms", in: common, matches: RoadLabelSceneDepthUniforms.self, offsets: [
+            MemoryLayout<RoadLabelSceneDepthUniforms>.offset(of: \.projectionView),
+            MemoryLayout<RoadLabelSceneDepthUniforms>.offset(of: \.inverseProjectionView),
+            MemoryLayout<RoadLabelSceneDepthUniforms>.offset(of: \.eye),
+            MemoryLayout<RoadLabelSceneDepthUniforms>.offset(of: \.viewportSize),
+            MemoryLayout<RoadLabelSceneDepthUniforms>.offset(of: \.enabled),
+        ])
+        let road = "Labels/Shaders/Road/RoadLabelTextVertex.wgsl"
+        try assertLayout("RoadGlyphInput", in: road, matches: RoadGlyphInput.self, offsets: [
+            MemoryLayout<RoadGlyphInput>.offset(of: \.pathIndex),
+            MemoryLayout<RoadGlyphInput>.offset(of: \.instanceIndex),
+            MemoryLayout<RoadGlyphInput>.offset(of: \.labelInstanceIndex),
+            MemoryLayout<RoadGlyphInput>.offset(of: \._padding),
+            MemoryLayout<RoadGlyphInput>.offset(of: \.glyphCenter),
+            MemoryLayout<RoadGlyphInput>.offset(of: \.labelCenterY),
+            MemoryLayout<RoadGlyphInput>.offset(of: \.labelWidth),
+            MemoryLayout<RoadGlyphInput>.offset(of: \.spacing),
+            MemoryLayout<RoadGlyphInput>.offset(of: \.minLength),
+        ])
+        try assertLayout("RoadGlyphPlacementOutput", in: road, matches: RoadGlyphPlacementOutput.self, offsets: [
+            MemoryLayout<RoadGlyphPlacementOutput>.offset(of: \.position),
+            MemoryLayout<RoadGlyphPlacementOutput>.offset(of: \.angle),
+            MemoryLayout<RoadGlyphPlacementOutput>.offset(of: \.visible),
+        ])
+        try assertLayout("TextStyle", in: "Text/Shaders/TextShader.wgsl", matches: TextStyleUniform.self, offsets: [
+            MemoryLayout<TextStyleUniform>.offset(of: \.textColor),
+            MemoryLayout<TextStyleUniform>.offset(of: \.fillBiasPx),
+            MemoryLayout<TextStyleUniform>.offset(of: \.strokeColor),
+            MemoryLayout<TextStyleUniform>.offset(of: \.strokeWidthPx),
+            MemoryLayout<TextStyleUniform>.offset(of: \.opacity),
+            MemoryLayout<TextStyleUniform>.offset(of: \.haloSoftness),
+        ])
+        try assertLayout("PoiIconStyle", in: "Labels/Shaders/POI/PoiSprite.wgsl", matches: PoiIconStyleUniform.self, offsets: [
+            MemoryLayout<PoiIconStyleUniform>.offset(of: \.backgroundColor),
+            MemoryLayout<PoiIconStyleUniform>.offset(of: \.iconColor),
+            MemoryLayout<PoiIconStyleUniform>.offset(of: \.opacity),
+        ])
+        try assertLayout("RouteShieldStyle", in: "Labels/Shaders/RouteShield/RouteShield.wgsl",
+                         matches: RouteShieldStyleUniform.self, offsets: [
+                             MemoryLayout<RouteShieldStyleUniform>.offset(of: \.fillColor),
+                             MemoryLayout<RouteShieldStyleUniform>.offset(of: \.borderColor),
+                             MemoryLayout<RouteShieldStyleUniform>.offset(of: \.headerColor),
+                             MemoryLayout<RouteShieldStyleUniform>.offset(of: \.borderWidthPoints),
+                             MemoryLayout<RouteShieldStyleUniform>.offset(of: \.cornerRadiusPoints),
+                             MemoryLayout<RouteShieldStyleUniform>.offset(of: \.headerFraction),
+                             MemoryLayout<RouteShieldStyleUniform>.offset(of: \.shape),
+                         ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.

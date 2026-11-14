@@ -46,6 +46,8 @@ final class LabelDrawTests: XCTestCase {
                                                           "textFragment", "roadTextFragment"])
         let renderer = try makeTextRenderer(device: device)
         XCTAssertEqual(device.pipelines.count, 5)
+        XCTAssertEqual(Set(device.pipelines.compactMap(\.label)), ["Text", "Labels", "RoadLabels", "PoiIcons", "RouteShields"],
+                       "Each pipeline its own name, the two on the POI quad told apart")
         for pipeline in device.pipelines {
             XCTAssertEqual(pipeline.sampleCount, 4)
             XCTAssertEqual(pipeline.depthStencilFormat, .depth32FloatStencil8)

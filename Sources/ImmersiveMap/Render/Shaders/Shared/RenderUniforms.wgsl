@@ -54,6 +54,8 @@ struct GlobeFrameConstants {
 //
 // 48: the shadow comparison sampler. Linear, no mip filter, clamped to the
 //     edge, compared with less-equal.
+// 49: the linear sampler of the glyph and icon atlases (TextShader.metal,
+//     PoiSprite.metal). Linear, no mip filter, clamped to the edge.
 
 // MARK: - Shadows
 
