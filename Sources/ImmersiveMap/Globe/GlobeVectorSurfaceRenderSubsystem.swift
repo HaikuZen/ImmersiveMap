@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -15,17 +17,17 @@ final class GlobeVectorSurfaceRenderSubsystem: RenderSubsystem {
     let name: String = "GlobeVectorSurface"
 
     private let pipeline: TilePipeline
-    private let depthDisabledState: MTLDepthStencilState
-    private let opaqueDepthState: MTLDepthStencilState
-    private let ribbonOwnerDepthState: MTLDepthStencilState
-    private let translucentDepthState: MTLDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
+    private let opaqueDepthState: any GPUDepthStencilState
+    private let ribbonOwnerDepthState: any GPUDepthStencilState
+    private let translucentDepthState: any GPUDepthStencilState
     private let debugOverlayControls: DebugOverlayControlState
 
     init(pipeline: TilePipeline,
-         depthDisabledState: MTLDepthStencilState,
-         opaqueDepthState: MTLDepthStencilState,
-         ribbonOwnerDepthState: MTLDepthStencilState,
-         translucentDepthState: MTLDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
+         opaqueDepthState: any GPUDepthStencilState,
+         ribbonOwnerDepthState: any GPUDepthStencilState,
+         translucentDepthState: any GPUDepthStencilState,
          debugOverlayControls: DebugOverlayControlState) {
         self.pipeline = pipeline
         self.depthDisabledState = depthDisabledState
@@ -39,7 +41,7 @@ final class GlobeVectorSurfaceRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
         guard layer == .globeVectorSurface,
               frameContext.renderSurfaceMode == .spherical else {
             return
@@ -47,6 +49,7 @@ final class GlobeVectorSurfaceRenderSubsystem: RenderSubsystem {
         let placeTilesContext = frameContext.sharedState.tilePlacementState.placeTilesContext
         guard placeTilesContext.tilePlacements.isEmpty == false else { return }
 
+        let encoder = MetalRenderEncoder(metalEncoder)
         let globe = frameContext.globeRenderUniform
         let pureSphere = GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
                                                             transition: globe.transition)

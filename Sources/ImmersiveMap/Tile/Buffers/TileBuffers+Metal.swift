@@ -11,10 +11,6 @@ extension TileBuffers {
     var backingBuffer: MTLBuffer? { gpuBackingBuffer?.metalBuffer }
 }
 
-extension TileBuffers.GeometryLayer {
-    var indexType: MTLIndexType { gpuIndexType.metal }
-}
-
 extension TileBuffers.Extruded {
     var indexType: MTLIndexType { gpuIndexType.metal }
 }

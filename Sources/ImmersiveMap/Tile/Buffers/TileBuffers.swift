@@ -16,9 +16,7 @@ struct TileBuffers {
         /// edge threshold), lockstep with `styles`; see `TileLineStyle`.
         let lineStyles: TileBufferView?
         /// Element width of `indices`: layers within the 16-bit vertex range
-        /// are narrowed at build time, oversized ones stay 32-bit. The
-        /// drawers still on Metal read it as `indexType`
-        /// (`TileBuffers+Metal.swift`).
+        /// are narrowed at build time, oversized ones stay 32-bit.
         let gpuIndexType: GPUIndexType
         /// Ground only: the index buffer's per-style runs in paint order,
         /// what the sphere drawer layers the ground by. Empty elsewhere.

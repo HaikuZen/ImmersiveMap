@@ -125,10 +125,10 @@ enum RenderGraphFactory {
         let postProcessingSubsystem = PostProcessingRenderSubsystem(fxaaPipeline: context.fxaaPipeline,
                                                                     inputTextureProvider: postProcessingInputTextureProvider)
         let globeVectorSurfaceSubsystem = GlobeVectorSurfaceRenderSubsystem(pipeline: context.globeVectorSurfacePipeline,
-                                                                            depthDisabledState: context.depthDisabledState,
-                                                                            opaqueDepthState: context.sphereOpaqueOwnerState,
-                                                                            ribbonOwnerDepthState: context.sphereRibbonOwnerState,
-                                                                            translucentDepthState: context.tileStencilTestState,
+                                                                            depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                                            opaqueDepthState: MetalDepthStencilState(context.sphereOpaqueOwnerState),
+                                                                            ribbonOwnerDepthState: MetalDepthStencilState(context.sphereRibbonOwnerState),
+                                                                            translucentDepthState: MetalDepthStencilState(context.tileStencilTestState),
                                                                             debugOverlayControls: debugOverlayControls)
         let surfaceLabelSubsystem = SurfaceLabelRenderSubsystem(pipeline: context.surfaceLabelPipeline,
                                                                 textRenderer: context.textRenderer,
