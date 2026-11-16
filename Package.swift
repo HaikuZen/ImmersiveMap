@@ -56,6 +56,15 @@ var targets: [Target] = [
         name: "ImmersiveMapWebGPU",
         dependencies: ["ImmersiveMapGPU"]
     ),
+    // The backend in a page: the import the stream goes to the page's host
+    // through and the export the host calls back (`@_extern(wasm)`,
+    // `@_expose(wasm)`). Linked by a browser program alone, as a module
+    // that imports from the page loads nowhere else (the tests' WasmKit).
+    .target(
+        name: "ImmersiveMapWebGPUBrowser",
+        dependencies: ["ImmersiveMapGPU", "ImmersiveMapWebGPU"],
+        swiftSettings: [.enableExperimentalFeature("Extern", .when(platforms: [.wasi]))]
+    ),
     // A GPU that draws nothing and logs the calls, for the tests of the
     // features' drawing on any platform.
     .target(
@@ -203,6 +212,15 @@ if portable {
 
 if portable {
     targets += [
+        // The browser probe (Web/probe/): the WebGPU backend drawing the
+        // probe scene through the page's host. A WebAssembly reactor, whose
+        // exports the page calls. Builds empty off WebAssembly.
+        .executableTarget(
+            name: "ImmersiveMapWebProbe",
+            dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapWebGPU", "ImmersiveMapWebGPUBrowser"],
+            swiftSettings: [.enableExperimentalFeature("Extern", .when(platforms: [.wasi]))],
+            linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor"], .when(platforms: [.wasi]))]
+        ),
         // The stand-in for Apple's `simd` module, under its name, so the
         // sources that write `import simd` compile unchanged.
         .target(

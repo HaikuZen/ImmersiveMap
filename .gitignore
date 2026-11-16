@@ -36,3 +36,7 @@ DerivedData/
 /LocalSecrets.plist
 # A developer's local copy of the tile archive, read by the dev app. Never committed.
 /LocalTiles/
+
+# The browser probe as Web/probe/build.sh builds it.
+/Web/probe/build/
+/.build-wasm-probe/

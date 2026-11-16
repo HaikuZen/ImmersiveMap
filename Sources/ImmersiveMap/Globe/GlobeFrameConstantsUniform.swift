@@ -25,6 +25,13 @@ struct GlobeFrameConstantsUniform {
     var panLatitude: Float
     var panLongitude: Float
     var curvature: Float
+    /// The gap before `_padding`, which a `SIMD3` aligns to 16: named, so
+    /// its bytes are zeros and not whatever the stack held, which would go
+    /// to the GPU with the constant data (unread, but a WebGPU frame's
+    /// stream would differ from run to run).
+    var _gap0: Float = 0
+    var _gap1: Float = 0
+    var _gap2: Float = 0
     var _padding: SIMD3<Float> = .zero
 
     static func make(globe: GlobeUniform, cameraMatrix: matrix_float4x4) -> GlobeFrameConstantsUniform {

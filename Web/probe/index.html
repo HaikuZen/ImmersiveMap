@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- Copyright (c) 2025-2026 ImmersiveMap contributors. SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ImmersiveMap WebGPU probe</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05080f; color: #cdd6e4; font: 13px/1.4 system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #status { position: fixed; left: 12px; bottom: 12px; right: 12px; white-space: pre-wrap; pointer-events: none; }
+  #status.error { color: #ff8a80; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="status">Loading…</div>
+<script type="module">
+// The engine's WebGPU backend in a browser: the probe scene (GPUProbeScene,
+// the globe's caps turning over a square of flat ground) drawn by the
+// Swift module through the page's host. Built and served by build.sh.
+import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
+import { startProbe } from './probe.mjs';
+
+const status = document.getElementById('status');
+const say = (text, isError = false) => { status.textContent = text; status.className = isError ? 'error' : ''; };
+
+try {
+    if (!navigator.gpu) throw new Error('This browser has no WebGPU.');
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error('No WebGPU adapter.');
+    const device = await adapter.requestDevice({ requiredFeatures: chooseFeatures(adapter) });
+    const errors = [];
+    device.addEventListener('uncapturederror', (event) => {
+        errors.push(event.error.message);
+        say(`WebGPU error:\n${errors.slice(-3).join('\n')}`, true);
+    });
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('webgpu');
+    // The engine's pipelines draw bgra8unorm, which every canvas takes.
+    context.configure({ device, format: 'bgra8unorm', alphaMode: 'opaque' });
+
+    const [shaders, module] = await Promise.all([
+        fetch('build/shaders.json').then((response) => response.json()),
+        WebAssembly.compileStreaming(fetch('build/ImmersiveMapWebProbe.wasm')),
+    ]);
+    const notes = [];
+    const probe = await startProbe({
+        device, module, shaders,
+        canvasTexture: () => context.getCurrentTexture(),
+        warn: (message) => notes.push(message),
+    });
+
+    const start = performance.now();
+    function frame(now) {
+        const scale = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.round(canvas.clientWidth * scale));
+        const height = Math.max(1, Math.round(canvas.clientHeight * scale));
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+        probe.frame(width, height, ((now - start) / 1000) * 0.05);
+        if (errors.length === 0) {
+            const counts = Object.entries(probe.host.counts).map(([key, value]) => `${value} ${key}`).join(', ');
+            say(`${counts}${notes.length ? `\n${notes.join('\n')}` : ''}`);
+        }
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+} catch (error) {
+    say(error.stack ?? String(error), true);
+}
+</script>
+</body>
+</html>
