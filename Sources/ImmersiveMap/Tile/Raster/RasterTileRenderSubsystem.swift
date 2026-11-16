@@ -402,14 +402,14 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         encoder.setVertexBuffer(styles.buffer, offset: styles.offset, index: 2)
         encoder.setVertexBuffer(styleZoomFade.buffer, offset: styleZoomFade.offset, index: 4)
         encoder.setVertexBytes(&fade, length: MemoryLayout<TileOverviewFadeUniform>.stride, index: 11)
-        let indexByteWidth = ground.indexType == .uint16 ? 2 : 4
+        let indexByteWidth = ground.gpuIndexType.byteCount
         var spanStart = 0
         var spanCount = 0
         func flush() {
             guard spanCount > 0 else { return }
             encoder.drawIndexedPrimitives(type: .triangle,
                                           indexCount: spanCount,
-                                          indexType: ground.indexType,
+                                          indexType: ground.gpuIndexType.metal,
                                           indexBuffer: indices.buffer,
                                           indexBufferOffset: indices.offset + spanStart * indexByteWidth)
             spanCount = 0
