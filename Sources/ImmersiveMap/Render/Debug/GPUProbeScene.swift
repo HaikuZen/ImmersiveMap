@@ -6,8 +6,9 @@ import simd
 
 /// A small scene of features already moved onto the GPU interface, drawn
 /// through any backend: the globe's polar caps turning over a square of
-/// flat ground with its fills and its line ribbons and a building standing
-/// on it (an extruded box, through the shadow cascades), into the world pass's
+/// flat ground with its fills and its line ribbons, a building standing
+/// on it (an extruded box, through the shadow cascades) and a label painted
+/// on the ground beside it, into the world pass's
 /// targets (multisampled colour resolved into the frame's target, depth
 /// and stencil). It is not the map: it is what a new backend is proven
 /// with before the render core runs on it. `WebGPUFrameStreamTests` holds
@@ -20,6 +21,12 @@ package final class GPUProbeScene {
     private let tilePipeline: TilePipeline
     private let extrudedPipeline: ExtrudedTilePipeline
     private let buildingIndexBuffers: HiddenBuildingIndexBuffers
+    private let surfaceLabelPipeline: SurfaceLabelPipeline
+    /// The text without its atlases, which the probe does not load: the
+    /// label's glyph samples an empty atlas, covers nothing and draws no
+    /// pixel, while its pipeline, bindings and draws are the map's.
+    private let textRenderer: TextRenderer
+    private let label: SurfaceLabelDrawing.Item
     private let groundState: any GPUDepthStencilState
     private let depthDisabledState: any GPUDepthStencilState
     private let mask: any GPUTexture
@@ -44,7 +51,8 @@ package final class GPUProbeScene {
         depthDescriptor.depthWriteEnabled = true
         guard let groundState = device.makeDepthStencilState(depthDescriptor),
               let depthDisabledState = device.makeDepthStencilState(GPUDepthStencilDescriptor()),
-              let tile = Self.groundTile(device: device) else {
+              let tile = Self.groundTile(device: device),
+              let label = Self.label(device: device, tile: tile.metalTile.tile) else {
             return nil
         }
         self.device = device
@@ -54,6 +62,7 @@ package final class GPUProbeScene {
         self.groundState = groundState
         self.depthDisabledState = depthDisabledState
         self.tile = tile
+        self.label = label
         caps = GlobeCapRenderer(sharedResources: GlobeCapRenderer.SharedResources.make(device: device,
                                                                                       pixelFormat: .bgra8Unorm,
                                                                                       sampleCount: 4,
@@ -65,6 +74,27 @@ package final class GPUProbeScene {
         tilePipeline = TilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4, readsGroundShadowMask: true)
         extrudedPipeline = ExtrudedTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         buildingIndexBuffers = HiddenBuildingIndexBuffers(device: device)
+        surfaceLabelPipeline = SurfaceLabelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        textRenderer = TextRenderer(device: device, resource: { _, _ in nil }, sampleCount: 4)
+    }
+
+    /// A label painted on the ground below the building: one glyph quad of
+    /// two triangles, anchored on the tile in its units and offset in
+    /// points, with a halo and a fill.
+    private static func label(device: any GPUDevice, tile: Tile) -> SurfaceLabelDrawing.Item? {
+        let anchor = SIMD2<Float>(2048, 1000)
+        let corners: [(offset: SIMD2<Float>, uv: SIMD2<Float>)] = [
+            (SIMD2(-40, -10), SIMD2(0, 1)), (SIMD2(40, -10), SIMD2(1, 1)), (SIMD2(40, 10), SIMD2(1, 0)),
+            (SIMD2(-40, -10), SIMD2(0, 1)), (SIMD2(40, 10), SIMD2(1, 0)), (SIMD2(-40, 10), SIMD2(0, 0)),
+        ]
+        let vertices = corners.map { LabelVertex(position: anchor, uv: $0.uv, labelIndex: 0, spriteUV: $0.offset) }
+        guard let buffer = device.makeBuffer(vertices, storage: .shared) else { return nil }
+        let style = LabelTextStyle(key: 1, fillColor: SIMD3(0.95, 0.95, 0.9), strokeColor: SIMD3(0.1, 0.1, 0.1),
+                                   haloEm: 0.15, sizePoints: 16, weight: .bold)
+        let record = SurfaceLabelRecord(key: 1, style: style, placement: SurfaceLabelPlacement(referenceZoom: Double(tile.z)),
+                                        vertexStart: 0, vertexCount: vertices.count)
+        return SurfaceLabelDrawing.Item(tile: tile, worldWrap: 0, record: record,
+                                        vertices: TileBufferView(gpuBuffer: buffer, offset: 0, count: vertices.count))
     }
 
     /// A box building in the middle of the tile: its lid and its four
@@ -220,6 +250,15 @@ package final class GPUProbeScene {
                                               extrudedTilePipeline: extrudedPipeline,
                                               extrudedStencilTestState: groundState,
                                               depthDisabledState: depthDisabledState)
+        let labelFrame = SurfaceLabelDrawing.Frame(cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),
+                                                   groundFog: .disabled,
+                                                   tileScreenPoints: Double(min(width, height)) * 0.45,
+                                                   viewportSizePx: SIMD2(Float(width), Float(height)),
+                                                   pixelsPerPoint: 2,
+                                                   labelOpacity: .solid,
+                                                   surface: .flat(FlatRenderState(pan: .zero, renderMapSize: 1)))
+        SurfaceLabelDrawing.draw([label], frame: labelFrame, pipeline: surfaceLabelPipeline, textRenderer: textRenderer,
+                                 depthState: groundState, depthDisabledState: depthDisabledState, encoder: encoder)
         encoder.endEncoding()
         commandBuffer.commit()
     }

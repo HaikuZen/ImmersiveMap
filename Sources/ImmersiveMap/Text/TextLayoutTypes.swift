@@ -119,6 +119,11 @@ struct LabelVertex {
     var position: SIMD2<Float>
     var uv: SIMD2<Float>
     var labelIndex: simd_int1
+    /// The gap `spriteUV` aligns to 8 after, named and zeroed: Swift leaves
+    /// a gap undefined, and its bytes would go into every label buffer, the
+    /// prepared tiles and the WebGPU stream as whatever the stack held. The
+    /// layout is as it was without it.
+    var _gap0: Int32 = 0
     var spriteUV: SIMD2<Float>
 
     init(position: SIMD2<Float>,

@@ -40,6 +40,16 @@ final class LabelDrawTests: XCTestCase {
         }
     }
 
+    func testALabelVertexHasNoUndefinedBytes() {
+        XCTAssertEqual(MemoryLayout<LabelVertex>.offset(of: \.labelIndex), 16)
+        XCTAssertEqual(MemoryLayout<LabelVertex>.offset(of: \._gap0), 20, "The gap spriteUV aligns after, named")
+        XCTAssertEqual(MemoryLayout<LabelVertex>.offset(of: \.spriteUV), 24)
+        XCTAssertEqual(MemoryLayout<LabelVertex>.stride, 32, "The layout the vertex had before its gap was named")
+        let vertex = LabelVertex(position: SIMD2(1, 2), uv: SIMD2(3, 4), labelIndex: 5, spriteUV: SIMD2(6, 7))
+        let bytes = withUnsafeBytes(of: vertex) { Array($0) }
+        XCTAssertEqual(Array(bytes[20 ..< 24]), [0, 0, 0, 0], "The bytes a buffer and the WebGPU stream carry are the same every run")
+    }
+
     func testTheTextPipelinesShareTheBlendAndTheLabelVertexLayout() throws {
         let device = RecordingGPUDevice(shaderFunctions: ["textVertex", "labelTextVertex", "roadLabelTextVertex",
                                                           "poiSpriteVertex", "poiSpriteFragment", "routeShieldFragment",
