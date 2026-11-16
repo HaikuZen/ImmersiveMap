@@ -207,6 +207,11 @@ jobs:
       - name: Check
         run: node Tools/WGSLCheck/check.mjs
 
+      # The engine's WebGPU frames (Web/test/frames, written by
+      # WebGPUFrameStreamTests), run through the backend's host on Dawn.
+      - name: Run the WebGPU frames
+        run: node Tools/WGSLCheck/frames.mjs
+
   # The same package for WebAssembly, its tests run by the toolchain's own
   # runtime (WasmKit, an interpreter, so the flattener's tests take minutes).
   # The test binary is given the checkout, for the Earcut fixtures, and /tmp,

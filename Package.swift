@@ -142,7 +142,7 @@ var targets: [Target] = [
     // layout), run on every platform the engine builds for.
     .testTarget(
         name: "ImmersiveMapPortableTests",
-        dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport"]
+        dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapWebGPU"]
     ),
     // Holds PortableEngineExclusions.txt to the engine's own imports.
     .testTarget(
