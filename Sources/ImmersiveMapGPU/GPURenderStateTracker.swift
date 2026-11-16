@@ -3,7 +3,9 @@
 
 /// The encoder state a WebGPU pipeline holds and a Metal encoder sets as it
 /// goes: which pipeline, which depth and stencil state, the cull mode, the
-/// winding, the depth bias and depth clipping. The engine sets these one
+/// winding, the depth bias and depth clipping, and the primitive topology,
+/// which Metal takes with each draw and WebGPU fixes in the pipeline (the
+/// flat ground's road edge lines draw `.line` through a triangle pipeline). The engine sets these one
 /// call at a time, as Metal lets it. A backend whose pipelines hold them
 /// (WebGPU) keeps this tracker per pass, and before each draw asks it for
 /// the pipeline variant the draw needs, which it makes once and caches by
@@ -24,6 +26,7 @@ package struct GPURenderStateTracker {
         package var frontFacing: GPUWinding
         package var depthBias: GPUDepthBias
         package var depthClipMode: GPUDepthClipMode
+        package var topology: GPUPrimitiveTopology
     }
 
     package enum DrawError: Error, Equatable {
@@ -56,14 +59,15 @@ package struct GPURenderStateTracker {
     package mutating func setDepthBias(_ bias: GPUDepthBias) { depthBias = bias }
     package mutating func setDepthClipMode(_ mode: GPUDepthClipMode) { depthClipMode = mode }
 
-    /// The variant the next draw needs, and whether it differs from the one
-    /// bound for the draw before, in which case the backend binds it.
-    package mutating func variantForDraw() throws -> (variant: Variant, needsBinding: Bool) {
+    /// The variant a draw of `topology` needs, and whether it differs from
+    /// the one bound for the draw before, in which case the backend binds it.
+    package mutating func variantForDraw(topology: GPUPrimitiveTopology = .triangle) throws -> (variant: Variant, needsBinding: Bool) {
         guard let pipeline else {
             throw DrawError.noPipeline
         }
         let variant = Variant(pipeline: pipeline, depthStencil: depthStencil, cullMode: cullMode,
-                              frontFacing: frontFacing, depthBias: depthBias, depthClipMode: depthClipMode)
+                              frontFacing: frontFacing, depthBias: depthBias, depthClipMode: depthClipMode,
+                              topology: topology)
         defer { bound = variant }
         return (variant, variant != bound)
     }

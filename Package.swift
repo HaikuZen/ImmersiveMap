@@ -49,6 +49,13 @@ var targets: [Target] = [
     .target(
         name: "ImmersiveMapGPU"
     ),
+    // The GPU interface over WebGPU, as a stream of commands its host runs
+    // (the browser's decoder, Web/), so the module calls the host once a
+    // submission. Plain Swift: every platform builds it.
+    .target(
+        name: "ImmersiveMapWebGPU",
+        dependencies: ["ImmersiveMapGPU"]
+    ),
     // A GPU that draws nothing and logs the calls, for the tests of the
     // features' drawing on any platform.
     .target(
@@ -124,6 +131,12 @@ var targets: [Target] = [
         name: "ImmersiveMapGPUTests",
         dependencies: ["ImmersiveMapGPU", "ImmersiveMapGPUTestSupport"]
     ),
+    // The WebGPU backend's command stream, read back by a decoder of the
+    // tests' own. Swift Testing, so the slim build runs it too.
+    .testTarget(
+        name: "ImmersiveMapWebGPUTests",
+        dependencies: ["ImmersiveMapGPU", "ImmersiveMapWebGPU"]
+    ),
     // The engine's tests that need no Metal, no Apple framework and no
     // picture (the drawing recorded by ImmersiveMapGPUTestSupport, the text
     // layout), run on every platform the engine builds for.
@@ -159,7 +172,7 @@ var targets: [Target] = [
 ]
 
 if slim {
-    targets.removeAll { $0.isTest && ["PortableFoundationTests", "PortableImageTests", "ImmersiveMapGPUTests"].contains($0.name) == false }
+    targets.removeAll { $0.isTest && ["PortableFoundationTests", "PortableImageTests", "ImmersiveMapGPUTests", "ImmersiveMapWebGPUTests"].contains($0.name) == false }
 }
 
 // The engine's files that build on Apple's platforms alone, listed in

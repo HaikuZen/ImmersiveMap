@@ -57,6 +57,18 @@ struct GPURenderStateTrackerTests {
         #expect(try tracker.variantForDraw().variant.pipeline == ObjectIdentifier(other))
     }
 
+    @Test func aDrawOfAnotherTopologyIsAnotherVariant() throws {
+        let pipeline = Object()
+        var tracker = GPURenderStateTracker()
+        tracker.setPipeline(pipeline)
+        let triangles = try tracker.variantForDraw()
+        let lines = try tracker.variantForDraw(topology: .line)
+        #expect(triangles.variant.topology == .triangle)
+        #expect(lines.needsBinding, "Lines through a triangle pipeline bind a line-list variant")
+        #expect(lines.variant.topology == .line)
+        #expect(try tracker.variantForDraw(topology: .triangle).needsBinding)
+    }
+
     @Test func theSameStateIsTheSameVariant() throws {
         let pipeline = Object(), depth = Object()
         var first = GPURenderStateTracker(), second = GPURenderStateTracker()
