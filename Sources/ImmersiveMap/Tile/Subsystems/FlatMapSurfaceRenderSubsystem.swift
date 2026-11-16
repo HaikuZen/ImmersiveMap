@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -18,10 +20,10 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
     let name: String = "FlatMapSurface"
 
     private let tilePipeline: TilePipeline
-    private let groundOwnerState: MTLDepthStencilState
-    private let tileStencilTestState: MTLDepthStencilState
-    private let roadRankState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let groundOwnerState: any GPUDepthStencilState
+    private let tileStencilTestState: any GPUDepthStencilState
+    private let roadRankState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     private let debugOverlayControls: DebugOverlayControlState
     private let groundShadowMaskTextureProvider: () -> MTLTexture?
     private let groundShadowMaskFallbackTexture: MTLTexture
@@ -38,10 +40,10 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
     private var groundReliefCentreDepth: Float?
 
     init(tilePipeline: TilePipeline,
-         groundOwnerState: MTLDepthStencilState,
-         tileStencilTestState: MTLDepthStencilState,
-         roadRankState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
+         groundOwnerState: any GPUDepthStencilState,
+         tileStencilTestState: any GPUDepthStencilState,
+         roadRankState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
          debugOverlayControls: DebugOverlayControlState,
          groundShadowMaskTextureProvider: @escaping () -> MTLTexture?,
          groundShadowMaskFallbackTexture: MTLTexture,
@@ -65,7 +67,7 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
         let part: FlatMapSurfaceDrawer.Part
         switch layer {
         case .flatMapSurface: part = .ground
@@ -78,6 +80,7 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
         let placeTilesContext = frameContext.sharedState.tilePlacementState.placeTilesContext
         guard placeTilesContext.tilePlacements.isEmpty == false else { return }
 
+        let encoder = MetalRenderEncoder(metalEncoder)
         let isWireframeEnabled = debugOverlayControls.snapshot().wireframeEnabled
         let groundShadowMask = GroundShadowMaskBinding.resolve(frameContext: frameContext,
                                                                maskTexture: groundShadowMaskTextureProvider(),
@@ -100,7 +103,12 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
                                   drawableSizePx: drawableSizePx,
                                   placeTilesContext: placeTilesContext,
                                   flatRenderState: frameContext.resolvedPresentation.flatRenderState,
-                                  groundShadowMask: groundShadowMask,
+                                  shadowUniform: groundShadowMask.uniform,
+                                  // The mask attachment or its lit fallback, both
+                                  // in the mask's format, and the shadow map or its
+                                  // fallback, both in the shadow map's.
+                                  groundShadowMask: MetalTexture(groundShadowMask.texture, format: GroundShadowMaskPipeline.format),
+                                  shadowCascades: MetalTexture(groundShadowMask.cascades, format: ShadowCascadeAtlas.depthFormat),
                                   tilePipeline: tilePipeline,
                                   groundOwnerState: groundOwnerState,
                                   tileStencilTestState: tileStencilTestState,
