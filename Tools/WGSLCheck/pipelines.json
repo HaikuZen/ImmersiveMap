@@ -263,6 +263,112 @@
     {
       "buffers" : [
         {
+          "arrayStride" : 8,
+          "attributes" : [
+            {
+              "format" : "float32",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32",
+              "offset" : 4,
+              "shaderLocation" : 1
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "horizonBandFragmentShader"
+      },
+      "label" : "HorizonGroundPipeline",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "horizonBandVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 8,
+          "attributes" : [
+            {
+              "format" : "float32",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32",
+              "offset" : 4,
+              "shaderLocation" : 1
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "horizonBandFragmentShader"
+      },
+      "label" : "HorizonSkyPipeline",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "horizonBandVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
           "arrayStride" : 32,
           "attributes" : [
             {

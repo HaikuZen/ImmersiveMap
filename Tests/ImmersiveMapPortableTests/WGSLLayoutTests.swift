@@ -300,6 +300,34 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheHorizonMatchesItsSwiftTwin() throws {
+        try assertLayout("Horizon", in: "Horizon/Shaders/Horizon.wgsl", matches: HorizonUniform.self, offsets: [
+            MemoryLayout<HorizonUniform>.offset(of: \.up),
+            MemoryLayout<HorizonUniform>.offset(of: \.depression),
+            MemoryLayout<HorizonUniform>.offset(of: \.center),
+            MemoryLayout<HorizonUniform>.offset(of: \.sunInfluence),
+            MemoryLayout<HorizonUniform>.offset(of: \.light),
+            MemoryLayout<HorizonUniform>.offset(of: \.skyStrength),
+            MemoryLayout<HorizonUniform>.offset(of: \.tint),
+            MemoryLayout<HorizonUniform>.offset(of: \.whitenWeight),
+            MemoryLayout<HorizonUniform>.offset(of: \.eye),
+            MemoryLayout<HorizonUniform>.offset(of: \.featherStrength),
+            MemoryLayout<HorizonUniform>.offset(of: \.bandRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.glowRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.whitenRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.featherRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.groundBandRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.groundGain),
+            MemoryLayout<HorizonUniform>.offset(of: \.cutoffStartRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.cutoffEndRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.skyColor),
+            MemoryLayout<HorizonUniform>.offset(of: \.skyOpacity),
+            MemoryLayout<HorizonUniform>.offset(of: \.skyGradientRadians),
+            MemoryLayout<HorizonUniform>.offset(of: \.viewProjection),
+            MemoryLayout<HorizonUniform>.offset(of: \.bandTopRadians),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.
