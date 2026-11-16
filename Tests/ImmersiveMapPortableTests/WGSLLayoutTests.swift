@@ -225,6 +225,72 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheGroundMatchesItsSwiftTwins() throws {
+        let shading = "Tile/Shaders/TileShading.wgsl"
+        try assertLayout("Style", in: shading, matches: TilePolygonStyle.self, offsets: [
+            MemoryLayout<TilePolygonStyle>.offset(of: \.color),
+        ])
+        try assertLayout("LineStyle", in: shading, matches: TileLineStyle.self, offsets: [
+            MemoryLayout<TileLineStyle>.offset(of: \.widthPoints),
+            MemoryLayout<TileLineStyle>.offset(of: \.dashLengthPoints),
+            MemoryLayout<TileLineStyle>.offset(of: \.dashGapPoints),
+            MemoryLayout<TileLineStyle>.offset(of: \.edgeThreshold),
+            MemoryLayout<TileLineStyle>.offset(of: \.minimumWidthPoints),
+            MemoryLayout<TileLineStyle>.offset(of: \.dashInTileUnits),
+            MemoryLayout<TileLineStyle>.offset(of: \.halfWidthUnits),
+            MemoryLayout<TileLineStyle>.offset(of: \.worldLockZoom),
+            MemoryLayout<TileLineStyle>.offset(of: \.rampStartWidthPoints),
+            MemoryLayout<TileLineStyle>.offset(of: \.rampStartZoom),
+            MemoryLayout<TileLineStyle>.offset(of: \.rampEndZoom),
+            MemoryLayout<TileLineStyle>.offset(of: \.rampStartAlpha),
+            MemoryLayout<TileLineStyle>.offset(of: \.sphereAlpha),
+            MemoryLayout<TileLineStyle>.offset(of: \.sphereColorRed),
+            MemoryLayout<TileLineStyle>.offset(of: \.sphereColorGreen),
+            MemoryLayout<TileLineStyle>.offset(of: \.sphereColorBlue),
+            MemoryLayout<TileLineStyle>.offset(of: \.sphereLookUntilZoom),
+        ])
+        try assertLayout("OverviewFadeUniform", in: shading, matches: TileOverviewFadeUniform.self, offsets: [
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.pixelsPerPoint),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.cameraZoom),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.viewportSizePx),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.pointWidthReferenceDepth),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.pointWidthCentrePixelsPerWorldUnit),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.groundAxisXClipX),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.groundAxisXClipY),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.groundAxisXClipW),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.groundAxisYClipX),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.groundAxisYClipY),
+            MemoryLayout<TileOverviewFadeUniform>.offset(of: \.groundAxisYClipW),
+        ])
+        try assertLayout("LineDashUniform", in: shading, matches: LineDashUniform.self, offsets: [
+            MemoryLayout<LineDashUniform>.offset(of: \.unitsPerPoint),
+        ])
+        try assertLayout("FlatDepthBand", in: "Tile/Shaders/Tile.wgsl", matches: FlatDepthBand.self, offsets: [
+            MemoryLayout<FlatDepthBand>.offset(of: \.offset),
+            MemoryLayout<FlatDepthBand>.offset(of: \.rankStep),
+        ])
+        try assertLayout("GroundReliefUniform", in: "Tile/Relief/Shaders/GroundRelief.wgsl", matches: GroundReliefUniform.self, offsets: [
+            MemoryLayout<GroundReliefUniform>.offset(of: \.placement),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.frame),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.hillshadeLight),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.hillshadeShadowColor),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.hillshadeHighlightColor),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.hillshadeEye),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.hillshadeFade),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.shading),
+            MemoryLayout<GroundReliefUniform>.offset(of: \.occlusion),
+        ])
+        let sphere = "Tile/Shaders/TileSphere.wgsl"
+        try assertLayout("GlobeSurfaceTile", in: sphere, matches: GlobeSurfaceTileUniform.self, offsets: [
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.uvOrigin),
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.uvScale),
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.referenceWorldX),
+        ])
+        try assertLayout("SphereHandoverUniform", in: sphere, matches: TileSphereHandoverUniform.self, offsets: [
+            MemoryLayout<TileSphereHandoverUniform>.offset(of: \.handover),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.

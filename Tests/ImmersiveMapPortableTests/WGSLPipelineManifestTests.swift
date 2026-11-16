@@ -77,6 +77,8 @@ final class WGSLPipelineManifestTests: XCTestCase {
         _ = TextRenderer(device: device, resource: TestResources.url, sampleCount: 4)
         _ = SurfaceLabelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = TreePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        _ = TilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4, readsGroundShadowMask: true)
+        _ = TilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4, surface: .sphere)
         return device.pipelines
     }
 

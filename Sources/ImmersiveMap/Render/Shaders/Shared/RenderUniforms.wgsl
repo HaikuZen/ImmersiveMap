@@ -54,8 +54,11 @@ struct GlobeFrameConstants {
 //
 // 48: the shadow comparison sampler. Linear, no mip filter, clamped to the
 //     edge, compared with less-equal.
-// 49: the linear sampler of the glyph and icon atlases (TextShader.metal,
-//     PoiSprite.metal). Linear, no mip filter, clamped to the edge.
+// 49: the linear sampler: the glyph and icon atlases (TextShader.metal,
+//     PoiSprite.metal), the ground shadow mask and the relief's terrain
+//     (Tile.metal, GroundRelief.h). Linear, no mip filter, clamped to the
+//     edge, normalized coordinates: a Metal sampler in pixel coordinates
+//     (`coord::pixel`) samples at the pixel over the texture's size here.
 
 // MARK: - Shadows
 
