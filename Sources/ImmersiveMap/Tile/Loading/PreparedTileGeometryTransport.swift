@@ -43,17 +43,12 @@ extension PreparedTileGeometryTransporting {
             .appendingPathComponent("\(url.lastPathComponent).tmp-\(UUID().uuidString)")
     }
 
-    /// The atomic swap shared by every file transport: `replaceItemAt` needs
-    /// an existing original, so the first save of a tile moves the staged
-    /// file instead. Readers that already opened the previous container keep
-    /// its inode; the next open sees the new one.
+    /// The atomic swap shared by every file transport
+    /// (`FileManager.replaceFile`): readers that already opened the previous
+    /// container keep its inode, and the next open sees the new one.
     func replaceFile(at url: URL, withStagedFileAt stagedURL: URL) throws {
         do {
-            if FileManager.default.fileExists(atPath: url.path) {
-                _ = try FileManager.default.replaceItemAt(url, withItemAt: stagedURL)
-            } else {
-                try FileManager.default.moveItem(at: stagedURL, to: url)
-            }
+            try FileManager.default.replaceFile(at: url, withFileAt: stagedURL)
         } catch {
             try? FileManager.default.removeItem(at: stagedURL)
             throw error

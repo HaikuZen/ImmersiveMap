@@ -36,20 +36,20 @@ enum DebugOverlayTextLines {
                                                   into lines: inout [String]) {
         let hasKnownFrameDelta = diagnostics.frameDeltaTime.isFinite && diagnostics.frameDeltaTime > 0
         let frameTimeText = hasKnownFrameDelta
-            ? "\(String(format: "%.2f", diagnostics.frameDeltaTime * 1000.0))ms"
+            ? "\(String(fixed: diagnostics.frameDeltaTime * 1000.0, fractionDigits: 2))ms"
             : "--"
         let fpsText = hasKnownFrameDelta
-            ? String(format: "%.1f", 1.0 / diagnostics.frameDeltaTime)
+            ? String(fixed: 1.0 / diagnostics.frameDeltaTime, fractionDigits: 1)
             : "--"
         // One value a line in every section, so a reader finds the one
         // they watch.
         var frameLines = ["frame:\(diagnostics.frameIndex)", "dt:\(frameTimeText)", "fps:\(fpsText)"]
         let gpuFrameMs = diagnostics.measurementValue(.gpuFrameDurationMs)
         if gpuFrameMs > 0 {
-            frameLines.append("gpu:\(String(format: "%.2f", gpuFrameMs))ms")
+            frameLines.append("gpu:\(String(fixed: gpuFrameMs, fractionDigits: 2))ms")
         }
         if let memorySnapshot {
-            frameLines.append("memory ram:\(String(format: "%.1f", memorySnapshot.physicalFootprintMegabytes))MB")
+            frameLines.append("memory ram:\(String(fixed: memorySnapshot.physicalFootprintMegabytes, fractionDigits: 1))MB")
         }
         appendSection(title: "Frame", body: frameLines, into: &lines)
 
@@ -71,7 +71,7 @@ enum DebugOverlayTextLines {
         let cpuLines = diagnostics.subsystemDurations
             .sorted { lhs, rhs in lhs.value != rhs.value ? lhs.value > rhs.value : lhs.key < rhs.key }
             .prefix(4)
-            .map { "\($0.key):\(String(format: "%.2f", $0.value * 1000.0))" }
+            .map { "\($0.key):\(String(fixed: $0.value * 1000.0, fractionDigits: 2))" }
         appendSection(title: "CPU ms", body: Array(cpuLines), into: &lines)
 
         let resourcesLines = ["buffers:\(diagnostics.counterValue(.resourceBufferCount))",
@@ -79,7 +79,7 @@ enum DebugOverlayTextLines {
                               "pipelines:\(diagnostics.counterValue(.resourcePipelineCount))"]
         appendSection(title: "Resources", body: resourcesLines, into: &lines)
 
-        let globeCullingMs = String(format: "%.2f", diagnostics.measurementValue(.globeCullingDurationMs))
+        let globeCullingMs = String(fixed: diagnostics.measurementValue(.globeCullingDurationMs), fractionDigits: 2)
         let globeCullingLines = ["ms:\(globeCullingMs)",
                                  "nodes:\(diagnostics.counterValue(.globeCullingVisitedNodes))",
                                  "frustum:\(diagnostics.counterValue(.globeCullingFrustumRejects))",

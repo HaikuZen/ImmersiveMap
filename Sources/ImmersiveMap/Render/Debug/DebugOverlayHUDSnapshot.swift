@@ -248,6 +248,6 @@ package struct DebugOverlayHUDSnapshot: Equatable {
     }
 
     private static func format(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(2)))
+        String(fixed: value, fractionDigits: 2)
     }
 }

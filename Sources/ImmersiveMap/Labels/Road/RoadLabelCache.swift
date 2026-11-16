@@ -6,8 +6,8 @@
 //  ImmersiveMap
 //
 
-import Foundation
 import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// One tile's road labels in the working set: the roads and glyphs the
