@@ -621,7 +621,3 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
     }
 }
 
-/// Mirror of `TileRasterSampling` in TileRaster.metal (fragment buffer 1).
-struct RasterTileSamplingUniform {
-    var mipLevelBias: Float
-}

@@ -79,6 +79,8 @@ final class WGSLPipelineManifestTests: XCTestCase {
         _ = TreePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = TilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4, readsGroundShadowMask: true)
         _ = TilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4, surface: .sphere)
+        _ = RasterTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        _ = PlacementStencilPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         return device.pipelines
     }
 

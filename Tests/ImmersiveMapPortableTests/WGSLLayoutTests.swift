@@ -289,6 +289,15 @@ final class WGSLLayoutTests: XCTestCase {
         try assertLayout("SphereHandoverUniform", in: sphere, matches: TileSphereHandoverUniform.self, offsets: [
             MemoryLayout<TileSphereHandoverUniform>.offset(of: \.handover),
         ])
+        let raster = "Tile/Shaders/TileRaster.wgsl"
+        try assertLayout("TileRasterSampling", in: raster, matches: RasterTileSamplingUniform.self, offsets: [
+            MemoryLayout<RasterTileSamplingUniform>.offset(of: \.mipLevelBias),
+        ])
+        try assertLayout("TileRasterSurfaceTile", in: raster, matches: GlobeSurfaceTileUniform.self, offsets: [
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.uvOrigin),
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.uvScale),
+            MemoryLayout<GlobeSurfaceTileUniform>.offset(of: \.referenceWorldX),
+        ])
     }
 
     func testAPlainVec3MovesTheFieldAfterIt() throws {

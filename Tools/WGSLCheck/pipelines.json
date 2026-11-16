@@ -325,6 +325,111 @@
     },
     {
       "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementDepthReset",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "placementDepthResetVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilFlat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilFlatRelief",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilSphereMorph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilSpherePure",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
         {
           "arrayStride" : 32,
           "attributes" : [
@@ -384,6 +489,199 @@
 
         },
         "entryPoint" : "poiSpriteVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileRasterBakeFragmentShader"
+      },
+      "label" : "RasterTileBake",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "rgba8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileRasterBakeVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterFlatFragmentShader"
+      },
+      "label" : "RasterTileFlat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileRasterFlatFragmentShader"
+      },
+      "label" : "RasterTileFlatRelief",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth16unorm",
+      "label" : "RasterTileReliefShadow",
+      "sampleCount" : 1,
+      "targets" : [
+
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileRasterReliefShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereFragmentShader"
+      },
+      "label" : "RasterTileSphereMorph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereFragmentShader"
+      },
+      "label" : "RasterTileSpherePure",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSpherePureVertexShader"
       }
     },
     {

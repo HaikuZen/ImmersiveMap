@@ -85,3 +85,9 @@ final class RasterTilePipeline {
         }
     }
 }
+
+/// Mirror of `TileRasterSampling` in TileRaster.metal and TileRaster.wgsl
+/// (fragment buffer 1): the bias added to the mip level the GPU picks.
+struct RasterTileSamplingUniform {
+    var mipLevelBias: Float
+}
