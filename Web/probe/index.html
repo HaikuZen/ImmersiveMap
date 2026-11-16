@@ -69,7 +69,9 @@ try {
     }
     requestAnimationFrame(frame);
 } catch (error) {
-    say(error.stack ?? String(error), true);
+    // Chrome's stack starts with the message, Firefox's leaves it out.
+    const stack = error.stack ?? '';
+    say(stack.includes(String(error)) ? stack : `${error}\n${stack}`.trim(), true);
 }
 </script>
 </body>
