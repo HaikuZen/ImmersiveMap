@@ -6,7 +6,8 @@ import simd
 
 /// A small scene of features already moved onto the GPU interface, drawn
 /// through any backend: the globe's polar caps turning over a square of
-/// flat ground with its fills and its line ribbons, into the world pass's
+/// flat ground with its fills and its line ribbons and a building standing
+/// on it (an extruded box, through the shadow cascades), into the world pass's
 /// targets (multisampled colour resolved into the frame's target, depth
 /// and stencil). It is not the map: it is what a new backend is proven
 /// with before the render core runs on it. `WebGPUFrameStreamTests` holds
@@ -17,7 +18,10 @@ package final class GPUProbeScene {
     private let queue: any GPUCommandQueue
     private let caps: GlobeCapRenderer
     private let tilePipeline: TilePipeline
+    private let extrudedPipeline: ExtrudedTilePipeline
+    private let buildingIndexBuffers: HiddenBuildingIndexBuffers
     private let groundState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     private let mask: any GPUTexture
     private let cascades: any GPUTexture
     private let tile: PlaceTile
@@ -39,6 +43,7 @@ package final class GPUProbeScene {
         depthDescriptor.depthCompare = .lessEqual
         depthDescriptor.depthWriteEnabled = true
         guard let groundState = device.makeDepthStencilState(depthDescriptor),
+              let depthDisabledState = device.makeDepthStencilState(GPUDepthStencilDescriptor()),
               let tile = Self.groundTile(device: device) else {
             return nil
         }
@@ -47,6 +52,7 @@ package final class GPUProbeScene {
         self.mask = mask
         self.cascades = cascades
         self.groundState = groundState
+        self.depthDisabledState = depthDisabledState
         self.tile = tile
         caps = GlobeCapRenderer(sharedResources: GlobeCapRenderer.SharedResources.make(device: device,
                                                                                       pixelFormat: .bgra8Unorm,
@@ -57,13 +63,40 @@ package final class GPUProbeScene {
                                                                    northCap: SIMD4(0.04, 0.09, 0.20, 1),
                                                                    southCap: SIMD4(0.30, 0.32, 0.36, 1)))
         tilePipeline = TilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4, readsGroundShadowMask: true)
+        extrudedPipeline = ExtrudedTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        buildingIndexBuffers = HiddenBuildingIndexBuffers(device: device)
+    }
+
+    /// A box building in the middle of the tile: its lid and its four
+    /// walls, wound clockwise seen from outside as the mesh builder winds
+    /// them, with outward normals, in the tile's units.
+    private static func building() -> (vertices: [ExtrudedVertexIn], indices: [UInt16]) {
+        let low: Float = 1500, high: Float = 2600, height: Float = 600
+        // The footprint clockwise seen from above (y up), as the mesh
+        // builder forces the exterior ring.
+        let ring: [SIMD2<Float>] = [SIMD2(low, low), SIMD2(low, high), SIMD2(high, high), SIMD2(high, low)]
+        var vertices: [ExtrudedVertexIn] = []
+        var indices: [UInt16] = []
+        func quad(_ corners: [SIMD3<Float>], normal: SIMD3<Float>) {
+            let base = UInt16(vertices.count)
+            vertices += corners.map { ExtrudedVertexIn(position: $0, normal: normal, styleIndex: 0) }
+            indices += [base, base + 1, base + 2, base, base + 2, base + 3]
+        }
+        quad(ring.map { SIMD3($0, height) }, normal: SIMD3(0, 0, 1))
+        for side in 0 ..< 4 {
+            let a = ring[side], b = ring[(side + 1) % 4]
+            let along = b - a
+            let outward = simd_normalize(SIMD2(-along.y, along.x))
+            quad([SIMD3(a, 0), SIMD3(a, height), SIMD3(b, height), SIMD3(b, 0)], normal: SIMD3(outward, 0))
+        }
+        return (vertices, indices)
     }
 
     /// A tile of the whole world in two triangles: an opaque fill, then the
-    /// same square as line ribbons, each view at a multiple of 256 as a
-    /// tile's spans are.
+    /// same square as line ribbons, and a building on it, each view at a
+    /// multiple of 256 as a tile's spans are.
     private static func groundTile(device: any GPUDevice) -> PlaceTile? {
-        guard let backing = device.makeBuffer(length: 2048, storage: .shared) else { return nil }
+        guard let backing = device.makeBuffer(length: 2560, storage: .shared) else { return nil }
         let contents = backing.contents()
         let corners: [SIMD2<Float>] = [SIMD2(0, 0), SIMD2(4096, 0), SIMD2(4096, 4096), SIMD2(0, 4096)]
         for (index, corner) in corners.enumerated() {
@@ -87,13 +120,25 @@ package final class GPUProbeScene {
             styleRuns: [GroundStyleRun(indexStart: 0, indexCount: 6, zoomFade: .zero, flags: GroundStyleRun.alphaOpaqueFlag),
                         GroundStyleRun(indexStart: 6, indexCount: 6, zoomFade: .zero,
                                        flags: GroundStyleRun.alphaOpaqueFlag | GroundStyleRun.linesClassFlag)])
+        let building = Self.building()
+        for (index, vertex) in building.vertices.enumerated() {
+            contents.storeBytes(of: vertex, toByteOffset: 1280 + index * MemoryLayout<ExtrudedVertexIn>.stride, as: ExtrudedVertexIn.self)
+        }
+        for (index, value) in building.indices.enumerated() {
+            contents.storeBytes(of: value, toByteOffset: 1536 + index * 2, as: UInt16.self)
+        }
+        contents.storeBytes(of: TilePolygonStyle(color: SIMD4(0.78, 0.74, 0.68, 1)), toByteOffset: 2048, as: TilePolygonStyle.self)
+        let extruded = TileBuffers.Extruded(vertices: TileBufferView(gpuBuffer: backing, offset: 1280, count: building.vertices.count),
+                                            indices: TileBufferView(gpuBuffer: backing, offset: 1536, count: building.indices.count),
+                                            styles: TileBufferView(gpuBuffer: backing, offset: 2048, count: 1),
+                                            gpuIndexType: .uint16)
         let empty = TileBuffers.GeometryLayer(vertices: nil, indices: nil, styles: nil, styleZoomFade: nil, lineStyles: nil, indexType: .uint16)
         let phases = RoadGeometryPhases(shadow: empty, casing: empty, fill: empty, detail: empty, overlay: empty)
         let buffers = TileBuffers(gpuBackingBuffer: backing,
                                   ground: ground,
                                   roads: RoadStructureBuckets(tunnel: phases, ground: phases, automobileGround: phases, bridge: phases),
                                   bridgeOverlay: empty,
-                                  extruded: TileBuffers.Extruded(vertices: nil, indices: nil, styles: nil, gpuIndexType: .uint16),
+                                  extruded: extruded,
                                   textLabels: TileBuffers.TextLabelSet(placementInputs: [], labelsByStyleRuns: [], poiIconRuns: []),
                                   roadLabels: TileBuffers.RoadLabels(pathInputs: [], pathRanges: [], pathLabels: [], labelStyle: nil,
                                                                      localGlyphVertices: nil, glyphBounds: [], glyphBoundRanges: [],
@@ -165,6 +210,16 @@ package final class GPUProbeScene {
                                       part: part,
                                       isWireframeEnabled: false)
         }
+        BuildingExtrusionDrawer.drawBuildings(renderEncoder: encoder,
+                                              cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),
+                                              shadowUniform: .disabled,
+                                              shadowMap: cascades,
+                                              placeTilesContext: PlaceTilesContext(tilePlacements: [tile]),
+                                              indexBuffers: buildingIndexBuffers,
+                                              flatRenderState: FlatRenderState(pan: .zero, renderMapSize: 1),
+                                              extrudedTilePipeline: extrudedPipeline,
+                                              extrudedStencilTestState: groundState,
+                                              depthDisabledState: depthDisabledState)
         encoder.endEncoding()
         commandBuffer.commit()
     }
