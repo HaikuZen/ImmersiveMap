@@ -184,7 +184,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
         XCTAssertEqual(try arenaBytes(of: materialized), try arenaBytes(of: parsed))
         XCTAssertEqual(materialized.tileBuffers.ground.verticesCount,
                        parsed.tileBuffers.ground.verticesCount)
-        XCTAssertEqual(materialized.tileBuffers.ground.indexType, parsed.tileBuffers.ground.indexType)
+        XCTAssertEqual(materialized.tileBuffers.ground.gpuIndexType, parsed.tileBuffers.ground.gpuIndexType)
         XCTAssertEqual(materialized.tileBuffers.roads.ground.fill.indicesCount,
                        parsed.tileBuffers.roads.ground.fill.indicesCount)
         XCTAssertEqual(materialized.tileBuffers.textLabels.labelsByStyleRuns.first?.localGlyphVertexCount,
@@ -478,7 +478,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
 
         let factory = MetalTileFactory(metalDevice: device)
         let parsed = try XCTUnwrap(factory.makeTile(from: preparedTile))
-        XCTAssertEqual(parsed.tileBuffers.ground.indexType, .uint32,
+        XCTAssertEqual(parsed.tileBuffers.ground.gpuIndexType, .uint32,
                        "Geometry above the narrowing ceiling must keep 32-bit indices")
 
         let encoded = try PreparedTileDiskCodec.encode(preparedTile: preparedTile,
@@ -491,7 +491,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
         guard case .tile(let materialized) = result else {
             return XCTFail("The wide-index image must materialize, got \(result)")
         }
-        XCTAssertEqual(materialized.tileBuffers.ground.indexType, .uint32)
+        XCTAssertEqual(materialized.tileBuffers.ground.gpuIndexType, .uint32)
         XCTAssertEqual(materialized.tileBuffers.ground.indicesCount, parsed.tileBuffers.ground.indicesCount)
         XCTAssertEqual(try arenaBytes(of: materialized), try arenaBytes(of: parsed))
     }
