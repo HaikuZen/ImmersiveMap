@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 import simd
 
 final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
@@ -19,8 +18,8 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
     /// The ground cut's draws for the models that cut into the ground.
     private let groundCutStates: SceneModelGroundCutStates
     private let depthDisabledState: any GPUDepthStencilState
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: any GPUTexture
     private let presentationStateStore = SceneModelPresentationStateStore()
     private var drawItems: [SceneModelDrawItem] = []
     private var shadowCasterItems: [SceneModelDrawItem] = []
@@ -32,8 +31,8 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
          surfaceMaskState: any GPUDepthStencilState,
          groundCutStates: SceneModelGroundCutStates,
          depthDisabledState: any GPUDepthStencilState,
-         shadowMapTextureProvider: @escaping () -> MTLTexture?,
-         shadowFallbackTexture: MTLTexture) {
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)?,
+         shadowFallbackTexture: any GPUTexture) {
         self.sceneModelSource = sceneModelSource
         self.meshStore = meshStore
         self.pipeline = pipeline
@@ -175,7 +174,7 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
                                   shadowUniform: shadowBinding.uniform,
                                   // The render core's shadow map or its fallback,
                                   // both in the shadow map's format.
-                                  shadowMap: MetalTexture(shadowBinding.texture, format: ShadowCascadeAtlas.depthFormat),
+                                  shadowMap: shadowBinding.texture,
                                   items: drawItems,
                                   pipeline: pipeline,
                                   surfaceMaskState: surfaceMaskState,

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 import simd
 
 /// Draws the models of the model archive (`ImmersiveMapSettings.modelArchive`):
@@ -48,8 +47,8 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
     private let extrudedDepthState: any GPUDepthStencilState
     private let surfaceMaskState: any GPUDepthStencilState
     private let depthDisabledState: any GPUDepthStencilState
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: any GPUTexture
     private var drawItems: [ModelTileDrawItem] = []
     private var shadowCasterItems: [ModelTileDrawItem] = []
     /// `ModelArchiveSettings.minimumZoom`: the models draw from it, each
@@ -67,8 +66,8 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
          extrudedDepthState: any GPUDepthStencilState,
          surfaceMaskState: any GPUDepthStencilState,
          depthDisabledState: any GPUDepthStencilState,
-         shadowMapTextureProvider: @escaping () -> MTLTexture?,
-         shadowFallbackTexture: MTLTexture,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)?,
+         shadowFallbackTexture: any GPUTexture,
          minimumZoom: Double = 0,
          riseSeconds: TimeInterval = 0) {
         self.store = store
@@ -252,7 +251,7 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
                                  shadowUniform: shadowBinding.uniform,
                                  // The render core's shadow map or its
                                  // fallback, both in the shadow map's format.
-                                 shadowMap: MetalTexture(shadowBinding.texture, format: ShadowCascadeAtlas.depthFormat),
+                                 shadowMap: shadowBinding.texture,
                                  items: drawItems,
                                  depthBias: depthBias,
                                  pipeline: pipeline,

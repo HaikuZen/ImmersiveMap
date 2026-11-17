@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 import simd
 
 /// Encodes the ground shadow mask pass of the flat presentation: a fullscreen
@@ -17,11 +16,11 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
     private let pipeline: GroundShadowMaskPipeline
     private let depthDisabledState: any GPUDepthStencilState
     /// The render core's shadow map, still a Metal texture.
-    private let shadowMapTextureProvider: () -> MTLTexture?
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
 
     init(pipeline: GroundShadowMaskPipeline,
          depthDisabledState: any GPUDepthStencilState,
-         shadowMapTextureProvider: @escaping () -> MTLTexture?) {
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)?) {
         self.pipeline = pipeline
         self.depthDisabledState = depthDisabledState
         self.shadowMapTextureProvider = shadowMapTextureProvider
@@ -52,7 +51,7 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
                         depthDisabledState: depthDisabledState,
                         maskUniform: maskUniform,
                         shadowUniform: shadowState.shadowUniform,
-                        shadowMap: MetalTexture(shadowMapTexture, format: ShadowCascadeAtlas.depthFormat))
+                        shadowMap: shadowMapTexture)
     }
 
     func handleMemoryWarning() {}

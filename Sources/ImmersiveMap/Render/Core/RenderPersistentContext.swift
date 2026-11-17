@@ -75,11 +75,11 @@ final class RenderPersistentContext {
     /// bound depth texture even though strength = 0 skips the sampling branch.
     /// Depth textures cannot be filled from the CPU, so a one-time no-draw pass
     /// clears this 1x1 texture to 1.0 ("lit everywhere") at init.
-    let shadowFallbackTexture: MTLTexture
+    let shadowFallbackTexture: any GPUTexture
     /// See `SharedRenderResources.sceneDepthFallbackTexture`.
-    let sceneDepthFallbackTexture: MTLTexture
+    let sceneDepthFallbackTexture: any GPUTexture
     /// See `SharedRenderResources.groundShadowMaskFallbackTexture`.
-    let groundShadowMaskFallbackTexture: MTLTexture
+    let groundShadowMaskFallbackTexture: any GPUTexture
 
     // MARK: - Tile and Label Resources
 
@@ -168,9 +168,12 @@ final class RenderPersistentContext {
         self.sceneModelGroundCutStates = shared.sceneModelGroundCutStates
         self.tileStencilTestState = shared.tileStencilTestState
         self.roadRankState = shared.roadRankState
-        self.shadowFallbackTexture = shared.shadowFallbackTexture
-        self.sceneDepthFallbackTexture = shared.sceneDepthFallbackTexture
-        self.groundShadowMaskFallbackTexture = shared.groundShadowMaskFallbackTexture
+        // The shared fallbacks as the GPU interface's, wrapped once so a
+        // receiver sees the same object every frame.
+        self.shadowFallbackTexture = MetalTexture(shared.shadowFallbackTexture, format: ShadowCascadeAtlas.depthFormat)
+        self.sceneDepthFallbackTexture = MetalTexture(shared.sceneDepthFallbackTexture, format: ShadowCascadeAtlas.depthFormat)
+        self.groundShadowMaskFallbackTexture = MetalTexture(shared.groundShadowMaskFallbackTexture,
+                                                            format: GroundShadowMaskPipeline.format)
 
         self.baseColors = styleRuntime.baseColors
 

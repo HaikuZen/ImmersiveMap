@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 
 /// Draws the extruded buildings of flat mode: opaque geometry straight into
 /// the world pass, before the ground, which then fails its depth test under
@@ -36,8 +35,8 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
     /// World-pass buildings: scene depth plus the tile-priority stencil test.
     private let extrudedStencilTestState: any GPUDepthStencilState
     private let depthDisabledState: any GPUDepthStencilState
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: any GPUTexture
     private let debugOverlayControls: DebugOverlayControlState
     /// The index buffers the tiles draw from while the frame's models
     /// stand in for some of their buildings, shared by the world pass and
@@ -67,8 +66,8 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
          extrudedDepthState: any GPUDepthStencilState,
          extrudedStencilTestState: any GPUDepthStencilState,
          depthDisabledState: any GPUDepthStencilState,
-         shadowMapTextureProvider: @escaping () -> MTLTexture?,
-         shadowFallbackTexture: MTLTexture,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)?,
+         shadowFallbackTexture: any GPUTexture,
          extrusion: ImmersiveMapSettings.ExtrusionSettings = ImmersiveMapSettings.ExtrusionSettings(),
          debugOverlayControls: DebugOverlayControlState) {
         self.debugOverlayControls = debugOverlayControls
@@ -219,7 +218,7 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
                                               shadowUniform: shadowBinding.uniform,
                                               // The render core's shadow map or its fallback,
                                               // both in the shadow map's format.
-                                              shadowMap: MetalTexture(shadowBinding.texture, format: ShadowCascadeAtlas.depthFormat),
+                                              shadowMap: shadowBinding.texture,
                                               placeTilesContext: frameContext.sharedState.tilePlacementState.buildingPlaceTilesContext,
                                               indexBuffers: hiddenBuildingIndexBuffers,
                                               flatRenderState: frameContext.resolvedPresentation.flatRenderState,

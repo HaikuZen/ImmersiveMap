@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 import simd
 
 /// The ground of the raster targets, the slots of a ring rule with a raster
@@ -83,12 +82,12 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
     private let sphereOpaqueOwnerState: any GPUDepthStencilState
     private let depthDisabledState: any GPUDepthStencilState
     private let debugOverlayControls: DebugOverlayControlState
-    private let groundShadowMaskTextureProvider: () -> MTLTexture?
-    private let groundShadowMaskFallbackTexture: MTLTexture
+    private let groundShadowMaskTextureProvider: () -> (any GPUTexture)?
+    private let groundShadowMaskFallbackTexture: any GPUTexture
     /// The shadow map the relief's draws sample at their raised points
     /// (`GroundShadowMaskBinding.cascades`), and its depth fallback.
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture?
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: (any GPUTexture)?
     private let groundFlattening: ImmersiveMapSettings.TileSettings.GroundFlatteningSettings
 
     /// The frame's sources, by the tile drawn, finest first.
@@ -122,10 +121,10 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
          sphereOpaqueOwnerState: any GPUDepthStencilState,
          depthDisabledState: any GPUDepthStencilState,
          debugOverlayControls: DebugOverlayControlState,
-         groundShadowMaskTextureProvider: @escaping () -> MTLTexture?,
-         groundShadowMaskFallbackTexture: MTLTexture,
-         shadowMapTextureProvider: @escaping () -> MTLTexture? = { nil },
-         shadowFallbackTexture: MTLTexture? = nil,
+         groundShadowMaskTextureProvider: @escaping () -> (any GPUTexture)?,
+         groundShadowMaskFallbackTexture: any GPUTexture,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)? = { nil },
+         shadowFallbackTexture: (any GPUTexture)? = nil,
          groundFlattening: ImmersiveMapSettings.TileSettings.GroundFlatteningSettings = .init()) {
         self.device = device
         self.pipeline = pipeline
@@ -422,8 +421,8 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
                                   cameraUniform: frameContext.cameraUniform,
                                   groundShadow: RasterTileDrawer.GroundShadow(
                                       uniform: groundShadowMask.uniform,
-                                      mask: MetalTexture(groundShadowMask.texture, format: GroundShadowMaskPipeline.format),
-                                      cascades: MetalTexture(groundShadowMask.cascades, format: ShadowCascadeAtlas.depthFormat)),
+                                      mask: groundShadowMask.texture,
+                                      cascades: groundShadowMask.cascades),
                                   groundFog: GroundFogUniform.resolve(frameContext: frameContext),
                                   groundRelief: groundRelief,
                                   renderMapSize: flatRenderState.renderMapSize,

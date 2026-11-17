@@ -42,8 +42,9 @@ extension GPUDevice {
 }
 
 /// A value's bytes as a shader reads constant data: the value's stride,
-/// zeros after the value's own size. A backend's own code calls it too
-/// (`GroundFogUniform+Metal.swift`), so every path sends the same bytes.
+/// zeros after the value's own size: what `setVertexValue` and
+/// `setFragmentValue` send, and what any other path that sends constant
+/// data calls too, so every path sends the same bytes.
 /// The value must be plain data: an array, a class or an existential would
 /// send its reference, never its contents.
 package func withGPUConstantBytes<Value>(of value: Value, _ body: (UnsafeRawPointer, Int) -> Void) {

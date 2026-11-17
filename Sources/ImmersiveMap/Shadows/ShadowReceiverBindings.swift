@@ -1,22 +1,18 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
-
-// The bindings hand Metal textures to the receivers (the tiles, the
-// buildings, the models), which still draw with Metal. They move onto the
-// GPU interface with those receivers.
+import ImmersiveMapGPU
 
 /// What a receiver binds at its shadow slots this frame: the real map with the
 /// live uniform when the pass ran, otherwise the 1x1 fallback with `.disabled`
 /// (the shader's strength guard then skips sampling entirely).
 struct ShadowReceiverBinding {
     let uniform: ShadowUniform
-    let texture: MTLTexture
+    let texture: any GPUTexture
 
     static func resolve(frameContext: FrameContext,
-                        shadowMapTexture: MTLTexture?,
-                        fallbackTexture: MTLTexture) -> ShadowReceiverBinding {
+                        shadowMapTexture: (any GPUTexture)?,
+                        fallbackTexture: any GPUTexture) -> ShadowReceiverBinding {
         guard let shadowState = ShadowPassGateResolver.resolve(frameContext: frameContext),
               let shadowMapTexture else {
             return ShadowReceiverBinding(uniform: .disabled, texture: fallbackTexture)
@@ -39,14 +35,14 @@ struct ShadowReceiverBinding {
 /// lookup a pixel, as the mask's.
 struct GroundShadowMaskBinding {
     let uniform: ShadowUniform
-    let texture: MTLTexture
-    let cascades: MTLTexture
+    let texture: any GPUTexture
+    let cascades: any GPUTexture
 
     static func resolve(frameContext: FrameContext,
-                        maskTexture: MTLTexture?,
-                        fallbackTexture: MTLTexture,
-                        shadowMapTexture: MTLTexture?,
-                        shadowFallbackTexture: MTLTexture) -> GroundShadowMaskBinding {
+                        maskTexture: (any GPUTexture)?,
+                        fallbackTexture: any GPUTexture,
+                        shadowMapTexture: (any GPUTexture)?,
+                        shadowFallbackTexture: any GPUTexture) -> GroundShadowMaskBinding {
         guard let shadowState = ShadowPassGateResolver.resolve(frameContext: frameContext),
               frameContext.renderSurfaceMode == .flat,
               let maskTexture,

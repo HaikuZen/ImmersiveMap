@@ -247,7 +247,7 @@ final class RenderPassGraph {
                 ? attachments.ensureSceneDepthResolveTexture(drawSize: frameContext.drawSize)
                 : depthTexture
         }
-        frameContext.sharedState.sceneDepthTexture = sceneDepthTexture?.metalTexture
+        frameContext.sharedState.gpuSceneDepthTexture = sceneDepthTexture
 
         let metalClearColor = RenderFrameClearColor.make(transition: frameContext.transition,
                                                          settings: settings,

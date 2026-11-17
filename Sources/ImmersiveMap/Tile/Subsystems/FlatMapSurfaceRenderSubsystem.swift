@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 import simd
 
 /// The flat ground: the main coverage's sources through the vector drawer
@@ -25,12 +24,12 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
     private let roadRankState: any GPUDepthStencilState
     private let depthDisabledState: any GPUDepthStencilState
     private let debugOverlayControls: DebugOverlayControlState
-    private let groundShadowMaskTextureProvider: () -> MTLTexture?
-    private let groundShadowMaskFallbackTexture: MTLTexture
+    private let groundShadowMaskTextureProvider: () -> (any GPUTexture)?
+    private let groundShadowMaskFallbackTexture: any GPUTexture
     /// The shadow map the relief's draws sample at their raised points
     /// (`GroundShadowMaskBinding.cascades`), and its depth fallback.
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture?
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: (any GPUTexture)?
     /// The tile zoom the ground is flattened from, the coarsest the
     /// terrain under the screen's centre is read at.
     private let groundFlatteningFromTileZoom: Int?
@@ -45,10 +44,10 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
          roadRankState: any GPUDepthStencilState,
          depthDisabledState: any GPUDepthStencilState,
          debugOverlayControls: DebugOverlayControlState,
-         groundShadowMaskTextureProvider: @escaping () -> MTLTexture?,
-         groundShadowMaskFallbackTexture: MTLTexture,
-         shadowMapTextureProvider: @escaping () -> MTLTexture? = { nil },
-         shadowFallbackTexture: MTLTexture? = nil,
+         groundShadowMaskTextureProvider: @escaping () -> (any GPUTexture)?,
+         groundShadowMaskFallbackTexture: any GPUTexture,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)? = { nil },
+         shadowFallbackTexture: (any GPUTexture)? = nil,
          groundFlatteningFromTileZoom: Int? = nil) {
         self.tilePipeline = tilePipeline
         self.groundOwnerState = groundOwnerState
@@ -105,8 +104,8 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
                                   // The mask attachment or its lit fallback, both
                                   // in the mask's format, and the shadow map or its
                                   // fallback, both in the shadow map's.
-                                  groundShadowMask: MetalTexture(groundShadowMask.texture, format: GroundShadowMaskPipeline.format),
-                                  shadowCascades: MetalTexture(groundShadowMask.cascades, format: ShadowCascadeAtlas.depthFormat),
+                                  groundShadowMask: groundShadowMask.texture,
+                                  shadowCascades: groundShadowMask.cascades,
                                   tilePipeline: tilePipeline,
                                   groundOwnerState: groundOwnerState,
                                   tileStencilTestState: tileStencilTestState,

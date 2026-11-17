@@ -10,8 +10,8 @@ enum RenderGraphFactory {
                                  settings: ImmersiveMapSettings,
                                  debugOverlayControls: DebugOverlayControlState,
                                  postProcessingInputTextureProvider: @escaping () -> (any GPUTexture)?,
-                                 shadowMapTextureProvider: @escaping () -> MTLTexture?,
-                                 groundShadowMaskTextureProvider: @escaping () -> MTLTexture?) -> RenderGraph {
+                                 shadowMapTextureProvider: @escaping () -> (any GPUTexture)?,
+                                 groundShadowMaskTextureProvider: @escaping () -> (any GPUTexture)?) -> RenderGraph {
         let tileWorkingSetSubsystem = TileWorkingSetSubsystem(tileRenderStore: context.tileRenderStore,
                                                               tileTraceRecorder: context.tileTraceRecorder,
                                                               terrainDemand: context.groundRelief?.store,
@@ -24,16 +24,14 @@ enum RenderGraphFactory {
                                                            settings: settings.labels,
                                                            debugOverlayControls: debugOverlayControls)
         let baseLabelDrawSubsystem = BaseLabelDrawSubsystem(textRenderer: context.textRenderer,
-                                                            poiSpriteAtlas: context.poiSpriteAtlas,
-                                                            labelDepthState: context.labelDepthState.metalState,
-                                                            depthDisabledState: context.depthDisabledState.metalState,
-                                                            metalDevice: context.metalContext.device)
+                                                            poiSpriteTexture: context.poiSpriteAtlas.texture,
+                                                            labelDepthState: context.labelDepthState,
+                                                            depthDisabledState: context.depthDisabledState)
         let roadLabelDrawSubsystem = RoadLabelDrawSubsystem(textRenderer: context.textRenderer,
-                                                            labelDepthState: context.labelDepthState.metalState,
-                                                            depthDisabledState: context.depthDisabledState.metalState,
+                                                            labelDepthState: context.labelDepthState,
+                                                            depthDisabledState: context.depthDisabledState,
                                                             fallbackDepthTexture: context.sceneDepthFallbackTexture,
-                                                            hidesBehindBuildingsFromZoom: settings.labels.road.hidesBehindBuildingsFromZoom,
-                                                            metalDevice: context.metalContext.device)
+                                                            hidesBehindBuildingsFromZoom: settings.labels.road.hidesBehindBuildingsFromZoom)
         let avatarSubsystem = AvatarRenderSubsystem(avatarsRenderer: context.avatarsRenderer,
                                                     avatarSource: context.avatarSource,
                                                     depthDisabledState: context.depthDisabledState.metalState)

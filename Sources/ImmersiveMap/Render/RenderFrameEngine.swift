@@ -131,10 +131,10 @@ final class RenderFrameEngine {
                                                                   attachments.currentPostProcessingInputTexture
                                                               },
                                                               shadowMapTextureProvider: { [attachments] in
-                                                                  attachments.currentShadowMapTexture?.metalTexture
+                                                                  attachments.currentShadowMapTexture
                                                               },
                                                               groundShadowMaskTextureProvider: { [attachments] in
-                                                                  attachments.currentGroundShadowMaskTexture?.metalTexture
+                                                                  attachments.currentGroundShadowMaskTexture
                                                               })
 
         self.settings = settings
