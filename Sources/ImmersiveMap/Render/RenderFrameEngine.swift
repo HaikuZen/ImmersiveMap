@@ -524,7 +524,7 @@ final class RenderFrameEngine {
     private func publishStaticResources(frameIndex: UInt64) {
         let resourceRegistry = renderGraph.resourceRegistry
         resourceRegistry.beginFrame(frameIndex: frameIndex)
-        resourceRegistry.setPipeline(persistentContext.polygonPipeline.pipelineState, named: .polygonPipeline)
+        resourceRegistry.setPipeline(persistentContext.polygonPipeline.pipelineState.metalPipeline, named: .polygonPipeline)
         resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState.metalPipeline, named: .tilePipeline)
         resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState.metalPipeline, named: .extrudedTilePipeline)
         resourceRegistry.setTexture(persistentContext.textRenderer.texture.metalTexture, named: .labelGlyphAtlas)
