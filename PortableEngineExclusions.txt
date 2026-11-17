@@ -62,7 +62,6 @@ Render/Shaders
 SceneModels/ModelTiles/ModelTileMesh+Metal.swift
 SceneModels/SceneModelAssetLoader.swift
 SceneModels/Shaders
-Shadows/GroundShadowMaskPipeline+Metal.swift
 Shadows/Shaders
 Shadows/ShadowCascadeAtlas+Metal.swift
 Starfield/Shaders

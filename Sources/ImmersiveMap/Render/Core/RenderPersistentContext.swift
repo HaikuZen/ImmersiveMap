@@ -168,12 +168,9 @@ final class RenderPersistentContext {
         self.sceneModelGroundCutStates = shared.sceneModelGroundCutStates
         self.tileStencilTestState = shared.tileStencilTestState
         self.roadRankState = shared.roadRankState
-        // The shared fallbacks as the GPU interface's, wrapped once so a
-        // receiver sees the same object every frame.
-        self.shadowFallbackTexture = MetalTexture(shared.shadowFallbackTexture, format: ShadowCascadeAtlas.depthFormat)
-        self.sceneDepthFallbackTexture = MetalTexture(shared.sceneDepthFallbackTexture, format: ShadowCascadeAtlas.depthFormat)
-        self.groundShadowMaskFallbackTexture = MetalTexture(shared.groundShadowMaskFallbackTexture,
-                                                            format: GroundShadowMaskPipeline.format)
+        self.shadowFallbackTexture = shared.shadowFallbackTexture
+        self.sceneDepthFallbackTexture = shared.sceneDepthFallbackTexture
+        self.groundShadowMaskFallbackTexture = shared.groundShadowMaskFallbackTexture
 
         self.baseColors = styleRuntime.baseColors
 

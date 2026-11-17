@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapGPU
 import ImmersiveMapMetal
 import Metal
 import XCTest
@@ -20,27 +21,27 @@ final class ShadowMapAttachmentTests: XCTestCase {
         return device
     }
 
+    /// Layered rendering is what fails validation and aborts the process:
+    /// the clear is one plain pass a slice, which the interface's pass, one
+    /// slice at most, cannot get wrong.
     @MainActor
     func testTheFallbackClearIsAPlainPassPerSlice() throws {
-        let device = try makeDevice()
-        let descriptor = MTLTextureDescriptor()
-        descriptor.textureType = .type2DArray
+        let device = reliefGPUDevice(try makeDevice())
+        var descriptor = GPUTextureDescriptor(format: ShadowCascadeAtlas.depthFormat, width: 1, height: 1)
+        descriptor.type = .type2DArray
         descriptor.arrayLength = ShadowCascadeAtlas.sliceCount
-        descriptor.pixelFormat = ShadowCascadeAtlas.depthPixelFormat
-        descriptor.width = 1
-        descriptor.height = 1
         descriptor.usage = [.renderTarget, .shaderRead]
-        descriptor.storageMode = .private
-        let texture = try XCTUnwrap(device.makeTexture(descriptor: descriptor))
+        let texture = try XCTUnwrap(device.makeTexture(descriptor))
 
         for slice in 0..<ShadowCascadeAtlas.sliceCount {
-            let passDescriptor = SharedRenderResources.makeShadowFallbackClearDescriptor(texture: texture, slice: slice)
+            let pass = RenderResources.fallbackClearPass(texture: texture, slice: slice)
 
-            XCTAssertEqual(passDescriptor.renderTargetArrayLength, 0,
-                           "Layered rendering is what fails validation and aborts the process")
-            XCTAssertEqual(passDescriptor.depthAttachment.slice, slice)
-            XCTAssertEqual(passDescriptor.depthAttachment.loadAction, .clear)
-            XCTAssertEqual(passDescriptor.depthAttachment.clearDepth, 1.0)
+            XCTAssertTrue(pass.colorAttachments.isEmpty)
+            let depth = try XCTUnwrap(pass.depthStencilAttachment)
+            XCTAssertEqual(depth.slice, slice)
+            XCTAssertEqual(depth.load, .clear)
+            XCTAssertEqual(depth.store, .store)
+            XCTAssertEqual(depth.clearDepth, 1.0)
         }
     }
 
@@ -53,7 +54,7 @@ final class ShadowMapAttachmentTests: XCTestCase {
             throw XCTSkip("Compiled Metal library is unavailable in this test environment")
         }
 
-        let fallback = try SharedRenderResources.shared(sampleCount: 1).shadowFallbackTexture
+        let fallback = try SharedRenderResources.shared(sampleCount: 1).shadowFallbackTexture.metalTexture
 
         XCTAssertEqual(fallback.textureType, .type2DArray)
         XCTAssertEqual(fallback.arrayLength, ShadowCascadeAtlas.sliceCount)
