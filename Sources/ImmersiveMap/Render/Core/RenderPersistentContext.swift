@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
 import ImmersiveMapMetal
 import Metal
 import MetalKit
@@ -39,31 +40,31 @@ final class RenderPersistentContext {
     /// The horizon layer's drawer; its pipeline is shared.
     let horizonRenderer: HorizonRenderer
     let flatTileOriginCalculator: FlatTileOriginCalculator
-    let extrudedDepthState: MTLDepthStencilState
-    let labelDepthState: MTLDepthStencilState
-    let globeCapDepthState: MTLDepthStencilState
+    let extrudedDepthState: any GPUDepthStencilState
+    let labelDepthState: any GPUDepthStencilState
+    let globeCapDepthState: any GPUDepthStencilState
     /// See `SharedRenderResources.skyBackdropDepthState`.
-    let skyBackdropDepthState: MTLDepthStencilState
+    let skyBackdropDepthState: any GPUDepthStencilState
     /// See `SharedRenderResources.horizonGroundDepthState`.
-    let horizonGroundDepthState: MTLDepthStencilState
-    let depthDisabledState: MTLDepthStencilState
+    let horizonGroundDepthState: any GPUDepthStencilState
+    let depthDisabledState: any GPUDepthStencilState
     /// See `SharedRenderResources.groundDepthState`.
-    let groundDepthState: MTLDepthStencilState
+    let groundDepthState: any GPUDepthStencilState
     /// The sphere's tile-priority stencil states and the flat ground's
     /// slot states; see SharedRenderResources.
-    let sphereOpaqueOwnerState: MTLDepthStencilState
-    let sphereRibbonOwnerState: MTLDepthStencilState
-    let tileStencilTestState: MTLDepthStencilState
-    let groundOwnerState: MTLDepthStencilState
-    let roadRankState: MTLDepthStencilState
-    let extrudedStencilTestState: MTLDepthStencilState
-    let placementStencilWriteState: MTLDepthStencilState
+    let sphereOpaqueOwnerState: any GPUDepthStencilState
+    let sphereRibbonOwnerState: any GPUDepthStencilState
+    let tileStencilTestState: any GPUDepthStencilState
+    let groundOwnerState: any GPUDepthStencilState
+    let roadRankState: any GPUDepthStencilState
+    let extrudedStencilTestState: any GPUDepthStencilState
+    let placementStencilWriteState: any GPUDepthStencilState
     /// See `SharedRenderResources.placementDepthWriteState`.
-    let placementDepthWriteState: MTLDepthStencilState
-    let placementStencilReliefWriteState: MTLDepthStencilState
-    let placementDepthResetState: MTLDepthStencilState
+    let placementDepthWriteState: any GPUDepthStencilState
+    let placementStencilReliefWriteState: any GPUDepthStencilState
+    let placementDepthResetState: any GPUDepthStencilState
     /// See `SharedRenderResources.sceneModelSurfaceMaskState`.
-    let sceneModelSurfaceMaskState: MTLDepthStencilState
+    let sceneModelSurfaceMaskState: any GPUDepthStencilState
     /// See `SharedRenderResources.sceneModelGroundCutStates`.
     let sceneModelGroundCutStates: SceneModelGroundCutStates
     /// Bound at the shadow-map slot when the shadow pass is skipped: receiver

@@ -46,36 +46,36 @@ final class SharedRenderResources {
     let colorPixelFormat: MTLPixelFormat = .bgra8Unorm
     // MARK: - Depth states and fallback textures
 
-    let extrudedDepthState: MTLDepthStencilState
+    let extrudedDepthState: any GPUDepthStencilState
     /// The label passes: lessEqual with the write on. The labels rasterize
     /// at the far plane and their fragments write one of two depths just
     /// short of it (TextShader.metal), fill nearer than halo, so a later
     /// glyph's halo never covers an earlier glyph's fill.
-    let labelDepthState: MTLDepthStencilState
-    let globeCapDepthState: MTLDepthStencilState
+    let labelDepthState: any GPUDepthStencilState
+    let globeCapDepthState: any GPUDepthStencilState
     /// The sky layers (the space background and the stars): drawn first on
     /// the sphere at the far plane, tested against the cleared depth without
     /// writing; the tile geometry blends over them.
-    let skyBackdropDepthState: MTLDepthStencilState
+    let skyBackdropDepthState: any GPUDepthStencilState
     /// The horizon layer's ground side: the far-plane fragment passes only
     /// where something wrote a nearer depth (the ground's rank band), never
     /// written, and not where a building or a model raised the surface mask
     /// bit, so the haze reaches the painted ground alone and the sky side
     /// keeps the rest.
-    let horizonGroundDepthState: MTLDepthStencilState
+    let horizonGroundDepthState: any GPUDepthStencilState
     /// The world-pass scene models: scene depth plus the surface mask write
     /// (see `TileSourceStencilPriority.surfaceMaskBit`).
-    let sceneModelSurfaceMaskState: MTLDepthStencilState
+    let sceneModelSurfaceMaskState: any GPUDepthStencilState
     /// The four draws of a scene model that cuts into the ground (see
     /// `TileSourceStencilPriority.groundHoleBit` and SceneModel.metal).
     let sceneModelGroundCutStates: SceneModelGroundCutStates
-    let depthDisabledState: MTLDepthStencilState
+    let depthDisabledState: any GPUDepthStencilState
     /// The flat ground: tested against the depth the opaque buildings wrote
     /// before it (strictly closer wins, so a wall base never loses to the
     /// ground plane it stands on), never written, since every ground layer
     /// is blended and lies on the same plane. Under a solid building the
     /// ground fails the test before its fragment is shaded.
-    let groundDepthState: MTLDepthStencilState
+    let groundDepthState: any GPUDepthStencilState
     /// The tile-priority stencil states (TileSourceStencilPriority), every
     /// one testing `equal` to the source's zoom, the planner's mark, and
     /// none writing the priority: the sphere's opaque ground (scene depth
@@ -83,32 +83,32 @@ final class SharedRenderResources {
     /// ribbons, the flat road edge lines and the bridge overlay of either
     /// surface. `sphereRibbonOwnerState` is the sphere's ribbon cores: the
     /// rank depth written under a strict test (`makeSphereRibbonOwnerDescriptor`).
-    let sphereOpaqueOwnerState: MTLDepthStencilState
-    let sphereRibbonOwnerState: MTLDepthStencilState
-    let tileStencilTestState: MTLDepthStencilState
+    let sphereOpaqueOwnerState: any GPUDepthStencilState
+    let sphereRibbonOwnerState: any GPUDepthStencilState
+    let tileStencilTestState: any GPUDepthStencilState
     /// The flat ground's opaque pass: the ground depth written, so a pixel
     /// is shaded once by its topmost opaque layer, under the tile-priority
     /// test.
-    let groundOwnerState: MTLDepthStencilState
+    let groundOwnerState: any GPUDepthStencilState
     /// The flat road buckets: the rank depth tested and written
     /// (`RoadRankDepth`), under the tile-priority test.
-    let roadRankState: MTLDepthStencilState
+    let roadRankState: any GPUDepthStencilState
     /// The world-pass buildings: the scene depth (lessEqual, written, for
     /// their own walls and roofs) plus the tile-priority stencil test, which
     /// replaces the old per-placement slot clip.
-    let extrudedStencilTestState: MTLDepthStencilState
+    let extrudedStencilTestState: any GPUDepthStencilState
     /// The placement prepass (`PlacementStencilRenderSubsystem`): the depth
     /// neither tested nor written, the source's zoom written into the
     /// priority bits.
-    let placementStencilWriteState: MTLDepthStencilState
+    let placementStencilWriteState: any GPUDepthStencilState
     /// The placement prepass on the relief (`PlacementStencilRenderSubsystem`):
     /// first the ground's depth, every point once, the stencil untouched,
     /// then the marks tested against that depth and writing none.
-    let placementDepthWriteState: MTLDepthStencilState
-    let placementStencilReliefWriteState: MTLDepthStencilState
+    let placementDepthWriteState: any GPUDepthStencilState
+    let placementStencilReliefWriteState: any GPUDepthStencilState
     /// The prepass's depth reset: the depth written whatever is there, the
     /// stencil untouched.
-    let placementDepthResetState: MTLDepthStencilState
+    let placementDepthResetState: any GPUDepthStencilState
     /// Bound at the shadow-map slot when the shadow pass is skipped: receiver
     /// shaders reference the texture statically and Metal validation requires a
     /// bound depth texture even though strength = 0 skips the sampling branch.
@@ -273,24 +273,24 @@ final class SharedRenderResources {
         let library: MTLLibrary
         let gpuDevice: MetalDevice
         let renderSampleCount: Int
-        let extrudedDepthState: MTLDepthStencilState
-        let labelDepthState: MTLDepthStencilState
-        let globeCapDepthState: MTLDepthStencilState
-        let skyBackdropDepthState: MTLDepthStencilState
-        let horizonGroundDepthState: MTLDepthStencilState
-        let depthDisabledState: MTLDepthStencilState
-        let groundDepthState: MTLDepthStencilState
-        let sphereOpaqueOwnerState: MTLDepthStencilState
-        let sphereRibbonOwnerState: MTLDepthStencilState
-        let tileStencilTestState: MTLDepthStencilState
-        let groundOwnerState: MTLDepthStencilState
-        let roadRankState: MTLDepthStencilState
-        let extrudedStencilTestState: MTLDepthStencilState
-        let placementStencilWriteState: MTLDepthStencilState
-        let placementDepthWriteState: MTLDepthStencilState
-        let placementStencilReliefWriteState: MTLDepthStencilState
-        let placementDepthResetState: MTLDepthStencilState
-        let sceneModelSurfaceMaskState: MTLDepthStencilState
+        let extrudedDepthState: any GPUDepthStencilState
+        let labelDepthState: any GPUDepthStencilState
+        let globeCapDepthState: any GPUDepthStencilState
+        let skyBackdropDepthState: any GPUDepthStencilState
+        let horizonGroundDepthState: any GPUDepthStencilState
+        let depthDisabledState: any GPUDepthStencilState
+        let groundDepthState: any GPUDepthStencilState
+        let sphereOpaqueOwnerState: any GPUDepthStencilState
+        let sphereRibbonOwnerState: any GPUDepthStencilState
+        let tileStencilTestState: any GPUDepthStencilState
+        let groundOwnerState: any GPUDepthStencilState
+        let roadRankState: any GPUDepthStencilState
+        let extrudedStencilTestState: any GPUDepthStencilState
+        let placementStencilWriteState: any GPUDepthStencilState
+        let placementDepthWriteState: any GPUDepthStencilState
+        let placementStencilReliefWriteState: any GPUDepthStencilState
+        let placementDepthResetState: any GPUDepthStencilState
+        let sceneModelSurfaceMaskState: any GPUDepthStencilState
         let sceneModelGroundCutStates: SceneModelGroundCutStates
         let shadowFallbackTexture: MTLTexture
         let sceneDepthFallbackTexture: MTLTexture
@@ -314,28 +314,28 @@ final class SharedRenderResources {
                      library: library,
                      gpuDevice: gpuDevice,
                      renderSampleCount: renderSampleCount,
-                     extrudedDepthState: device.makeDepthStencilState(descriptor: Self.makeSceneDepthDescriptor())!,
-                     labelDepthState: device.makeDepthStencilState(descriptor: Self.makeSceneDepthDescriptor())!,
-                     globeCapDepthState: device.makeDepthStencilState(descriptor: Self.makeGlobeCapDepthDescriptor())!,
-                     skyBackdropDepthState: device.makeDepthStencilState(descriptor: Self.makeSkyBackdropDepthDescriptor())!,
-                     horizonGroundDepthState: device.makeDepthStencilState(descriptor: Self.makeHorizonGroundDepthDescriptor())!,
-                     depthDisabledState: device.makeDepthStencilState(descriptor: Self.makeDepthDisabledDescriptor())!,
-                     groundDepthState: device.makeDepthStencilState(descriptor: Self.makeGroundDepthDescriptor())!,
-                     sphereOpaqueOwnerState: device.makeDepthStencilState(descriptor: Self.makeSphereOpaqueOwnerDescriptor())!,
-                     sphereRibbonOwnerState: device.makeDepthStencilState(descriptor: Self.makeSphereRibbonOwnerDescriptor())!,
-                     tileStencilTestState: device.makeDepthStencilState(descriptor: Self.makeTileStencilTestDescriptor())!,
-                     groundOwnerState: device.makeDepthStencilState(descriptor: Self.makeGroundOwnerDescriptor())!,
-                     roadRankState: device.makeDepthStencilState(descriptor: Self.makeRoadRankDescriptor())!,
-                     extrudedStencilTestState: device.makeDepthStencilState(descriptor: Self.makeExtrudedStencilTestDescriptor())!,
-                     placementStencilWriteState: device.makeDepthStencilState(descriptor: Self.makePlacementStencilWriteDescriptor())!,
-                     placementDepthWriteState: device.makeDepthStencilState(descriptor: Self.makePlacementDepthWriteDescriptor())!,
-                     placementStencilReliefWriteState: device.makeDepthStencilState(descriptor: Self.makePlacementStencilReliefWriteDescriptor())!,
-                     placementDepthResetState: device.makeDepthStencilState(descriptor: Self.makePlacementDepthResetDescriptor())!,
-                     sceneModelSurfaceMaskState: device.makeDepthStencilState(descriptor: Self.makeSceneModelSurfaceMaskDescriptor())!,
+                     extrudedDepthState: gpuDevice.makeDepthStencilState(Self.makeSceneDepthDescriptor())!,
+                     labelDepthState: gpuDevice.makeDepthStencilState(Self.makeSceneDepthDescriptor())!,
+                     globeCapDepthState: gpuDevice.makeDepthStencilState(Self.makeGlobeCapDepthDescriptor())!,
+                     skyBackdropDepthState: gpuDevice.makeDepthStencilState(Self.makeSkyBackdropDepthDescriptor())!,
+                     horizonGroundDepthState: gpuDevice.makeDepthStencilState(Self.makeHorizonGroundDepthDescriptor())!,
+                     depthDisabledState: gpuDevice.makeDepthStencilState(Self.makeDepthDisabledDescriptor())!,
+                     groundDepthState: gpuDevice.makeDepthStencilState(Self.makeGroundDepthDescriptor())!,
+                     sphereOpaqueOwnerState: gpuDevice.makeDepthStencilState(Self.makeSphereOpaqueOwnerDescriptor())!,
+                     sphereRibbonOwnerState: gpuDevice.makeDepthStencilState(Self.makeSphereRibbonOwnerDescriptor())!,
+                     tileStencilTestState: gpuDevice.makeDepthStencilState(Self.makeTileStencilTestDescriptor())!,
+                     groundOwnerState: gpuDevice.makeDepthStencilState(Self.makeGroundOwnerDescriptor())!,
+                     roadRankState: gpuDevice.makeDepthStencilState(Self.makeRoadRankDescriptor())!,
+                     extrudedStencilTestState: gpuDevice.makeDepthStencilState(Self.makeExtrudedStencilTestDescriptor())!,
+                     placementStencilWriteState: gpuDevice.makeDepthStencilState(Self.makePlacementStencilWriteDescriptor())!,
+                     placementDepthWriteState: gpuDevice.makeDepthStencilState(Self.makePlacementDepthWriteDescriptor())!,
+                     placementStencilReliefWriteState: gpuDevice.makeDepthStencilState(Self.makePlacementStencilReliefWriteDescriptor())!,
+                     placementDepthResetState: gpuDevice.makeDepthStencilState(Self.makePlacementDepthResetDescriptor())!,
+                     sceneModelSurfaceMaskState: gpuDevice.makeDepthStencilState(Self.makeSceneModelSurfaceMaskDescriptor())!,
                      sceneModelGroundCutStates: SceneModelGroundCutStates(
-                        holeWrite: MetalDepthStencilState(device.makeDepthStencilState(descriptor: Self.makeSceneModelGroundHoleDescriptor(raises: true))!),
-                        holeClear: MetalDepthStencilState(device.makeDepthStencilState(descriptor: Self.makeSceneModelGroundHoleDescriptor(raises: false))!),
-                        holeTest: MetalDepthStencilState(device.makeDepthStencilState(descriptor: Self.makeSceneModelGroundHoleTestDescriptor())!)),
+                        holeWrite: gpuDevice.makeDepthStencilState(Self.makeSceneModelGroundHoleDescriptor(raises: true))!,
+                        holeClear: gpuDevice.makeDepthStencilState(Self.makeSceneModelGroundHoleDescriptor(raises: false))!,
+                        holeTest: gpuDevice.makeDepthStencilState(Self.makeSceneModelGroundHoleTestDescriptor())!),
                      shadowFallbackTexture: Self.makeShadowFallbackTexture(device: device),
                      sceneDepthFallbackTexture: Self.makeSceneDepthFallbackTexture(device: device),
                      groundShadowMaskFallbackTexture: Self.makeGroundShadowMaskFallbackTexture(device: device),
@@ -629,53 +629,53 @@ final class SharedRenderResources {
 
     // MARK: - Depth descriptors
 
-    private nonisolated static func makeSceneDepthDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .lessEqual
-        descriptor.isDepthWriteEnabled = true
+    private nonisolated static func makeSceneDepthDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .lessEqual
+        descriptor.depthWriteEnabled = true
         return descriptor
     }
 
-    private nonisolated static func makeGlobeCapDepthDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .lessEqual
-        descriptor.isDepthWriteEnabled = false
+    private nonisolated static func makeGlobeCapDepthDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .lessEqual
+        descriptor.depthWriteEnabled = false
         return descriptor
     }
 
-    private nonisolated static func makeSkyBackdropDepthDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .lessEqual
-        descriptor.isDepthWriteEnabled = false
+    private nonisolated static func makeSkyBackdropDepthDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .lessEqual
+        descriptor.depthWriteEnabled = false
         return descriptor
     }
 
     /// The horizon layer's ground side: a far-plane fragment (z = 1) passes
     /// the greater test exactly where a nearer depth was written, which is
     /// every painted pixel, and fails on the cleared depth of the sky.
-    private nonisolated static func makeHorizonGroundDepthDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .greater
-        descriptor.isDepthWriteEnabled = false
+    private nonisolated static func makeHorizonGroundDepthDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .greater
+        descriptor.depthWriteEnabled = false
         // And not where a standing surface raised the mask bit: the haze is
         // the ground's, and a wall crossing the horizon row keeps its own
         // colour. Reference 0 through a mask of the bit alone.
-        let stencil = MTLStencilDescriptor()
-        stencil.stencilCompareFunction = .equal
-        stencil.stencilFailureOperation = .keep
-        stencil.depthFailureOperation = .keep
-        stencil.depthStencilPassOperation = .keep
+        var stencil = GPUStencilFaceState()
+        stencil.compare = .equal
+        stencil.stencilFailure = .keep
+        stencil.depthFailure = .keep
+        stencil.pass = .keep
         stencil.readMask = TileSourceStencilPriority.surfaceMaskBit
         stencil.writeMask = 0
-        descriptor.frontFaceStencil = stencil
-        descriptor.backFaceStencil = stencil
+        descriptor.frontStencil = stencil
+        descriptor.backStencil = stencil
         return descriptor
     }
 
-    private nonisolated static func makeGroundDepthDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .less
-        descriptor.isDepthWriteEnabled = false
+    private nonisolated static func makeGroundDepthDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .less
+        descriptor.depthWriteEnabled = false
         return descriptor
     }
 
@@ -691,12 +691,12 @@ final class SharedRenderResources {
     /// roads and the translucent fills never paint over them, whatever
     /// the depth says over a relief, where a road biased off the ground
     /// would.
-    private nonisolated static func makeTilePriorityStencil(opaque: Bool) -> MTLStencilDescriptor {
-        let stencil = MTLStencilDescriptor()
-        stencil.stencilCompareFunction = .equal
-        stencil.stencilFailureOperation = .keep
-        stencil.depthFailureOperation = .keep
-        stencil.depthStencilPassOperation = .keep
+    private nonisolated static func makeTilePriorityStencil(opaque: Bool) -> GPUStencilFaceState {
+        var stencil = GPUStencilFaceState()
+        stencil.compare = .equal
+        stencil.stencilFailure = .keep
+        stencil.depthFailure = .keep
+        stencil.pass = .keep
         stencil.readMask = opaque
             ? TileSourceStencilPriority.priorityMask
             : TileSourceStencilPriority.priorityMask | TileSourceStencilPriority.surfaceMaskBit
@@ -707,12 +707,12 @@ final class SharedRenderResources {
     /// The surface mask (TileSourceStencilPriority.surfaceMaskBit): a
     /// standing surface raises the bit wherever it passes both tests, and
     /// nothing else in the stencil changes.
-    private nonisolated static func makeSurfaceMaskWrite(compare: MTLCompareFunction) -> MTLStencilDescriptor {
-        let stencil = MTLStencilDescriptor()
-        stencil.stencilCompareFunction = compare
-        stencil.stencilFailureOperation = .keep
-        stencil.depthFailureOperation = .keep
-        stencil.depthStencilPassOperation = .replace
+    private nonisolated static func makeSurfaceMaskWrite(compare: GPUCompareFunction) -> GPUStencilFaceState {
+        var stencil = GPUStencilFaceState()
+        stencil.compare = compare
+        stencil.stencilFailure = .keep
+        stencil.depthFailure = .keep
+        stencil.pass = .replace
         stencil.readMask = TileSourceStencilPriority.priorityMask
         stencil.writeMask = TileSourceStencilPriority.surfaceMaskBit
         return stencil
@@ -720,10 +720,10 @@ final class SharedRenderResources {
 
     /// The sphere's opaque ground pass: the layer-rank depth (lessEqual,
     /// written) under the tile-priority test.
-    private nonisolated static func makeSphereOpaqueOwnerDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeSceneDepthDescriptor()
-        descriptor.frontFaceStencil = makeTilePriorityStencil(opaque: true)
-        descriptor.backFaceStencil = makeTilePriorityStencil(opaque: true)
+    private nonisolated static func makeSphereOpaqueOwnerDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeSceneDepthDescriptor()
+        descriptor.frontStencil = makeTilePriorityStencil(opaque: true)
+        descriptor.backStencil = makeTilePriorityStencil(opaque: true)
         return descriptor
     }
 
@@ -733,12 +733,12 @@ final class SharedRenderResources {
     /// of them, and a second piece of the same stroke, at the same rank,
     /// is rejected where the first already painted. Under the tile-priority
     /// test with the surface mask, as every non-owning pass.
-    private nonisolated static func makeSphereRibbonOwnerDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .less
-        descriptor.isDepthWriteEnabled = true
-        descriptor.frontFaceStencil = makeTilePriorityStencil(opaque: false)
-        descriptor.backFaceStencil = makeTilePriorityStencil(opaque: false)
+    private nonisolated static func makeSphereRibbonOwnerDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .less
+        descriptor.depthWriteEnabled = true
+        descriptor.frontStencil = makeTilePriorityStencil(opaque: false)
+        descriptor.backStencil = makeTilePriorityStencil(opaque: false)
         return descriptor
     }
 
@@ -750,12 +750,12 @@ final class SharedRenderResources {
     /// lessEqual for a source's own layers, which stack at the band's
     /// steps, and a vector tile over a raster of the same source (its
     /// lines) lies nearer by half a step (TileRaster.metal).
-    private nonisolated static func makeGroundOwnerDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeGroundDepthDescriptor()
-        descriptor.depthCompareFunction = .lessEqual
-        descriptor.isDepthWriteEnabled = true
-        descriptor.frontFaceStencil = makeTilePriorityStencil(opaque: true)
-        descriptor.backFaceStencil = makeTilePriorityStencil(opaque: true)
+    private nonisolated static func makeGroundOwnerDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeGroundDepthDescriptor()
+        descriptor.depthCompare = .lessEqual
+        descriptor.depthWriteEnabled = true
+        descriptor.frontStencil = makeTilePriorityStencil(opaque: true)
+        descriptor.backStencil = makeTilePriorityStencil(opaque: true)
         return descriptor
     }
 
@@ -765,21 +765,21 @@ final class SharedRenderResources {
     /// nearer than what is there, so an opaque road is shaded once per
     /// pixel by its highest rank, and a road that blends lands once per
     /// pixel of a rank, an equal rank failing.
-    private nonisolated static func makeRoadRankDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeGroundDepthDescriptor()
-        descriptor.isDepthWriteEnabled = true
-        descriptor.frontFaceStencil = makeTilePriorityStencil(opaque: false)
-        descriptor.backFaceStencil = makeTilePriorityStencil(opaque: false)
+    private nonisolated static func makeRoadRankDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeGroundDepthDescriptor()
+        descriptor.depthWriteEnabled = true
+        descriptor.frontStencil = makeTilePriorityStencil(opaque: false)
+        descriptor.backStencil = makeTilePriorityStencil(opaque: false)
         return descriptor
     }
 
     /// The non-owning tile passes of either surface (translucent fills,
     /// ribbons, the flat road edge lines and the bridge overlay): the
     /// ground depth test plus the tile-priority test, no writes.
-    private nonisolated static func makeTileStencilTestDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeGroundDepthDescriptor()
-        descriptor.frontFaceStencil = makeTilePriorityStencil(opaque: false)
-        descriptor.backFaceStencil = makeTilePriorityStencil(opaque: false)
+    private nonisolated static func makeTileStencilTestDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeGroundDepthDescriptor()
+        descriptor.frontStencil = makeTilePriorityStencil(opaque: false)
+        descriptor.backStencil = makeTilePriorityStencil(opaque: false)
         return descriptor
     }
 
@@ -787,49 +787,49 @@ final class SharedRenderResources {
     /// passes and is never written, so a placement's mark lands on every
     /// pixel of its square, through the priority bits alone
     /// (`TileSourceStencilPriority`).
-    private nonisolated static func makePlacementStencilWriteDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeDepthDisabledDescriptor()
-        descriptor.frontFaceStencil = makePlacementMarkStencil()
-        descriptor.backFaceStencil = makePlacementMarkStencil()
+    private nonisolated static func makePlacementStencilWriteDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeDepthDisabledDescriptor()
+        descriptor.frontStencil = makePlacementMarkStencil()
+        descriptor.backStencil = makePlacementMarkStencil()
         return descriptor
     }
 
     /// The relief's first prepass: the ground's depth, every point of it
     /// once, the nearer of two surfaces kept, the stencil untouched.
-    private nonisolated static func makePlacementDepthWriteDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .lessEqual
-        descriptor.isDepthWriteEnabled = true
+    private nonisolated static func makePlacementDepthWriteDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .lessEqual
+        descriptor.depthWriteEnabled = true
         return descriptor
     }
 
     /// The relief's marks: a placement's mark lands where its ground is
     /// the one in front, at or before the ground's depth, and the depth
     /// is left as it is.
-    private nonisolated static func makePlacementStencilReliefWriteDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .lessEqual
-        descriptor.isDepthWriteEnabled = false
-        descriptor.frontFaceStencil = makePlacementMarkStencil()
-        descriptor.backFaceStencil = makePlacementMarkStencil()
+    private nonisolated static func makePlacementStencilReliefWriteDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .lessEqual
+        descriptor.depthWriteEnabled = false
+        descriptor.frontStencil = makePlacementMarkStencil()
+        descriptor.backStencil = makePlacementMarkStencil()
         return descriptor
     }
 
     /// The relief's depth reset: the far plane written over every pixel,
     /// the stencil untouched, so the ground passes meet the cleared depth.
-    private nonisolated static func makePlacementDepthResetDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .always
-        descriptor.isDepthWriteEnabled = true
+    private nonisolated static func makePlacementDepthResetDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .always
+        descriptor.depthWriteEnabled = true
         return descriptor
     }
 
-    private nonisolated static func makePlacementMarkStencil() -> MTLStencilDescriptor {
-        let stencil = MTLStencilDescriptor()
-        stencil.stencilCompareFunction = .always
-        stencil.stencilFailureOperation = .keep
-        stencil.depthFailureOperation = .keep
-        stencil.depthStencilPassOperation = .replace
+    private nonisolated static func makePlacementMarkStencil() -> GPUStencilFaceState {
+        var stencil = GPUStencilFaceState()
+        stencil.compare = .always
+        stencil.stencilFailure = .keep
+        stencil.depthFailure = .keep
+        stencil.pass = .replace
         stencil.readMask = 0
         stencil.writeMask = TileSourceStencilPriority.priorityMask
         return stencil
@@ -842,38 +842,38 @@ final class SharedRenderResources {
     /// wall rises into the pixels of the ground behind it, where that test
     /// would compare it against the wrong tile anyway. The surface mask bit
     /// is still raised where a building lands, for the horizon.
-    private nonisolated static func makeExtrudedStencilTestDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeSceneDepthDescriptor()
-        descriptor.frontFaceStencil = makeSurfaceMaskWrite(compare: .always)
-        descriptor.backFaceStencil = makeSurfaceMaskWrite(compare: .always)
+    private nonisolated static func makeExtrudedStencilTestDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeSceneDepthDescriptor()
+        descriptor.frontStencil = makeSurfaceMaskWrite(compare: .always)
+        descriptor.backStencil = makeSurfaceMaskWrite(compare: .always)
         return descriptor
     }
 
     /// The world-pass scene models: scene depth, no priority test (a model
     /// belongs to no tile), and the surface mask bit raised where it lands.
-    private nonisolated static func makeSceneModelSurfaceMaskDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeSceneDepthDescriptor()
-        descriptor.frontFaceStencil = makeSurfaceMaskWrite(compare: .always)
-        descriptor.backFaceStencil = makeSurfaceMaskWrite(compare: .always)
+    private nonisolated static func makeSceneModelSurfaceMaskDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeSceneDepthDescriptor()
+        descriptor.frontStencil = makeSurfaceMaskWrite(compare: .always)
+        descriptor.backStencil = makeSurfaceMaskWrite(compare: .always)
         return descriptor
     }
 
     /// The ground hole's footprint draws (SceneModel.metal): depth neither
     /// tested nor written, the ground hole bit raised on every pixel of the
     /// flattened outline, or lowered again after the model.
-    private nonisolated static func makeSceneModelGroundHoleDescriptor(raises: Bool) -> MTLDepthStencilDescriptor {
-        let descriptor = makeDepthDisabledDescriptor()
-        let stencil = MTLStencilDescriptor()
-        stencil.stencilCompareFunction = .always
-        stencil.stencilFailureOperation = .keep
-        stencil.depthFailureOperation = .keep
+    private nonisolated static func makeSceneModelGroundHoleDescriptor(raises: Bool) -> GPUDepthStencilDescriptor {
+        var descriptor = makeDepthDisabledDescriptor()
+        var stencil = GPUStencilFaceState()
+        stencil.compare = .always
+        stencil.stencilFailure = .keep
+        stencil.depthFailure = .keep
         // Replace writes the reference, which is the bit, through the mask;
         // zero clears the bit through the same mask.
-        stencil.depthStencilPassOperation = raises ? .replace : .zero
+        stencil.pass = raises ? .replace : .zero
         stencil.readMask = 0
         stencil.writeMask = TileSourceStencilPriority.groundHoleBit
-        descriptor.frontFaceStencil = stencil
-        descriptor.backFaceStencil = stencil
+        descriptor.frontStencil = stencil
+        descriptor.backStencil = stencil
         return descriptor
     }
 
@@ -881,19 +881,19 @@ final class SharedRenderResources {
     /// bit raised where the model lands, and the ground hole bit tested
     /// alone, equal to the reference's bit, which the drawer sets raised for
     /// the draw inside the hole and clear for the draw outside it.
-    private nonisolated static func makeSceneModelGroundHoleTestDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = makeSceneDepthDescriptor()
-        let stencil = makeSurfaceMaskWrite(compare: .equal)
+    private nonisolated static func makeSceneModelGroundHoleTestDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = makeSceneDepthDescriptor()
+        var stencil = makeSurfaceMaskWrite(compare: .equal)
         stencil.readMask = TileSourceStencilPriority.groundHoleBit
-        descriptor.frontFaceStencil = stencil
-        descriptor.backFaceStencil = stencil
+        descriptor.frontStencil = stencil
+        descriptor.backStencil = stencil
         return descriptor
     }
 
-    private nonisolated static func makeDepthDisabledDescriptor() -> MTLDepthStencilDescriptor {
-        let descriptor = MTLDepthStencilDescriptor()
-        descriptor.depthCompareFunction = .always
-        descriptor.isDepthWriteEnabled = false
+    private nonisolated static func makeDepthDisabledDescriptor() -> GPUDepthStencilDescriptor {
+        var descriptor = GPUDepthStencilDescriptor()
+        descriptor.depthCompare = .always
+        descriptor.depthWriteEnabled = false
         return descriptor
     }
 }

@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
 import ImmersiveMapMetal
 import Metal
 
@@ -24,42 +25,42 @@ enum RenderGraphFactory {
                                                            debugOverlayControls: debugOverlayControls)
         let baseLabelDrawSubsystem = BaseLabelDrawSubsystem(textRenderer: context.textRenderer,
                                                             poiSpriteAtlas: context.poiSpriteAtlas,
-                                                            labelDepthState: context.labelDepthState,
-                                                            depthDisabledState: context.depthDisabledState,
+                                                            labelDepthState: context.labelDepthState.metalState,
+                                                            depthDisabledState: context.depthDisabledState.metalState,
                                                             metalDevice: context.metalContext.device)
         let roadLabelDrawSubsystem = RoadLabelDrawSubsystem(textRenderer: context.textRenderer,
-                                                            labelDepthState: context.labelDepthState,
-                                                            depthDisabledState: context.depthDisabledState,
+                                                            labelDepthState: context.labelDepthState.metalState,
+                                                            depthDisabledState: context.depthDisabledState.metalState,
                                                             fallbackDepthTexture: context.sceneDepthFallbackTexture,
                                                             hidesBehindBuildingsFromZoom: settings.labels.road.hidesBehindBuildingsFromZoom,
                                                             metalDevice: context.metalContext.device)
         let avatarSubsystem = AvatarRenderSubsystem(avatarsRenderer: context.avatarsRenderer,
                                                     avatarSource: context.avatarSource,
-                                                    depthDisabledState: context.depthDisabledState)
+                                                    depthDisabledState: context.depthDisabledState.metalState)
         let markerSubsystem = MarkerRenderSubsystem(markerSource: context.markerSource)
         let sceneModelSubsystem = SceneModelRenderSubsystem(sceneModelSource: context.sceneModelSource,
                                                             meshStore: context.sceneModelMeshStore,
                                                             pipeline: context.sceneModelPipeline,
-                                                            extrudedDepthState: MetalDepthStencilState(context.extrudedDepthState),
-                                                            surfaceMaskState: MetalDepthStencilState(context.sceneModelSurfaceMaskState),
+                                                            extrudedDepthState: context.extrudedDepthState,
+                                                            surfaceMaskState: context.sceneModelSurfaceMaskState,
                                                             groundCutStates: context.sceneModelGroundCutStates,
-                                                            depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                            depthDisabledState: context.depthDisabledState,
                                                             shadowMapTextureProvider: shadowMapTextureProvider,
                                                             shadowFallbackTexture: context.shadowFallbackTexture)
         let modelTileSubsystem = ModelTileRenderSubsystem(store: context.modelTileStore,
                                                           pipeline: context.modelTilePipeline,
-                                                          extrudedDepthState: MetalDepthStencilState(context.extrudedDepthState),
-                                                          surfaceMaskState: MetalDepthStencilState(context.sceneModelSurfaceMaskState),
-                                                          depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                          extrudedDepthState: context.extrudedDepthState,
+                                                          surfaceMaskState: context.sceneModelSurfaceMaskState,
+                                                          depthDisabledState: context.depthDisabledState,
                                                           shadowMapTextureProvider: shadowMapTextureProvider,
                                                           shadowFallbackTexture: context.shadowFallbackTexture,
                                                           minimumZoom: settings.modelArchive.minimumZoom,
                                                           riseSeconds: settings.scene.extrusion.riseSeconds)
         let flatMapSurfaceSubsystem = FlatMapSurfaceRenderSubsystem(tilePipeline: context.tilePipeline,
-                                                                    groundOwnerState: MetalDepthStencilState(context.groundOwnerState),
-                                                                    tileStencilTestState: MetalDepthStencilState(context.tileStencilTestState),
-                                                                    roadRankState: MetalDepthStencilState(context.roadRankState),
-                                                                    depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                                    groundOwnerState: context.groundOwnerState,
+                                                                    tileStencilTestState: context.tileStencilTestState,
+                                                                    roadRankState: context.roadRankState,
+                                                                    depthDisabledState: context.depthDisabledState,
                                                                     debugOverlayControls: debugOverlayControls,
                                                                     groundShadowMaskTextureProvider: groundShadowMaskTextureProvider,
                                                                     groundShadowMaskFallbackTexture: context.groundShadowMaskFallbackTexture,
@@ -67,22 +68,22 @@ enum RenderGraphFactory {
                                                                     shadowFallbackTexture: context.shadowFallbackTexture,
                                                                     groundFlatteningFromTileZoom: settings.tiles.resolvedGroundFlatteningFromTileZoom)
         let groundShadowMaskSubsystem = GroundShadowMaskRenderSubsystem(pipeline: context.groundShadowMaskPipeline,
-                                                                        depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                                        depthDisabledState: context.depthDisabledState,
                                                                         shadowMapTextureProvider: shadowMapTextureProvider)
         let placementStencilSubsystem = PlacementStencilRenderSubsystem(device: context.gpuDevice,
                                                                         pipeline: context.placementStencilPipeline,
-                                                                        placementStencilWriteState: MetalDepthStencilState(context.placementStencilWriteState),
-                                                                        placementDepthWriteState: MetalDepthStencilState(context.placementDepthWriteState),
-                                                                        placementStencilReliefWriteState: MetalDepthStencilState(context.placementStencilReliefWriteState),
-                                                                        placementDepthResetState: MetalDepthStencilState(context.placementDepthResetState),
-                                                                        depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                                        placementStencilWriteState: context.placementStencilWriteState,
+                                                                        placementDepthWriteState: context.placementDepthWriteState,
+                                                                        placementStencilReliefWriteState: context.placementStencilReliefWriteState,
+                                                                        placementDepthResetState: context.placementDepthResetState,
+                                                                        depthDisabledState: context.depthDisabledState,
                                                                         groundFlattening: settings.tiles.groundFlattening)
         let rasterTileSubsystem = RasterTileRenderSubsystem(device: context.gpuDevice,
                                                             pipeline: context.rasterTilePipeline,
                                                             settings: settings.tiles.rasterization,
-                                                            groundOwnerState: MetalDepthStencilState(context.groundOwnerState),
-                                                            sphereOpaqueOwnerState: MetalDepthStencilState(context.sphereOpaqueOwnerState),
-                                                            depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                            groundOwnerState: context.groundOwnerState,
+                                                            sphereOpaqueOwnerState: context.sphereOpaqueOwnerState,
+                                                            depthDisabledState: context.depthDisabledState,
                                                             debugOverlayControls: debugOverlayControls,
                                                             groundShadowMaskTextureProvider: groundShadowMaskTextureProvider,
                                                             groundShadowMaskFallbackTexture: context.groundShadowMaskFallbackTexture,
@@ -91,9 +92,9 @@ enum RenderGraphFactory {
                                                             groundFlattening: settings.tiles.groundFlattening)
         let buildingExtrusionSubsystem = BuildingExtrusionRenderSubsystem(device: context.gpuDevice,
                                                                           extrudedTilePipeline: context.extrudedTilePipeline,
-                                                                          extrudedDepthState: MetalDepthStencilState(context.extrudedDepthState),
-                                                                          extrudedStencilTestState: MetalDepthStencilState(context.extrudedStencilTestState),
-                                                                          depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                                          extrudedDepthState: context.extrudedDepthState,
+                                                                          extrudedStencilTestState: context.extrudedStencilTestState,
+                                                                          depthDisabledState: context.depthDisabledState,
                                                                           shadowMapTextureProvider: shadowMapTextureProvider,
                                                                           shadowFallbackTexture: context.shadowFallbackTexture,
                                                                           extrusion: settings.scene.extrusion,
@@ -101,40 +102,40 @@ enum RenderGraphFactory {
         let treeSubsystem = TreeRenderSubsystem(modelStore: context.treeModelStore,
                                                 pipeline: context.treePipeline,
                                                 palette: context.treePalette,
-                                                stencilTestState: MetalDepthStencilState(context.extrudedStencilTestState),
-                                                groundDepthState: MetalDepthStencilState(context.groundDepthState),
-                                                depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
+                                                stencilTestState: context.extrudedStencilTestState,
+                                                groundDepthState: context.groundDepthState,
+                                                depthDisabledState: context.depthDisabledState,
                                                 settings: settings.scene.trees,
                                                 riseSeconds: settings.scene.extrusion.riseSeconds)
         let layerSubsystem = LayerRenderSubsystem(source: context.layerSource,
                                                   store: context.layerMeshStore,
                                                   pipeline: context.layerPipeline,
-                                                  depthDisabledState: MetalDepthStencilState(context.depthDisabledState))
+                                                  depthDisabledState: context.depthDisabledState)
         let reliefShadowCasterSubsystem = GroundReliefShadowCasterSubsystem(device: context.gpuDevice,
                                                                             pipeline: context.rasterTilePipeline,
-                                                                            depthState: MetalDepthStencilState(context.extrudedDepthState),
+                                                                            depthState: context.extrudedDepthState,
                                                                             groundFlattening: settings.tiles.groundFlattening)
         let starfieldSubsystem = StarfieldRenderSubsystem(starfieldRenderer: context.starfieldRenderer,
-                                                          skyBackdropDepthState: context.skyBackdropDepthState,
-                                                          depthDisabledState: context.depthDisabledState)
+                                                          skyBackdropDepthState: context.skyBackdropDepthState.metalState,
+                                                          depthDisabledState: context.depthDisabledState.metalState)
         let horizonSubsystem = HorizonRenderSubsystem(horizonRenderer: context.horizonRenderer,
-                                                      skyDepthState: context.skyBackdropDepthState,
-                                                      groundDepthState: context.horizonGroundDepthState,
-                                                      depthDisabledState: context.depthDisabledState)
+                                                      skyDepthState: context.skyBackdropDepthState.metalState,
+                                                      groundDepthState: context.horizonGroundDepthState.metalState,
+                                                      depthDisabledState: context.depthDisabledState.metalState)
         let postProcessingSubsystem = PostProcessingRenderSubsystem(fxaaPipeline: context.fxaaPipeline,
                                                                     inputTextureProvider: postProcessingInputTextureProvider)
         let globeVectorSurfaceSubsystem = GlobeVectorSurfaceRenderSubsystem(pipeline: context.globeVectorSurfacePipeline,
-                                                                            depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
-                                                                            opaqueDepthState: MetalDepthStencilState(context.sphereOpaqueOwnerState),
-                                                                            ribbonOwnerDepthState: MetalDepthStencilState(context.sphereRibbonOwnerState),
-                                                                            translucentDepthState: MetalDepthStencilState(context.tileStencilTestState),
+                                                                            depthDisabledState: context.depthDisabledState,
+                                                                            opaqueDepthState: context.sphereOpaqueOwnerState,
+                                                                            ribbonOwnerDepthState: context.sphereRibbonOwnerState,
+                                                                            translucentDepthState: context.tileStencilTestState,
                                                                             debugOverlayControls: debugOverlayControls)
         let surfaceLabelSubsystem = SurfaceLabelRenderSubsystem(pipeline: context.surfaceLabelPipeline,
                                                                 textRenderer: context.textRenderer,
-                                                                depthState: MetalDepthStencilState(context.groundDepthState),
-                                                                depthDisabledState: MetalDepthStencilState(context.depthDisabledState))
-        let globeCapSubsystem = GlobeCapRenderSubsystem(globeCapDepthState: context.globeCapDepthState,
-                                                        depthDisabledState: context.depthDisabledState,
+                                                                depthState: context.groundDepthState,
+                                                                depthDisabledState: context.depthDisabledState)
+        let globeCapSubsystem = GlobeCapRenderSubsystem(globeCapDepthState: context.globeCapDepthState.metalState,
+                                                        depthDisabledState: context.depthDisabledState.metalState,
                                                         globeCapRenderer: context.globeCapRenderer)
         let debugSubsystem = DebugOverlayRenderSubsystem(polygonPipeline: context.polygonPipeline,
                                                          debugOverlayRenderer: context.debugOverlayRenderer,
