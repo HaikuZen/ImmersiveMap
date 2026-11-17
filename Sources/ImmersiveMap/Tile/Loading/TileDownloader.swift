@@ -131,11 +131,12 @@ class TileDownloader: @unchecked Sendable {
                                        requestHeaders: network.tileRequestHeaders,
                                        session: URLSession(configuration: configuration))
         #else
-        // No `URLSession` (WebAssembly): the host's fetcher comes with the
-        // browser host, until then the tiles do not arrive.
+        // No `URLSession` (WebAssembly): the host's fetcher, the page's
+        // `fetch` in a browser.
         archive = PMTilesArchiveClient(archiveURL: network.tileArchiveURL,
                                        requestHeaders: network.tileRequestHeaders,
-                                       fetchRange: PMTilesArchiveClient.noNetwork)
+                                       fetchRange: PMTilesArchiveClient.hostFetcher(archiveURL: network.tileArchiveURL,
+                                                                                    requestHeaders: network.tileRequestHeaders))
         #endif
     }
 

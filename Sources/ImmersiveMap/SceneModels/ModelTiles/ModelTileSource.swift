@@ -85,11 +85,12 @@ final class ModelTileSource: @unchecked Sendable {
                   diskCacheSizeInBytes: settings.diskCacheSizeInBytes,
                   clearsDiskCache: clearsDiskCache)
         #else
-        // No `URLSession` (WebAssembly): until the host's fetcher, nothing.
+        // No `URLSession` (WebAssembly): the host's fetcher.
         self.init(archive: PMTilesArchiveClient(archiveURL: archiveURL,
                                                 requestHeaders: settings.requestHeaders,
                                                 tileType: .unknown,
-                                                fetchRange: PMTilesArchiveClient.noNetwork),
+                                                fetchRange: PMTilesArchiveClient.hostFetcher(archiveURL: archiveURL,
+                                                                                             requestHeaders: settings.requestHeaders)),
                   diskCacheSizeInBytes: settings.diskCacheSizeInBytes,
                   clearsDiskCache: clearsDiskCache)
         #endif

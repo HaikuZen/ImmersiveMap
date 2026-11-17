@@ -100,10 +100,12 @@ final class OverviewTileSource: @unchecked Sendable {
                                        requestHeaders: [:],
                                        session: .shared)
         #else
-        // No `URLSession` (WebAssembly): until the host's fetcher, nothing.
+        // No `URLSession` (WebAssembly): the file read whole, or the host's
+        // fetcher.
         archive = PMTilesArchiveClient(archiveURL: archiveURL,
                                        requestHeaders: [:],
-                                       fetchRange: PMTilesArchiveClient.noNetwork)
+                                       fetchRange: PMTilesArchiveClient.hostFetcher(archiveURL: archiveURL,
+                                                                                    requestHeaders: [:]))
         #endif
     }
 

@@ -216,13 +216,18 @@ package final class WebGPUDevice: GPUDevice, @unchecked Sendable {
     /// Hands the sink the pending resource commands, the uploads of every
     /// buffer written since, and the command buffer's commands.
     func commit(id: UInt32, commands: WebGPUCommandWriter, completedHandlers: [@Sendable () -> Void]) {
+        // The written buffers leave the lock with this, and are let go of
+        // after it: the last reference to a buffer the engine has dropped
+        // may be the one held here, and its `deinit` takes the lock
+        // (`release`), which on a page's one thread never comes free.
+        var uploaded: [UInt32: WebGPUBuffer] = [:]
         let stream = state.withLock { state -> WebGPUCommandWriter in
             var stream = state.pending
             state.pending.removeAll()
-            for handle in state.dirty.keys.sorted() {
-                Self.writeUpload(of: state.dirty[handle]!, into: &stream)
+            swap(&uploaded, &state.dirty)
+            for handle in uploaded.keys.sorted() {
+                Self.writeUpload(of: uploaded[handle]!, into: &stream)
             }
-            state.dirty.removeAll()
             stream.append(commands)
             stream.command(.submit)
             stream.word(id)

@@ -221,6 +221,15 @@ if portable {
             swiftSettings: [.enableExperimentalFeature("Extern", .when(platforms: [.wasi]))],
             linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor"], .when(platforms: [.wasi]))]
         ),
+        // The map in a browser (Web/map/): the engine over the WebGPU
+        // backend, the page's host and the page's `fetch`. A WebAssembly
+        // reactor like the probe. Builds empty off WebAssembly.
+        .executableTarget(
+            name: "ImmersiveMapWebMap",
+            dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapWebGPU", "ImmersiveMapWebGPUBrowser", "PMTiles", "PortableFoundation"],
+            swiftSettings: [.enableExperimentalFeature("Extern", .when(platforms: [.wasi]))],
+            linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor"], .when(platforms: [.wasi]))]
+        ),
         // The stand-in for Apple's `simd` module, under its name, so the
         // sources that write `import simd` compile unchanged.
         .target(

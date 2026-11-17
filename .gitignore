@@ -40,3 +40,6 @@ DerivedData/
 # The browser probe as Web/probe/build.sh builds it.
 /Web/probe/build/
 /.build-wasm-probe/
+# The map page as Web/map/build.sh builds it.
+/Web/map/build/
+/.build-wasm-map/

@@ -1,0 +1,124 @@
+<!doctype html>
+<!-- Copyright (c) 2025-2026 ImmersiveMap contributors. SPDX-License-Identifier: MIT -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ImmersiveMap in a browser</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05080f; color: #cdd6e4; font: 13px/1.4 system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  #status { position: fixed; left: 12px; bottom: 12px; right: 12px; white-space: pre-wrap; pointer-events: none; }
+  #status.error { color: #ff8a80; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="status">Loading…</div>
+<script type="module">
+// The engine in a browser: the map drawn by the Swift module through the
+// page's WebGPU host, its tiles read with the page's fetch. Drag to move,
+// the wheel to zoom, a right drag or a shift drag to turn and tilt.
+// `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA off.
+// Built and served by build.sh.
+import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
+import { startMap, fetchResources } from './map.mjs';
+
+const status = document.getElementById('status');
+const say = (text, isError = false) => { status.textContent = text; status.className = isError ? 'error' : ''; };
+
+try {
+    if (!navigator.gpu) throw new Error('This browser has no WebGPU.');
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error('No WebGPU adapter.');
+    const device = await adapter.requestDevice({ requiredFeatures: chooseFeatures(adapter) });
+    const errors = [];
+    device.addEventListener('uncapturederror', (event) => {
+        errors.push(event.error.message);
+        say(`WebGPU error:\n${errors.slice(-3).join('\n')}`, true);
+    });
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('webgpu');
+    // The engine's pipelines draw bgra8unorm, which every canvas takes.
+    context.configure({ device, format: 'bgra8unorm', alphaMode: 'opaque' });
+
+    say('Loading the module, the shaders and the resources…');
+    const [shaders, module, resources] = await Promise.all([
+        fetch('build/shaders.json').then((response) => response.json()),
+        WebAssembly.compileStreaming(fetch('build/ImmersiveMapWebMap.wasm')),
+        fetchResources('build/resources'),
+    ]);
+    const query = new URLSearchParams(location.search);
+    const notes = [];
+    const map = await startMap({
+        device, module, shaders, resources,
+        canvasTexture: () => context.getCurrentTexture(),
+        archiveURL: query.get('archive') ?? '',
+        multisample: query.get('msaa') !== '0',
+        warn: (message) => notes.push(message),
+    });
+
+    // Input, in points (CSS pixels).
+    let drag = null;
+    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+    canvas.addEventListener('pointerdown', (event) => {
+        canvas.setPointerCapture(event.pointerId);
+        drag = { x: event.clientX, y: event.clientY, orbit: event.button === 2 || event.shiftKey };
+    });
+    canvas.addEventListener('pointermove', (event) => {
+        if (!drag) return;
+        const dx = event.clientX - drag.x;
+        const dy = event.clientY - drag.y;
+        drag.x = event.clientX;
+        drag.y = event.clientY;
+        if (drag.orbit) {
+            map.orbit((dx / canvas.clientWidth) * Math.PI, (dy / canvas.clientHeight) * Math.PI * 0.5);
+        } else {
+            map.pan(dx, dy);
+        }
+    });
+    const endDrag = () => {
+        if (drag && !drag.orbit) map.pan(0, 0, true);
+        drag = null;
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        // A wheel notch (100 pixels) is a fifth of a level.
+        const pixels = event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY;
+        map.zoom(-pixels / 500);
+    }, { passive: false });
+
+    // The engine only logs a failed download, so a host that refuses
+    // the page's origin (CORS) would leave an empty globe and no word.
+    const downloadStatus = () => {
+        const { answered, failed, firstFailure } = map.downloads;
+        if (failed === 0) return '';
+        return `${failed} of ${answered + failed} tile archive requests failed, the first with: ${firstFailure}\n`
+            + 'If the archive is on another site, its host must allow this page\'s origin (CORS), '
+            + 'or serve the archive from this site and open the page with ?archive=/<file>.pmtiles.';
+    };
+
+    function frame() {
+        const scale = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.round(canvas.clientWidth * scale));
+        const height = Math.max(1, Math.round(canvas.clientHeight * scale));
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+        map.frame(width, height, scale);
+        if (errors.length === 0) say([downloadStatus(), ...notes.slice(-3)].filter(Boolean).join('\n'));
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+} catch (error) {
+    // Chrome's stack starts with the message, Firefox's leaves it out.
+    const stack = error.stack ?? '';
+    say(stack.includes(String(error)) ? stack : `${error}\n${stack}`.trim(), true);
+}
+</script>
+</body>
+</html>

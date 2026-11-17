@@ -110,12 +110,69 @@ package final class PMTilesArchiveClient: @unchecked Sendable {
     }
 
     #else
-    /// What a client fetches with where there is no `URLSession` until the
-    /// host gives it a fetcher of its own (the browser's `fetch`): every
-    /// request fails, as with no network.
+    /// What a client fetches with where there is no `URLSession` and the
+    /// host gave no fetcher of its own: every request fails, as with no
+    /// network.
     package struct NoNetwork: Error {}
 
     package static let noNetwork: RangeFetcher = { _, _ in throw NoNetwork() }
+
+    /// Makes the fetcher of an archive over HTTP where there is no
+    /// `URLSession` (the browser's `fetch`, through the page). The host sets
+    /// it once, before it makes the map, and the clients made after that read
+    /// through it. Nil: no network.
+    nonisolated(unsafe) package static var hostFetcherMaker: (@Sendable (_ archiveURL: URL, _ requestHeaders: [String: String]) -> RangeFetcher)?
+
+    /// What a client reads its archive with where there is no `URLSession`:
+    /// a file on disk directly, anything else through the host's fetcher.
+    package static func hostFetcher(archiveURL: URL, requestHeaders: [String: String]) -> RangeFetcher {
+        if archiveURL.isFileURL {
+            return makeWholeFileFetcher(archiveURL: archiveURL)
+        }
+        return hostFetcherMaker?(archiveURL, requestHeaders) ?? noNetwork
+    }
+
+    /// The file fetcher without `FileHandle`, which FoundationEssentials
+    /// lacks: the file is read whole on the first request and kept, and each
+    /// range is answered from it, as `makeFileFetcher` answers (a 206 with
+    /// no ETag, a range past the end short). Meant for the small archives a
+    /// program ships with it (the overview's).
+    private static func makeWholeFileFetcher(archiveURL: URL) -> RangeFetcher {
+        let contents = WholeFile(url: archiveURL)
+        return { range, _ in
+            let data = try contents.data()
+            let lower = Int(min(range.lowerBound, UInt64(data.count)))
+            let upper = Int(min(range.upperBound, UInt64(data.count)))
+            return RangeResponse(statusCode: 206, body: data.subdata(in: lower ..< upper))
+        }
+    }
+
+    /// The file's bytes, read on first use. `@unchecked Sendable`: the one
+    /// mutable field is behind the lock.
+    private final class WholeFile: @unchecked Sendable {
+        private let url: URL
+        private let lock = NSLock()
+        private var contents: Data?
+
+        init(url: URL) {
+            self.url = url
+        }
+
+        func data() throws -> Data {
+            lock.lock()
+            defer { lock.unlock() }
+            if let contents {
+                return contents
+            }
+            do {
+                let read = try Data(contentsOf: url)
+                contents = read
+                return read
+            } catch {
+                throw Failure.network(String(describing: error))
+            }
+        }
+    }
     #endif
 
     /// The test seam, and the way in for a platform without `URLSession`: a
