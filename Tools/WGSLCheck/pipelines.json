@@ -918,6 +918,175 @@
     },
     {
       "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth16unorm",
+      "label" : "SceneModelCasters",
+      "sampleCount" : 1,
+      "targets" : [
+
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "SceneModelGroundFootprint",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelGroundFootprintVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "sceneModelFragmentShader"
+      },
+      "label" : "SceneModels",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "sceneModelFragmentShader"
+      },
+      "label" : "SceneModelsClippedBelowGround",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelVertexShader"
+      }
+    },
+    {
+      "buffers" : [
 
       ],
       "depthStencilFormat" : "depth32float-stencil8",

@@ -208,7 +208,12 @@ final class RenderPersistentContext {
                                              reliefSubdivisionStep: { parseOptions.reliefSubdivisionStep(tileZoom: $0) })
 
         self.sceneModelSource = sceneModelSource
-        self.sceneModelMeshStore = SceneModelMeshStore(device: metal.device)
+        // Metal's device is safe to use from any thread, the loads' queue
+        // included.
+        nonisolated(unsafe) let modelDevice = metal.device
+        self.sceneModelMeshStore = SceneModelMeshStore(loadAsset: { url in
+            try SceneModelAssetLoader.load(url: url, device: modelDevice)
+        })
         self.sceneModelMeshStore.eventSink = eventSink
         self.sceneModelPipeline = shared.sceneModelPipeline
         self.modelTilePipeline = shared.modelTilePipeline

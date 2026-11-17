@@ -9,7 +9,8 @@ import simd
 /// through any backend: a sky of stars (instanced quads on a device without
 /// point sprites), the globe's polar caps turning over a square of
 /// flat ground with its fills and its line ribbons, a building standing
-/// on it (an extruded box, through the shadow cascades), a label painted
+/// on it (an extruded box, through the shadow cascades), a scene model
+/// beside it (a box of the models' own layout), a label painted
 /// on the ground beside it, a layer of the app's (a zone, a path and a
 /// point) and the horizon's sky over all of it, into the world pass's
 /// targets (multisampled colour resolved into the frame's target, depth
@@ -25,6 +26,8 @@ package final class GPUProbeScene {
     private let extrudedPipeline: ExtrudedTilePipeline
     private let buildingIndexBuffers: HiddenBuildingIndexBuffers
     private let surfaceLabelPipeline: SurfaceLabelPipeline
+    private let modelPipeline: SceneModelPipeline
+    private let model: SceneModelMesh
     /// The text without its atlases, which the probe does not load: the
     /// label's glyph samples an empty atlas, covers nothing and draws no
     /// pixel, while its pipeline, bindings and draws are the map's.
@@ -62,7 +65,8 @@ package final class GPUProbeScene {
               let tile = Self.groundTile(device: device),
               let label = Self.label(device: device, tile: tile.metalTile.tile),
               let layer = Self.layer(device: device),
-              let stars = device.makeBuffer(Self.stars(), storage: .shared) else {
+              let stars = device.makeBuffer(Self.stars(), storage: .shared),
+              let model = Self.model(device: device) else {
             return nil
         }
         self.device = device
@@ -75,6 +79,7 @@ package final class GPUProbeScene {
         self.label = label
         self.layer = layer
         self.stars = stars
+        self.model = model
         caps = GlobeCapRenderer(sharedResources: GlobeCapRenderer.SharedResources.make(device: device,
                                                                                       pixelFormat: .bgra8Unorm,
                                                                                       sampleCount: 4,
@@ -90,6 +95,7 @@ package final class GPUProbeScene {
         textRenderer = TextRenderer(device: device, resource: { _, _ in nil }, sampleCount: 4)
         horizon = HorizonRenderer(pipeline: HorizonPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4))
         starPipeline = StarfieldPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        modelPipeline = SceneModelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
     }
 
@@ -117,6 +123,46 @@ package final class GPUProbeScene {
                                        twinklePhase: Float(index) / 8,
                                        halo: Float(index % 3) / 2)
         }
+    }
+
+    /// A scene model: a box from -1 to 1 on each axis in the models'
+    /// interleaved layout (`SceneModelVertexLayout`), four corners a face
+    /// wound counterclockwise seen from outside, untextured, in one
+    /// submesh. It stands in for an asset the loader would read, which
+    /// only Apple's platforms can.
+    private static func model(device: any GPUDevice) -> SceneModelMesh? {
+        // Each face by its normal and two tangents whose cross product is it.
+        let faces: [(normal: SIMD3<Float>, u: SIMD3<Float>, v: SIMD3<Float>)] = [
+            (SIMD3(1, 0, 0), SIMD3(0, 1, 0), SIMD3(0, 0, 1)),
+            (SIMD3(-1, 0, 0), SIMD3(0, 0, 1), SIMD3(0, 1, 0)),
+            (SIMD3(0, 1, 0), SIMD3(0, 0, 1), SIMD3(1, 0, 0)),
+            (SIMD3(0, -1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1)),
+            (SIMD3(0, 0, 1), SIMD3(1, 0, 0), SIMD3(0, 1, 0)),
+            (SIMD3(0, 0, -1), SIMD3(0, 1, 0), SIMD3(1, 0, 0)),
+        ]
+        var vertices: [Float] = []
+        var indices: [UInt16] = []
+        for face in faces {
+            let first = UInt16(vertices.count / 8)
+            for (a, b) in [(Float(-1), Float(-1)), (1, -1), (1, 1), (-1, 1)] {
+                let position = face.normal + face.u * a + face.v * b
+                vertices += [position.x, position.y, position.z,
+                             face.normal.x, face.normal.y, face.normal.z,
+                             (a + 1) / 2, (b + 1) / 2]
+            }
+            indices += [first, first + 1, first + 2, first, first + 2, first + 3]
+        }
+        assert(SceneModelVertexLayout.stride == 8 * MemoryLayout<Float>.stride)
+        guard let vertexBuffer = device.makeBuffer(vertices, storage: .shared),
+              let indexBuffer = device.makeBuffer(indices, storage: .shared) else { return nil }
+        let submesh = SceneModelMesh.Submesh(topology: .triangle, indexCount: indices.count, indexType: .uint16,
+                                             indexBuffer: indexBuffer, indexBufferOffset: 0)
+        return SceneModelMesh(meshes: [SceneModelMesh.Part(vertexBuffer: vertexBuffer, vertexBufferOffset: 0, submeshes: [submesh])],
+                              localTransforms: [matrix_identity_float4x4],
+                              materials: [[SceneModelMesh.SubmeshMaterial(baseColorTexture: nil,
+                                                                          baseColor: SIMD4(0.85, 0.55, 0.3, 1))]],
+                              localBounds: SceneModelBounds(minimum: SIMD3(repeating: -1), maximum: SIMD3(repeating: 1)),
+                              costInBytes: 0)
     }
 
     /// A layer of the app's over the ground: a zone, a path across it and a
@@ -324,6 +370,29 @@ package final class GPUProbeScene {
                                               extrudedTilePipeline: extrudedPipeline,
                                               extrudedStencilTestState: groundState,
                                               depthDisabledState: depthDisabledState)
+        // The model beside the building, a sixteenth of the world across and
+        // standing on the plane: a power of two, so its normal matrix (an
+        // inverse) is exact on every platform.
+        GroundFogUniform.bind(.disabled, encoder: encoder)
+        let modelScale: Float = 1.0 / 32
+        let modelMatrix = matrix_float4x4(columns: (SIMD4(modelScale, 0, 0, 0),
+                                                    SIMD4(0, modelScale, 0, 0),
+                                                    SIMD4(0, 0, modelScale, 0),
+                                                    SIMD4(0.5, -0.5, modelScale, 1)))
+        SceneModelDrawer.draw(renderEncoder: encoder,
+                              cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),
+                              shadowUniform: .disabled,
+                              shadowMap: cascades,
+                              items: [SceneModelDrawItem(mesh: model,
+                                                         modelMatrix: modelMatrix,
+                                                         groundPlane: SceneModelGroundPlane(surfacePosition: SIMD3(0.5, -0.5, 0),
+                                                                                            up: SIMD3(0, 0, 1)),
+                                                         cutsIntoGround: false)],
+                              pipeline: modelPipeline,
+                              surfaceMaskState: groundState,
+                              groundCutStates: SceneModelGroundCutStates(holeWrite: groundState, holeClear: groundState,
+                                                                         holeTest: groundState),
+                              depthDisabledState: depthDisabledState)
         let labelFrame = SurfaceLabelDrawing.Frame(cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),
                                                    groundFog: .disabled,
                                                    tileScreenPoints: Double(min(width, height)) * 0.45,

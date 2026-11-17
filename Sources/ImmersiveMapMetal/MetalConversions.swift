@@ -190,6 +190,18 @@ extension GPUPrimitiveTopology {
         }
     }
 
+    /// The interface's name for a Metal primitive type, nil for a line
+    /// strip, which the engine does not draw.
+    package init?(metal: MTLPrimitiveType) {
+        switch metal {
+        case .point: self = .point
+        case .line: self = .line
+        case .triangle: self = .triangle
+        case .triangleStrip: self = .triangleStrip
+        default: return nil
+        }
+    }
+
     package var metalClass: MTLPrimitiveTopologyClass {
         switch self {
         case .point: return .point

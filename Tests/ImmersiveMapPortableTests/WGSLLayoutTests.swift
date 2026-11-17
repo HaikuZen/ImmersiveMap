@@ -427,6 +427,20 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheSceneModelsMatchTheirSwiftTwins() throws {
+        let models = "SceneModels/Shaders/SceneModel.wgsl"
+        try assertLayout("SceneModelMaterial", in: models, matches: SceneModelDrawer.SceneModelMaterialUniform.self, offsets: [
+            MemoryLayout<SceneModelDrawer.SceneModelMaterialUniform>.offset(of: \.baseColor),
+        ])
+        try assertLayout("SceneModelGroundPlane", in: models, matches: SceneModelGroundPlane.self, offsets: [
+            MemoryLayout<SceneModelGroundPlane>.offset(of: \.surfacePosition),
+            MemoryLayout<SceneModelGroundPlane>.offset(of: \.up),
+        ])
+        // The normal matrix, a mat3x3f: three columns of 16 bytes.
+        XCTAssertEqual(MemoryLayout<SceneModelNormalMatrixUniform>.stride, 48)
+        XCTAssertEqual(Self.undefinedByteRanges(of: SceneModelNormalMatrixUniform.self), [])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.

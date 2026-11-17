@@ -40,10 +40,10 @@ enum RenderGraphFactory {
         let sceneModelSubsystem = SceneModelRenderSubsystem(sceneModelSource: context.sceneModelSource,
                                                             meshStore: context.sceneModelMeshStore,
                                                             pipeline: context.sceneModelPipeline,
-                                                            extrudedDepthState: context.extrudedDepthState,
-                                                            surfaceMaskState: context.sceneModelSurfaceMaskState,
+                                                            extrudedDepthState: MetalDepthStencilState(context.extrudedDepthState),
+                                                            surfaceMaskState: MetalDepthStencilState(context.sceneModelSurfaceMaskState),
                                                             groundCutStates: context.sceneModelGroundCutStates,
-                                                            depthDisabledState: context.depthDisabledState,
+                                                            depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
                                                             shadowMapTextureProvider: shadowMapTextureProvider,
                                                             shadowFallbackTexture: context.shadowFallbackTexture)
         let modelTileSubsystem = ModelTileRenderSubsystem(store: context.modelTileStore,

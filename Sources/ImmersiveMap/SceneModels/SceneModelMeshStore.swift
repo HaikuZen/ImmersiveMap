@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import PortableFoundation
 
 /// Async loader and LRU owner of scene model meshes, keyed and deduplicated by
 /// source URL: any number of models sharing a source share one loaded mesh.
@@ -10,6 +9,8 @@ import Metal
 /// pipeline; failures retry with a growing cooldown whose expiry also
 /// invalidates a frame (on-demand rendering would otherwise wait for a gesture).
 /// Thread-safe (`@unchecked Sendable`): all mutable state is serialized by `lock`.
+/// The loading itself is the platform's (`SceneModelAssetLoader` on Apple's
+/// platforms, through Model I/O), handed in as `loadAsset`.
 final class SceneModelMeshStore: @unchecked Sendable {
     static let defaultCostLimitBytes = 128 * 1024 * 1024
     static let maxLoadAttempts = 3
@@ -22,19 +23,14 @@ final class SceneModelMeshStore: @unchecked Sendable {
 
     weak var eventSink: RenderFrameEventSink?
 
-    private let device: MTLDevice
-    private let loadAsset: @Sendable (URL, MTLDevice) throws -> SceneModelMesh
+    private let loadAsset: @Sendable (URL) throws -> SceneModelMesh
     private let lock = NSLock()
     private var cache: LRUMemoryCache<URL, SceneModelMesh>
     private var statesByURL: [URL: LoadState] = [:]
     private var referencedURLs: Set<URL> = []
 
-    init(device: MTLDevice,
-         costLimitBytes: Int = SceneModelMeshStore.defaultCostLimitBytes,
-         loadAsset: @escaping @Sendable (URL, MTLDevice) throws -> SceneModelMesh = { url, device in
-             try SceneModelAssetLoader.load(url: url, device: device)
-         }) {
-        self.device = device
+    init(costLimitBytes: Int = SceneModelMeshStore.defaultCostLimitBytes,
+         loadAsset: @escaping @Sendable (URL) throws -> SceneModelMesh) {
         self.cache = LRUMemoryCache(costLimit: costLimitBytes)
         self.loadAsset = loadAsset
     }
@@ -100,7 +96,7 @@ final class SceneModelMeshStore: @unchecked Sendable {
     }
 
     /// Loads run one at a time on a queue of their own, never on the Swift
-    /// concurrency pool. A load blocks its thread: `MTKTextureLoader` hands
+    /// concurrency pool. A load blocks its thread: on Apple's platforms `MTKTextureLoader` hands
     /// each texture to Metal's IO queue and waits on a semaphore for it. As
     /// detached tasks, a few dozen models loading at once put every
     /// thread of the pool to sleep in that wait, and the tile loads, which
@@ -114,7 +110,7 @@ final class SceneModelMeshStore: @unchecked Sendable {
         loadQueue.async { [weak self] in
             guard let self else { return }
             do {
-                let mesh = try self.loadAsset(url, self.device)
+                let mesh = try self.loadAsset(url)
                 self.finishLoad(url: url, mesh: mesh)
             } catch {
                 self.failLoad(url: url)
