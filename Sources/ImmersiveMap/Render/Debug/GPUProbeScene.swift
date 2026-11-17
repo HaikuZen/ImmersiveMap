@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// A small scene of features already moved onto the GPU interface, drawn
-/// through any backend: the globe's polar caps turning over a square of
+/// through any backend: a sky of stars (instanced quads on a device without
+/// point sprites), the globe's polar caps turning over a square of
 /// flat ground with its fills and its line ribbons, a building standing
 /// on it (an extruded box, through the shadow cascades), a label painted
 /// on the ground beside it, a layer of the app's (a zone, a path and a
@@ -29,6 +31,7 @@ package final class GPUProbeScene {
     private let textRenderer: TextRenderer
     private let label: SurfaceLabelDrawing.Item
     private let horizon: HorizonRenderer
+    private let stars: StarfieldRenderer
     private let layerPipeline: LayerPipeline
     private let layer: LayerMesh
     private let groundState: any GPUDepthStencilState
@@ -83,6 +86,12 @@ package final class GPUProbeScene {
         surfaceLabelPipeline = SurfaceLabelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         textRenderer = TextRenderer(device: device, resource: { _, _ in nil }, sampleCount: 4)
         horizon = HorizonRenderer(pipeline: HorizonPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4))
+        // A small sky: the model is seeded, so every frame's stars are the same.
+        var sky = ImmersiveMapSettings.default.scene.starfield
+        sky.starCount = 64
+        stars = StarfieldRenderer(device: device,
+                                  pipeline: StarfieldPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4),
+                                  config: sky)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
     }
 
@@ -243,6 +252,13 @@ package final class GPUProbeScene {
                                                SIMD4(0, 0, -0.5, 0),
                                                SIMD4(0, 0, 0.5, 1)))
         let globe = GlobeUniform(panX: turn, panY: -0.2, radius: 0.7, transition: 0)
+        // The stars first, the background at the far plane.
+        stars.draw(renderEncoder: encoder,
+                   globe: globe,
+                   cameraView: matrix_identity_float4x4,
+                   cameraEye: SIMD3(0, 0, 3),
+                   drawSize: CGSize(width: width, height: height),
+                   nowTime: turn)
         caps.draw(renderEncoder: encoder, globeFrame: GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: camera), globe: globe)
         for part in [FlatMapSurfaceDrawer.Part.ground, .roads] {
             FlatMapSurfaceDrawer.draw(renderEncoder: encoder,
