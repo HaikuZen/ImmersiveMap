@@ -100,6 +100,26 @@ struct ShadowCasterMatrices {
     lightProjectionView: mat4x4f,
 }
 
+/// The WebGPU host sets this on a pipeline the engine draws with its depth
+/// clamped (`setDepthClipMode(.clamp)`, the shadow casters) on a device
+/// without depth-clip-control, which has no `unclippedDepth`. Metal clamps
+/// in hardware and never sets it. Its id is the host's, beside the Metal
+/// function constants' small ones.
+@id(1000) override kHostClampsDepth: bool = false;
+
+/// A caster's clip position, its depth clamped into the light's range where
+/// the host asks: a caster behind the light's near plane still writes its
+/// depth, at the plane, and still casts. Pancaking, done per vertex: a
+/// triangle across the plane takes, on its side in front, depths a little
+/// nearer the light than its own, under the light's orthographic
+/// projection (w is 1).
+fn casterClipPosition(clip: vec4f) -> vec4f {
+    if (kHostClampsDepth) {
+        return vec4f(clip.xy, clamp(clip.z, 0.0, clip.w), clip.w);
+    }
+    return clip;
+}
+
 /// Directional shadow sampling parameters. Mirrors ShadowUniform.swift.
 struct Shadow {
     /// The near window, sharp, and the far window, coarse. A far window the

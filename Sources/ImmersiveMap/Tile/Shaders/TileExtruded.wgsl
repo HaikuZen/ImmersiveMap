@@ -138,5 +138,5 @@ fn tileExtrudedFragmentShader(in: VertexOut) -> @location(0) vec4f {
 
 @vertex
 fn tileExtrudedShadowVertexShader(vertexIn: VertexIn) -> @builtin(position) vec4f {
-    return casters.lightProjectionView * extrudedWorldPosition(vertexIn);
+    return casterClipPosition(casters.lightProjectionView * extrudedWorldPosition(vertexIn));
 }

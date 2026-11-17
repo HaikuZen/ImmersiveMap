@@ -68,7 +68,7 @@ export class ImmersiveMapWebGPUHost {
         for (const shader of shaders.modules) {
             const module = device.createShaderModule({ code: shader.code, label: shader.file });
             for (const [name, entryPoint] of Object.entries(shader.entryPoints)) {
-                this.entryPoints.set(name, { module, ...entryPoint });
+                this.entryPoints.set(name, { module, hostClampsDepth: shader.hostClampsDepth === true, ...entryPoint });
             }
         }
         this.emptyFragment = device.createShaderModule({ code: '@fragment fn immersiveMapEmptyFragment() {}', label: 'empty fragment' });
@@ -361,7 +361,13 @@ export class ImmersiveMapWebGPUHost {
             multisample: { count: pipeline.sampleCount },
         };
         if (state.clamp === 1) {
-            if (this.clampsDepth) descriptor.primitive.unclippedDepth = true;
+            if (this.clampsDepth) {
+                descriptor.primitive.unclippedDepth = true;
+            } else if (vertex.hostClampsDepth) {
+                // No depth-clip-control: the vertex stage clamps the depth
+                // itself (kHostClampsDepth, RenderUniforms.wgsl).
+                descriptor.vertex.constants = { ...pipeline.vertex.constants, 1000: 1 };
+            }
         }
         if (pipeline.depthStencilFormat) {
             const format = this.textureFormat(pipeline.depthStencilFormat);

@@ -76,7 +76,7 @@ function moduleDeclaring(modules, entryPoint) {
 /// world pass's depth as `worldDepthFormat`, the format the host gives it
 /// on that device. Returns the pipelines built and the failures, each
 /// failure already printed.
-async function buildPipelines(device, modules, worldDepthFormat, printEach) {
+async function buildPipelines(device, modules, worldDepthFormat, printEach, hostClampsDepth = false) {
     let built = 0;
     let failures = 0;
     for (const pipeline of manifest.pipelines) {
@@ -93,7 +93,11 @@ async function buildPipelines(device, modules, worldDepthFormat, printEach) {
             vertex: {
                 module: vertexModule.module,
                 entryPoint: pipeline.vertex.entryPoint,
-                constants: pipeline.vertex.constants,
+                // Without depth-clip-control the host sets the depth clamp's
+                // override on every module that declares it, the casters'.
+                constants: hostClampsDepth && modules.get(vertexModule.path).hostClampsDepth
+                    ? { ...pipeline.vertex.constants, 1000: 1 }
+                    : pipeline.vertex.constants,
                 buffers: pipeline.buffers,
             },
             primitive: { topology: pipeline.topology },
@@ -149,9 +153,13 @@ errors += (await buildPipelines(device, modules, 'depth32float-stencil8', true))
 const plainDevice = await (await gpu.requestAdapter()).requestDevice();
 const plainModules = new Map();
 for (const path of wgslFiles()) {
-    plainModules.set(path, { module: plainDevice.createShaderModule({ code: compose(path).code, label: relative(repositoryRoot, path) }) });
+    const { code } = compose(path);
+    plainModules.set(path, {
+        module: plainDevice.createShaderModule({ code, label: relative(repositoryRoot, path) }),
+        hostClampsDepth: /@id\(1000\)\s+override\s+kHostClampsDepth/.test(code),
+    });
 }
-const plain = await buildPipelines(plainDevice, plainModules, 'depth24plus-stencil8', false);
+const plain = await buildPipelines(plainDevice, plainModules, 'depth24plus-stencil8', false, true);
 errors += plain.failures;
 if (plain.failures === 0) {
     console.log(`ok ${plain.built} pipelines without depth32float-stencil8 and depth-clip-control`);

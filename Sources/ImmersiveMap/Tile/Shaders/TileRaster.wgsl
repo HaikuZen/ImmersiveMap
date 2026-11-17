@@ -188,7 +188,7 @@ fn tileRasterReliefShadowVertexShader(@builtin(vertex_index) vertexID: u32) -> @
     let localPosition = grid[vertexID];
     var worldPosition = modelMatrix * vec4f(localPosition, 0.0, 1.0);
     worldPosition.z += groundReliefLift(localPosition, reliefHeightsVertex, vertexLinearSampler, vertexRelief);
-    return casters.lightProjectionView * worldPosition;
+    return casterClipPosition(casters.lightProjectionView * worldPosition);
 }
 
 // MARK: - The placement prepass's depth reset

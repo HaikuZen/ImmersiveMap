@@ -116,7 +116,10 @@ export function shaderBundle() {
         if (declared.size === 0) continue;
         const { code } = compose(path);
         const entryPoints = Object.fromEntries(Object.entries(reflectEntryPoints(code)).filter(([name]) => declared.has(name)));
-        modules.push({ file: relative(sourcesRoot, path), code, entryPoints });
+        // Whether the module declares the override the host clamps a
+        // caster's depth by on a device without depth-clip-control.
+        const hostClampsDepth = /@id\(1000\)\s+override\s+kHostClampsDepth/.test(code);
+        modules.push({ file: relative(sourcesRoot, path), code, entryPoints, hostClampsDepth });
     }
     return { modules };
 }
