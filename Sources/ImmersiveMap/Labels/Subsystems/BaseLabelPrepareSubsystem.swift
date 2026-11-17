@@ -30,7 +30,6 @@ import simd
 /// draws.
 final class BaseLabelPrepareSubsystem: RenderSubsystem {
     let name: String = "BaseLabels"
-    private static let traceLocale = Locale(identifier: "en_US_POSIX")
 
     private let baseLabelCache: BaseLabelCache
     private let roadLabelCache: RoadLabelCache?
@@ -1033,7 +1032,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     }
 
     private static func formatTraceFloat(_ value: Float) -> String {
-        String(format: "%.2f", locale: traceLocale, Double(value))
+        String(fixed: Double(value), fractionDigits: 2)
     }
 }
 
