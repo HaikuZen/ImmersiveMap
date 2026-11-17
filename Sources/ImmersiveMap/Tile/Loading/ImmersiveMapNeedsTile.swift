@@ -1169,6 +1169,14 @@ final class ImmersiveMapNeedsTile: @unchecked Sendable {
     var tileLoadingStatusSnapshotForTesting: TileLoadingStatusSnapshot? {
         tileLoadingStatusReporter?.snapshot()
     }
+
+    /// Whether `tile` is downloaded and waits for a CPU slot: the point a
+    /// test waits on before it moves the clock past the network stage's
+    /// deadline, where a fixed sleep leaves a slow machine's tile still in
+    /// the network stage.
+    func isWaitingForCPUSlotForTesting(_ tile: Tile) -> Bool {
+        stateQueue.sync { ongoingTasks[tile]?.stage == .cpuQueued }
+    }
     #endif
 
     private static func retryFailureDescription(_ reason: TileRetryFailureReason) -> String {
