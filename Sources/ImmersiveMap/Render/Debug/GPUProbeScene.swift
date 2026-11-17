@@ -7,8 +7,9 @@ import simd
 /// A small scene of features already moved onto the GPU interface, drawn
 /// through any backend: the globe's polar caps turning over a square of
 /// flat ground with its fills and its line ribbons, a building standing
-/// on it (an extruded box, through the shadow cascades) and a label painted
-/// on the ground beside it, into the world pass's
+/// on it (an extruded box, through the shadow cascades), a label painted
+/// on the ground beside it, a layer of the app's (a zone, a path and a
+/// point) and the horizon's sky over all of it, into the world pass's
 /// targets (multisampled colour resolved into the frame's target, depth
 /// and stencil). It is not the map: it is what a new backend is proven
 /// with before the render core runs on it. `WebGPUFrameStreamTests` holds
@@ -27,6 +28,9 @@ package final class GPUProbeScene {
     /// pixel, while its pipeline, bindings and draws are the map's.
     private let textRenderer: TextRenderer
     private let label: SurfaceLabelDrawing.Item
+    private let horizon: HorizonRenderer
+    private let layerPipeline: LayerPipeline
+    private let layer: LayerMesh
     private let groundState: any GPUDepthStencilState
     private let depthDisabledState: any GPUDepthStencilState
     private let mask: any GPUTexture
@@ -52,7 +56,8 @@ package final class GPUProbeScene {
         guard let groundState = device.makeDepthStencilState(depthDescriptor),
               let depthDisabledState = device.makeDepthStencilState(GPUDepthStencilDescriptor()),
               let tile = Self.groundTile(device: device),
-              let label = Self.label(device: device, tile: tile.metalTile.tile) else {
+              let label = Self.label(device: device, tile: tile.metalTile.tile),
+              let layer = Self.layer(device: device) else {
             return nil
         }
         self.device = device
@@ -63,6 +68,7 @@ package final class GPUProbeScene {
         self.depthDisabledState = depthDisabledState
         self.tile = tile
         self.label = label
+        self.layer = layer
         caps = GlobeCapRenderer(sharedResources: GlobeCapRenderer.SharedResources.make(device: device,
                                                                                       pixelFormat: .bgra8Unorm,
                                                                                       sampleCount: 4,
@@ -76,6 +82,23 @@ package final class GPUProbeScene {
         buildingIndexBuffers = HiddenBuildingIndexBuffers(device: device)
         surfaceLabelPipeline = SurfaceLabelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         textRenderer = TextRenderer(device: device, resource: { _, _ in nil }, sampleCount: 4)
+        horizon = HorizonRenderer(pipeline: HorizonPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4))
+        layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+    }
+
+    /// A layer of the app's over the ground: a zone, a path across it and a
+    /// point, by the public layer types and the mesh builder.
+    private static func layer(device: any GPUDevice) -> LayerMesh? {
+        let zone = ImmersiveMapPolygon(exterior: [GeoCoordinate(latitude: -40, longitude: -100),
+                                                  GeoCoordinate(latitude: -40, longitude: -40),
+                                                  GeoCoordinate(latitude: 20, longitude: -40),
+                                                  GeoCoordinate(latitude: 20, longitude: -100)])
+        let path = ImmersiveMapPolyline(coordinates: [GeoCoordinate(latitude: -50, longitude: 40),
+                                                      GeoCoordinate(latitude: 0, longitude: 80),
+                                                      GeoCoordinate(latitude: 50, longitude: 120)])
+        let point = ImmersiveMapPoint(coordinate: GeoCoordinate(latitude: 50, longitude: -70))
+        let layer = ImmersiveMapLayer(id: "probe", polygons: [zone], polylines: [path], points: [point])
+        return LayerMesh(key: layer.meshKey, data: LayerMeshBuilder.build(layer: layer), device: device)
     }
 
     /// A label painted on the ground below the building: one glyph quad of
@@ -259,6 +282,55 @@ package final class GPUProbeScene {
                                                    surface: .flat(FlatRenderState(pan: .zero, renderMapSize: 1)))
         SurfaceLabelDrawing.draw([label], frame: labelFrame, pipeline: surfaceLabelPipeline, textRenderer: textRenderer,
                                  depthState: groundState, depthDisabledState: depthDisabledState, encoder: encoder)
+
+        // The layer, its chunks placed on the plane as the layer subsystem
+        // places them, after the frame's shared values it binds.
+        let viewport = SIMD2<Float>(Float(width), Float(height))
+        encoder.setVertexValue(CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0), index: 1)
+        encoder.setVertexValue(globe, index: 8)
+        encoder.setVertexValue(GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: camera), index: 10)
+        GlobeLightUniform.bind(.disabled, encoder: encoder)
+        GroundFogUniform.bind(.disabled, encoder: encoder)
+        LayerDrawing.drawLayers([(layer, false)],
+                                pipeline: layerPipeline,
+                                surface: .flat,
+                                placements: { chunk in
+                                    let originAndSize = ImmersiveMapProjection.flatTileOriginAndSize(x: chunk.tile.x, y: chunk.tile.y,
+                                                                                                     z: chunk.tile.z, worldWrap: 0,
+                                                                                                     flatRenderPan: .zero,
+                                                                                                     renderMapSize: 1)
+                                    let scale = originAndSize.z / Float(TileCoordinateSpace.tileExtent)
+                                    return [LayerDrawUniform(modelMatrix: Matrix.translationMatrix(x: originAndSize.x,
+                                                                                                    y: originAndSize.y, z: 0)
+                                                                 * Matrix.scaleMatrix(sx: scale, sy: scale, sz: 1),
+                                                             uvOrigin: .zero,
+                                                             uvScale: 0,
+                                                             referenceWorldX: 0,
+                                                             viewportSizePx: viewport,
+                                                             pixelsPerPoint: 2,
+                                                             depth: LayerDepth.depth)]
+                                },
+                                depthDisabledState: depthDisabledState,
+                                encoder: encoder)
+
+        // The horizon's sky side over what nothing painted, its band about
+        // the view's vertical, the edge a little below it.
+        encoder.setDepthStencilState(groundState)
+        horizon.draw(renderEncoder: encoder,
+                     uniform: HorizonUniform(up: SIMD3(0, 1, 0), depression: 0.05,
+                                             center: SIMD3(0, 0, -1), sunInfluence: 0,
+                                             light: SIMD3(0, 0, 1), skyStrength: 0.6,
+                                             tint: SIMD3(0.55, 0.7, 0.95), whitenWeight: 0.3,
+                                             eye: SIMD3(0, 0, 3), featherStrength: 0.4,
+                                             bandRadians: 0.05, glowRadians: 0.3, whitenRadians: 0.02,
+                                             featherRadians: 0.005, groundBandRadians: 0.05, groundGain: 1,
+                                             cutoffStartRadians: 0.2, cutoffEndRadians: 0.3,
+                                             skyColor: SIMD3(0.2, 0.35, 0.6), skyOpacity: 0,
+                                             skyGradientRadians: 0.2,
+                                             viewProjection: camera,
+                                             bandTopRadians: 0.6),
+                     groundSide: false)
+        encoder.setDepthStencilState(depthDisabledState)
         encoder.endEncoding()
         commandBuffer.commit()
     }
