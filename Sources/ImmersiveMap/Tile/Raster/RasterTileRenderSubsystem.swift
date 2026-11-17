@@ -335,16 +335,16 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
 
     // MARK: - The draws
 
-    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard sources.isEmpty == false, let sampler else { return }
         let sampling = RasterTileDrawer.Sampling(sampler: sampler,
                                                  mipLevelBias: mipLevelBias,
                                                  wireframe: debugOverlayControls.snapshot().wireframeEnabled)
         switch (layer, frameContext.renderSurfaceMode) {
         case (.flatMapSurface, .flat):
-            encodeFlat(encoder: MetalRenderEncoder(metalEncoder), frameContext: frameContext, sampling: sampling)
+            encodeFlat(encoder: encoder, frameContext: frameContext, sampling: sampling)
         case (.globeVectorSurface, .spherical):
-            encodeSphere(encoder: MetalRenderEncoder(metalEncoder), frameContext: frameContext, sampling: sampling)
+            encodeSphere(encoder: encoder, frameContext: frameContext, sampling: sampling)
         default:
             return
         }

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
 import simd
 
 /// The placement prepass, on either surface: before any ground draws, the
@@ -72,7 +70,7 @@ final class PlacementStencilRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .placementStencil else { return }
         let surface: PlacementStencilDrawing.Surface
         switch frameContext.renderSurfaceMode {
@@ -87,7 +85,7 @@ final class PlacementStencilRenderSubsystem: RenderSubsystem {
         drawing.encode(placements: frameContext.sharedState.tilePlacementState.placeTilesContext.tilePlacements,
                        cameraUniform: frameContext.cameraUniform,
                        surface: surface,
-                       encoder: MetalRenderEncoder(encoder))
+                       encoder: encoder)
     }
 
     func handleMemoryWarning() {}

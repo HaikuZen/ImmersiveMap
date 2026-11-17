@@ -6,6 +6,7 @@
 //  ImmersiveMap
 //
 
+import ImmersiveMapGPU
 import ImmersiveMapMetal
 import Metal
 
@@ -41,11 +42,12 @@ final class BaseLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
 
     func prepareGPU(frameContext: FrameContext, resourceRegistry: RenderResourceRegistry) {
         if let labelRuntimeMetaBuffer = frameContext.sharedState.baseLabelState.labelRuntimeMetaBuffer {
-            resourceRegistry.setBuffer(labelRuntimeMetaBuffer.metalBuffer, named: .baseLabelRuntimeBuffer)
+            resourceRegistry.setBuffer(labelRuntimeMetaBuffer, named: .baseLabelRuntimeBuffer)
         }
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder gpuEncoder: any GPURenderEncoder, frameContext: FrameContext) {
+        let encoder = gpuEncoder.metalEncoder
         guard layer == .labels else {
             return
         }
@@ -70,7 +72,7 @@ final class BaseLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
         // (TextShader.metal). Nothing else writes that depth, so the scene
         // models, drawn in the world pass, never hide a label.
         encoder.setDepthStencilState(labelDepthState)
-        RendererLabelDrawer.drawBaseLabels(renderEncoder: MetalRenderEncoder(encoder),
+        RendererLabelDrawer.drawBaseLabels(renderEncoder: gpuEncoder,
                                            screenMatrix: frameContext.cameraMatrices.screen,
                                            screenScale: frameContext.screenScale,
                                            textRenderer: textRenderer,

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import QuartzCore
 
 /// Encodes the render passes of one frame: acquires the render target, prepares attachments and the pass plan, and invokes subsystem encoders.
@@ -19,7 +19,7 @@ final class RenderFramePassEncoder {
     func encode(frameContext: FrameContext,
                 acquireTarget: () -> FrameRenderTarget?,
                 settings: ImmersiveMapSettings) -> FrameRenderTarget? {
-        guard let commandBuffer = frameContext.commandBuffer else {
+        guard let commandBuffer = frameContext.gpuCommandBuffer else {
             frameContext.services.diagnostics.recordSkipReason(.missingCommandBuffer)
             return nil
         }
@@ -43,14 +43,16 @@ final class RenderFramePassEncoder {
 
         let signposter = MapSignposts.render
         for passNode in passNodes {
-            guard let descriptor = passNode.descriptorProvider.makeRenderPassDescriptor(frameContext: frameContext,
+            guard var descriptor = passNode.descriptorProvider.makeRenderPassDescriptor(frameContext: frameContext,
                                                                                        attachments: attachments,
-                                                                                       target: target),
-                  let renderEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+                                                                                       target: target) else {
                 continue
             }
             // Names the encoder in GPU captures and Metal System Trace.
-            renderEncoder.label = passNode.name.rawValue
+            descriptor.label = passNode.name.rawValue
+            guard let renderEncoder = commandBuffer.makeRenderEncoder(descriptor) else {
+                continue
+            }
 
             let passSignpostState = signposter.beginInterval("encodePass", "\(passNode.name.rawValue)")
             let passStart = CACurrentMediaTime()

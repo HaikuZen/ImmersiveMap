@@ -127,7 +127,7 @@ final class RenderFrameEngine {
                                                               settings: settings,
                                                               debugOverlayControls: debugOverlayControls,
                                                               postProcessingInputTextureProvider: { [attachments] in
-                                                                  attachments.currentPostProcessingInputTexture?.metalTexture
+                                                                  attachments.currentPostProcessingInputTexture
                                                               },
                                                               shadowMapTextureProvider: { [attachments] in
                                                                   attachments.currentShadowMapTexture?.metalTexture
@@ -524,11 +524,11 @@ final class RenderFrameEngine {
     private func publishStaticResources(frameIndex: UInt64) {
         let resourceRegistry = renderGraph.resourceRegistry
         resourceRegistry.beginFrame(frameIndex: frameIndex)
-        resourceRegistry.setPipeline(persistentContext.polygonPipeline.pipelineState.metalPipeline, named: .polygonPipeline)
-        resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState.metalPipeline, named: .tilePipeline)
-        resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState.metalPipeline, named: .extrudedTilePipeline)
-        resourceRegistry.setTexture(persistentContext.textRenderer.texture.metalTexture, named: .labelGlyphAtlas)
-        resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture.metalTexture, named: .poiSpriteAtlas)
+        resourceRegistry.setPipeline(persistentContext.polygonPipeline.pipelineState, named: .polygonPipeline)
+        resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState, named: .tilePipeline)
+        resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState, named: .extrudedTilePipeline)
+        resourceRegistry.setTexture(persistentContext.textRenderer.texture, named: .labelGlyphAtlas)
+        resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture, named: .poiSpriteAtlas)
     }
 
     private func prepareGPU(frameContext: FrameContext) {

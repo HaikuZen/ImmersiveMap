@@ -67,11 +67,12 @@ final class RoadLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
 
     func prepareGPU(frameContext: FrameContext, resourceRegistry: RenderResourceRegistry) {
         if let runtimeMetaBuffer = frameContext.sharedState.roadLabelState.runtimeMetaBuffer {
-            resourceRegistry.setBuffer(runtimeMetaBuffer.metalBuffer, named: .roadLabelRuntimeBuffer)
+            resourceRegistry.setBuffer(runtimeMetaBuffer, named: .roadLabelRuntimeBuffer)
         }
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder gpuEncoder: any GPURenderEncoder, frameContext: FrameContext) {
+        let encoder = gpuEncoder.metalEncoder
         guard layer == .labels else {
             return
         }
@@ -99,7 +100,7 @@ final class RoadLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
             viewportSize: SIMD2<Float>(Float(frameContext.drawSize.width), Float(frameContext.drawSize.height)),
             enabled: sceneDepth == nil ? 0 : 1)
         let depth = sceneDepth ?? fallbackDepthTexture
-        RendererLabelDrawer.drawRoadLabels(renderEncoder: MetalRenderEncoder(encoder),
+        RendererLabelDrawer.drawRoadLabels(renderEncoder: gpuEncoder,
                                            screenMatrix: frameContext.cameraMatrices.screen,
                                            screenScale: frameContext.screenScale,
                                            textRenderer: textRenderer,

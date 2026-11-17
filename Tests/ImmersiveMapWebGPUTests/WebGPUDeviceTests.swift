@@ -108,7 +108,7 @@ private struct StreamReader {
                 let hasDepth = try word()
                 arguments.append(.word(hasDepth))
                 if hasDepth == 1 {
-                    for _ in 0 ..< 3 { arguments.append(.word(try word())) }
+                    for _ in 0 ..< 4 { arguments.append(.word(try word())) }
                     arguments.append(.float(Float(bitPattern: try word())))
                     arguments.append(.word(try word()))
                 }

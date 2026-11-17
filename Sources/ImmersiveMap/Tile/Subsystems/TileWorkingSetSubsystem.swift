@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import ImmersiveMapGPU
 import Metal
 import simd
 
@@ -374,7 +375,7 @@ final class TileWorkingSetSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer _: RenderLayer, encoder _: MTLRenderCommandEncoder, frameContext _: FrameContext) {}
+    func encode(layer _: RenderLayer, encoder _: any GPURenderEncoder, frameContext _: FrameContext) {}
 
     func handleMemoryWarning() {
         tileRenderStore.handleMemoryWarning()

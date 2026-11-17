@@ -58,6 +58,13 @@ package struct GPUColorAttachment {
 
 package struct GPUDepthStencilAttachment {
     package var texture: any GPUTexture
+    /// The slice of an array texture the pass draws into.
+    package var slice = 0
+    /// Where a multisampled depth is resolved to one sample (sample 0) at
+    /// the pass's end, with `store` `.multisampleResolve`. Only on a device
+    /// with `GPUDeviceFeatures.depthResolve`. The stencil is never
+    /// resolved: a depth that resolves leaves its stencil unstored.
+    package var resolveTexture: (any GPUTexture)?
     package var load: GPULoadAction = .clear
     package var store: GPUStoreAction = .dontCare
     package var clearDepth: Double = 1

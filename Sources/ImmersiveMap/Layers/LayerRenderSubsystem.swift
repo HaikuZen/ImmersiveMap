@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
 import simd
 
 /// The `Layers` folder: the layers of the app's own data drawn over the map
@@ -72,7 +70,7 @@ final class LayerRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard drawn.isEmpty == false else { return }
         let surface: LayerPipeline.Surface
         switch (layer, frameContext.renderSurfaceMode) {
@@ -85,8 +83,6 @@ final class LayerRenderSubsystem: RenderSubsystem {
         default:
             return
         }
-
-        let encoder = MetalRenderEncoder(metalEncoder)
         encoder.pushDebugGroup("layers")
         let cameraUniform = frameContext.cameraUniform
         let globe = frameContext.globeRenderUniform

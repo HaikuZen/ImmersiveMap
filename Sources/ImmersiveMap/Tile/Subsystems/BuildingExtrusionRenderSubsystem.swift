@@ -168,11 +168,10 @@ final class BuildingExtrusionRenderSubsystem: RenderSubsystem {
         return Tile(x: tile.x >> shift, y: tile.y >> shift, z: tile.z - shift)
     }
 
-    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard frameContext.renderSurfaceMode == .flat, drawsAny else {
             return
         }
-        let encoder = MetalRenderEncoder(metalEncoder)
 
         if let slot = ShadowCascadeSlot(casterLayer: layer) {
             guard let lightProjectionView = frameContext.shadowFrameState?.lightProjectionView(for: slot) else { return }

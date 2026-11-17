@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import QuartzCore
 
@@ -12,16 +14,20 @@ import QuartzCore
 struct FrameRenderTarget {
     /// Color texture the drawable-bound passes render into.
     let texture: MTLTexture
+    /// `texture` as the GPU interface's, for the pass descriptors. Nil for
+    /// a colour format the interface has no name for, which the shared
+    /// resources refuse at launch.
+    let gpuTexture: (any GPUTexture)?
     /// Non-nil only on the live `CAMetalLayer` path; presented after commit.
     let drawable: CAMetalDrawable?
 
     init(texture: MTLTexture, drawable: CAMetalDrawable? = nil) {
         self.texture = texture
+        self.gpuTexture = GPUPixelFormat(metal: texture.pixelFormat).map { MetalTexture(texture, format: $0) }
         self.drawable = drawable
     }
 
     init(drawable: CAMetalDrawable) {
-        self.texture = drawable.texture
-        self.drawable = drawable
+        self.init(texture: drawable.texture, drawable: drawable)
     }
 }

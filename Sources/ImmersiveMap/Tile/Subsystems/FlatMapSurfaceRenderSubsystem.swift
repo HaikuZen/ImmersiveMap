@@ -67,7 +67,7 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         let part: FlatMapSurfaceDrawer.Part
         switch layer {
         case .flatMapSurface: part = .ground
@@ -79,8 +79,6 @@ final class FlatMapSurfaceRenderSubsystem: RenderSubsystem {
         }
         let placeTilesContext = frameContext.sharedState.tilePlacementState.placeTilesContext
         guard placeTilesContext.tilePlacements.isEmpty == false else { return }
-
-        let encoder = MetalRenderEncoder(metalEncoder)
         let isWireframeEnabled = debugOverlayControls.snapshot().wireframeEnabled
         let groundShadowMask = GroundShadowMaskBinding.resolve(frameContext: frameContext,
                                                                maskTexture: groundShadowMaskTextureProvider(),

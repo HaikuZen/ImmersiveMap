@@ -45,6 +45,15 @@ extension GPUDepthStencilState {
     }
 }
 
+extension GPURenderEncoder {
+    package var metalEncoder: MTLRenderCommandEncoder {
+        guard let encoder = self as? MetalRenderEncoder else {
+            preconditionFailure("\(Swift.type(of: self)) is not a Metal backend's render encoder")
+        }
+        return encoder.encoder
+    }
+}
+
 extension GPUCommandBuffer {
     package var metalCommandBuffer: MTLCommandBuffer {
         guard let commandBuffer = self as? MetalCommandBuffer else {

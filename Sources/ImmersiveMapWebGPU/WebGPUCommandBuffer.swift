@@ -44,8 +44,11 @@ final class WebGPUCommandBuffer: GPUCommandBuffer {
             writer.float(attachment.clearColor.alpha)
         }
         if let depth = pass.depthStencilAttachment {
+            precondition(depth.resolveTexture == nil,
+                         "WebGPU resolves colour alone: a depth resolve needs GPUDeviceFeatures.depthResolve")
             writer.word(1)
             writer.word(Self.handle(of: depth.texture))
+            writer.word(depth.slice)
             writer.word(depth.load.webGPUWord)
             writer.word(depth.store.webGPUWord)
             writer.float(depth.clearDepth)

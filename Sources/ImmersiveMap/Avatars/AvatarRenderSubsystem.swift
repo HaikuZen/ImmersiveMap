@@ -6,6 +6,8 @@
 //  ImmersiveMap
 //
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 
 final class AvatarRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
@@ -55,7 +57,8 @@ final class AvatarRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvid
             .withFrameIndex(frameContext.frameIndex)
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder gpuEncoder: any GPURenderEncoder, frameContext: FrameContext) {
+        let encoder = gpuEncoder.metalEncoder
         guard layer == .avatars else { return }
         encoder.setDepthStencilState(depthDisabledState)
         RendererAvatarDrawer.drawAvatars(renderEncoder: encoder,

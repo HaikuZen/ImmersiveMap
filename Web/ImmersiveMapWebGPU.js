@@ -400,18 +400,19 @@ export class ImmersiveMapWebGPUHost {
     }
 
     /// The view a pass draws into: the canvas's texture of the frame, or
-    /// the first slice and level of a texture.
-    attachmentView(handle) {
+    /// one slice of a texture at its first level.
+    attachmentView(handle, slice = 0) {
         if (handle === canvasHandle) {
             const texture = this.canvasTexture();
             if (!texture) throw new Error('A pass draws into the canvas, and the host has no canvas texture');
             return texture.createView();
         }
         const texture = this.objects.get(handle);
-        let view = texture.views.get('attachment');
+        const key = `attachment/${slice}`;
+        let view = texture.views.get(key);
         if (!view) {
-            view = texture.gpu.createView({ dimension: '2d', baseArrayLayer: 0, arrayLayerCount: 1, baseMipLevel: 0, mipLevelCount: 1 });
-            texture.views.set('attachment', view);
+            view = texture.gpu.createView({ dimension: '2d', baseArrayLayer: slice, arrayLayerCount: 1, baseMipLevel: 0, mipLevelCount: 1 });
+            texture.views.set(key, view);
         }
         return view;
     }
@@ -536,8 +537,8 @@ export class ImmersiveMapWebGPUHost {
         }
         const descriptor = { colorAttachments };
         if (word() === 1) {
-            const texture = word(), load = word(), store = word(), depthClearValue = float(), stencilClearValue = word();
-            const attachment = { view: this.attachmentView(texture), depthLoadOp: loadOps[load], depthStoreOp: storeOps[store], depthClearValue };
+            const texture = word(), slice = word(), load = word(), store = word(), depthClearValue = float(), stencilClearValue = word();
+            const attachment = { view: this.attachmentView(texture, slice), depthLoadOp: loadOps[load], depthStoreOp: storeOps[store], depthClearValue };
             const format = texture === canvasHandle ? '' : this.objects.get(texture).format;
             if (format.includes('stencil')) {
                 attachment.stencilLoadOp = loadOps[load];

@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import ImmersiveMapMetal
-import Metal
+import ImmersiveMapGPU
 
 /// The polar caps: the sphere beyond the Mercator edge, drawn after the tile
 /// geometry in the constant colours the style states for them (see
@@ -11,12 +10,12 @@ import Metal
 final class GlobeCapRenderSubsystem: RenderSubsystem {
     let name: String = "GlobeCap"
 
-    private let globeCapDepthState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let globeCapDepthState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     private let globeCapRenderer: GlobeCapRenderer
 
-    init(globeCapDepthState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
+    init(globeCapDepthState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
          globeCapRenderer: GlobeCapRenderer) {
         self.globeCapDepthState = globeCapDepthState
         self.depthDisabledState = depthDisabledState
@@ -27,14 +26,14 @@ final class GlobeCapRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .globeCap,
               frameContext.renderSurfaceMode == .spherical else {
             return
         }
 
         encoder.setDepthStencilState(globeCapDepthState)
-        globeCapRenderer.draw(renderEncoder: MetalRenderEncoder(encoder),
+        globeCapRenderer.draw(renderEncoder: encoder,
                               globeFrame: GlobeFrameConstantsUniform.make(globe: frameContext.globeRenderUniform,
                                                                           cameraMatrix: frameContext.cameraUniform.matrix),
                               globe: frameContext.globeRenderUniform,

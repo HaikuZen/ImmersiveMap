@@ -273,13 +273,22 @@ package final class MetalCommandBuffer: GPUCommandBuffer {
         if let depthStencil = pass.depthStencilAttachment {
             let texture = metalObject(depthStencil.texture, as: MetalTexture.self)
             descriptor.depthAttachment.texture = texture.texture
+            descriptor.depthAttachment.slice = depthStencil.slice
             descriptor.depthAttachment.loadAction = depthStencil.load.metal
             descriptor.depthAttachment.storeAction = depthStencil.store.metal
             descriptor.depthAttachment.clearDepth = depthStencil.clearDepth
+            if let resolve = depthStencil.resolveTexture {
+                descriptor.depthAttachment.resolveTexture = metalObject(resolve, as: MetalTexture.self).texture
+                descriptor.depthAttachment.depthResolveFilter = .sample0
+            }
             if texture.format.hasStencil {
                 descriptor.stencilAttachment.texture = texture.texture
+                descriptor.stencilAttachment.slice = depthStencil.slice
                 descriptor.stencilAttachment.loadAction = depthStencil.load.metal
-                descriptor.stencilAttachment.storeAction = depthStencil.store.metal
+                // No stencil resolve: a resolving depth drops its stencil.
+                descriptor.stencilAttachment.storeAction = depthStencil.store == .multisampleResolve
+                    ? .dontCare
+                    : depthStencil.store.metal
                 descriptor.stencilAttachment.clearStencil = depthStencil.clearStencil
             }
         }

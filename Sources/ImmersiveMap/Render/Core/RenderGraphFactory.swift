@@ -9,7 +9,7 @@ enum RenderGraphFactory {
     static func makeDefaultGraph(context: RenderPersistentContext,
                                  settings: ImmersiveMapSettings,
                                  debugOverlayControls: DebugOverlayControlState,
-                                 postProcessingInputTextureProvider: @escaping () -> MTLTexture?,
+                                 postProcessingInputTextureProvider: @escaping () -> (any GPUTexture)?,
                                  shadowMapTextureProvider: @escaping () -> MTLTexture?,
                                  groundShadowMaskTextureProvider: @escaping () -> MTLTexture?) -> RenderGraph {
         let tileWorkingSetSubsystem = TileWorkingSetSubsystem(tileRenderStore: context.tileRenderStore,
@@ -116,12 +116,12 @@ enum RenderGraphFactory {
                                                                             depthState: context.extrudedDepthState,
                                                                             groundFlattening: settings.tiles.groundFlattening)
         let starfieldSubsystem = StarfieldRenderSubsystem(starfieldRenderer: context.starfieldRenderer,
-                                                          skyBackdropDepthState: context.skyBackdropDepthState.metalState,
-                                                          depthDisabledState: context.depthDisabledState.metalState)
+                                                          skyBackdropDepthState: context.skyBackdropDepthState,
+                                                          depthDisabledState: context.depthDisabledState)
         let horizonSubsystem = HorizonRenderSubsystem(horizonRenderer: context.horizonRenderer,
-                                                      skyDepthState: context.skyBackdropDepthState.metalState,
-                                                      groundDepthState: context.horizonGroundDepthState.metalState,
-                                                      depthDisabledState: context.depthDisabledState.metalState)
+                                                      skyDepthState: context.skyBackdropDepthState,
+                                                      groundDepthState: context.horizonGroundDepthState,
+                                                      depthDisabledState: context.depthDisabledState)
         let postProcessingSubsystem = PostProcessingRenderSubsystem(fxaaPipeline: context.fxaaPipeline,
                                                                     inputTextureProvider: postProcessingInputTextureProvider)
         let globeVectorSurfaceSubsystem = GlobeVectorSurfaceRenderSubsystem(pipeline: context.globeVectorSurfacePipeline,
@@ -134,8 +134,8 @@ enum RenderGraphFactory {
                                                                 textRenderer: context.textRenderer,
                                                                 depthState: context.groundDepthState,
                                                                 depthDisabledState: context.depthDisabledState)
-        let globeCapSubsystem = GlobeCapRenderSubsystem(globeCapDepthState: context.globeCapDepthState.metalState,
-                                                        depthDisabledState: context.depthDisabledState.metalState,
+        let globeCapSubsystem = GlobeCapRenderSubsystem(globeCapDepthState: context.globeCapDepthState,
+                                                        depthDisabledState: context.depthDisabledState,
                                                         globeCapRenderer: context.globeCapRenderer)
         let debugSubsystem = DebugOverlayRenderSubsystem(polygonPipeline: context.polygonPipeline,
                                                          debugOverlayRenderer: context.debugOverlayRenderer,

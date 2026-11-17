@@ -6,9 +6,8 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 import ImmersiveMapGPU
-import Metal
 import simd
 
 /// The frame's label decisions on the CPU: which base and road labels show,
@@ -282,7 +281,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
     /// The labels are drawn by `BaseLabelDrawSubsystem`.
-    func encode(layer _: RenderLayer, encoder _: MTLRenderCommandEncoder, frameContext _: FrameContext) {}
+    func encode(layer _: RenderLayer, encoder _: any GPURenderEncoder, frameContext _: FrameContext) {}
 
     func handleMemoryWarning() {
         reset()

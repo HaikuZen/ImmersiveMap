@@ -17,28 +17,6 @@ enum RenderFrameStageMeasurer {
     }
 }
 
-enum RenderDebugOverlayPolicy {
-    static func shouldEncode(_ settings: ImmersiveMapSettings.DebugSettings,
-                             controls: DebugOverlayControlSnapshot) -> Bool {
-        guard settings.enableDebugPanel else {
-            return false
-        }
-        guard controls.axesEnabled
-            || controls.tileLayersEnabled
-            || controls.tileGridEnabled
-            || controls.roadLabelTilesEnabled
-            || controls.baseLabelBoundsEnabled
-            || controls.roadLabelBoundsEnabled else {
-            return false
-        }
-        #if DEBUG
-        return true
-        #else
-        return false
-        #endif
-    }
-}
-
 /// The world pass's clear colour: space for as long as the surface is the
 /// sphere, most of the unroll included, so the starfield stays through the
 /// morph; the style's map colour from the surface switch on, where it is

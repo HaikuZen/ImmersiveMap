@@ -55,8 +55,9 @@ package enum WebGPUOpcode: UInt32, CaseIterable, Sendable {
     // A command buffer's commands.
     /// color attachment count, then per attachment: texture, resolve texture
     /// or 0, load action, store action, clear red, green, blue, alpha
-    /// (floats). Then 1 and the depth attachment's texture, load action,
-    /// store action, clear depth (float), clear stencil, or 0 for none.
+    /// (floats). Then 1 and the depth attachment's texture, slice, load
+    /// action, store action, clear depth (float), clear stencil, or 0 for
+    /// none.
     /// Then the pass's label.
     case beginRenderPass = 20
     case endPass = 21

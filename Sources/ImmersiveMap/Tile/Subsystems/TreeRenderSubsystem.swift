@@ -106,13 +106,12 @@ final class TreeRenderSubsystem: RenderSubsystem {
         return fine.tile.findParentTile(atZoom: coarse.z) == coarse.tile
     }
 
-    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard frameContext.renderSurfaceMode == .flat,
               items.isEmpty == false,
               let mesh = modelStore.mesh else {
             return
         }
-        let encoder = MetalRenderEncoder(metalEncoder)
         let lightDirection = frameContext.services.settings.scene.light.direction
         switch layer {
         case .buildingExtrusion:

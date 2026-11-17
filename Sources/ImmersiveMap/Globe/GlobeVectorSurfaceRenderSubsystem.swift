@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
 import simd
 
 /// The globe's ground: the placements' ground geometry projected onto the
@@ -41,15 +39,13 @@ final class GlobeVectorSurfaceRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .globeVectorSurface,
               frameContext.renderSurfaceMode == .spherical else {
             return
         }
         let placeTilesContext = frameContext.sharedState.tilePlacementState.placeTilesContext
         guard placeTilesContext.tilePlacements.isEmpty == false else { return }
-
-        let encoder = MetalRenderEncoder(metalEncoder)
         let globe = frameContext.globeRenderUniform
         let pureSphere = GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
                                                             transition: globe.transition)

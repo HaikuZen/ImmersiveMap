@@ -1,20 +1,19 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import ImmersiveMapMetal
-import Metal
+import ImmersiveMapGPU
 import simd
 
 final class StarfieldRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
     let name: String = "Starfield"
 
     private let starfieldRenderer: StarfieldRenderer
-    private let skyBackdropDepthState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let skyBackdropDepthState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
 
     init(starfieldRenderer: StarfieldRenderer,
-         skyBackdropDepthState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState) {
+         skyBackdropDepthState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState) {
         self.starfieldRenderer = starfieldRenderer
         self.skyBackdropDepthState = skyBackdropDepthState
         self.depthDisabledState = depthDisabledState
@@ -53,7 +52,7 @@ final class StarfieldRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .starfield,
               frameContext.renderSurfaceMode == .spherical,
               Self.frameShowsSky(frameContext: frameContext) else {
@@ -64,9 +63,7 @@ final class StarfieldRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
         // depth test rejects every fragment the sphere covered, so only
         // space is shaded.
         encoder.setDepthStencilState(skyBackdropDepthState)
-        // The render core still encodes with Metal: the starfield draws
-        // through the GPU interface over the same encoder.
-        starfieldRenderer.draw(renderEncoder: MetalRenderEncoder(encoder),
+        starfieldRenderer.draw(renderEncoder: encoder,
                                globe: frameContext.globeRenderUniform,
                                cameraView: frameContext.cameraMatrices.view,
                                cameraEye: frameContext.cameraEye,

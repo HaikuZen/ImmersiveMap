@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
 
 /// The ground relief's shadow casters in the frame: the drawing
 /// (`GroundReliefShadowCasterDrawing`, where the casters are explained),
@@ -29,7 +27,7 @@ final class GroundReliefShadowCasterSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard let slot = ShadowCascadeSlot(casterLayer: layer),
               frameContext.renderSurfaceMode == .flat,
               let relief = frameContext.services.groundRelief, relief.castsShadows,
@@ -38,7 +36,7 @@ final class GroundReliefShadowCasterSubsystem: RenderSubsystem {
                        relief: relief,
                        lightProjectionView: lightProjectionView,
                        flatRenderState: frameContext.resolvedPresentation.flatRenderState,
-                       encoder: MetalRenderEncoder(encoder))
+                       encoder: encoder)
     }
 
     func handleMemoryWarning() {}

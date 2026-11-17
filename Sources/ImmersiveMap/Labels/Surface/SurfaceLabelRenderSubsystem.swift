@@ -65,7 +65,7 @@ final class SurfaceLabelRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .surfaceLabels, drawItems.isEmpty == false else { return }
 
         // Every tile at its own zoom has the same world size: the map's at
@@ -102,7 +102,7 @@ final class SurfaceLabelRenderSubsystem: RenderSubsystem {
                                  textRenderer: textRenderer,
                                  depthState: depthState,
                                  depthDisabledState: depthDisabledState,
-                                 encoder: MetalRenderEncoder(encoder))
+                                 encoder: encoder)
     }
 
     func handleMemoryWarning() {}

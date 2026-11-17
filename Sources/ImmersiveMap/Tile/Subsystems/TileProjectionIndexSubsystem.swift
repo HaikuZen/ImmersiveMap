@@ -7,6 +7,8 @@
 //
 
 import Foundation
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 
 final class TileProjectionIndexSubsystem: RenderSubsystem {
@@ -58,10 +60,10 @@ final class TileProjectionIndexSubsystem: RenderSubsystem {
         guard let tileOriginDataBuffer else {
             return
         }
-        resourceRegistry.setBuffer(tileOriginDataBuffer, named: .tileOriginDataBuffer)
+        resourceRegistry.setBuffer(MetalBuffer(tileOriginDataBuffer), named: .tileOriginDataBuffer)
     }
 
-    func encode(layer _: RenderLayer, encoder _: MTLRenderCommandEncoder, frameContext _: FrameContext) {}
+    func encode(layer _: RenderLayer, encoder _: any GPURenderEncoder, frameContext _: FrameContext) {}
 
     func handleMemoryWarning() {
         sourceProjectionTiles.removeAll(keepingCapacity: false)

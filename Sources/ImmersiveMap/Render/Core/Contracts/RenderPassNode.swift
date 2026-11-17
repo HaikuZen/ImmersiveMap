@@ -1,13 +1,14 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
 import Metal
 import QuartzCore
 
 protocol RenderPassDescriptorProvider: AnyObject {
     func makeRenderPassDescriptor(frameContext: FrameContext,
                                   attachments: FrameAttachmentStore,
-                                  target: FrameRenderTarget?) -> MTLRenderPassDescriptor?
+                                  target: FrameRenderTarget?) -> GPURenderPassDescriptor?
 }
 
 struct RenderPassNode {

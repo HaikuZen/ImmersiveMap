@@ -31,7 +31,7 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .groundShadowMask,
               frameContext.renderSurfaceMode == .flat,
               let shadowState = ShadowPassGateResolver.resolve(frameContext: frameContext),
@@ -47,7 +47,7 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
             projectionView: frameContext.cameraMatrices.projectionView,
             viewportSize: SIMD2<Float>(Float(maskSize.width), Float(maskSize.height))
         )
-        GroundShadowMaskDrawing.encodeMask(encoder: MetalRenderEncoder(encoder),
+        GroundShadowMaskDrawing.encodeMask(encoder: encoder,
                         pipeline: pipeline,
                         depthDisabledState: depthDisabledState,
                         maskUniform: maskUniform,
