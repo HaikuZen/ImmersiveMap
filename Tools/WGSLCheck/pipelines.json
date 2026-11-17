@@ -2536,6 +2536,357 @@
     },
     {
       "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerFillFragment"
+      },
+      "label" : "layerFillVertex flat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerFillVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerFillFragment"
+      },
+      "label" : "layerFillVertex morph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerFillVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerFillFragment"
+      },
+      "label" : "layerFillVertex sphere",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerFillVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerLineFragment"
+      },
+      "label" : "layerLineVertex flat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerLineVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerLineFragment"
+      },
+      "label" : "layerLineVertex morph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerLineVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerLineFragment"
+      },
+      "label" : "layerLineVertex sphere",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerLineVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerPointFragment"
+      },
+      "label" : "layerPointVertex flat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerPointVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerPointFragment"
+      },
+      "label" : "layerPointVertex morph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerPointVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerPointFragment"
+      },
+      "label" : "layerPointVertex sphere",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerPointVertex"
+      }
+    },
+    {
+      "buffers" : [
         {
           "arrayStride" : 32,
           "attributes" : [

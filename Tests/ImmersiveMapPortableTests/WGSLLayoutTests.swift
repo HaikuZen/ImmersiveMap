@@ -328,6 +328,37 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheLayersMatchTheirSwiftTwins() throws {
+        let layers = "Layers/Shaders/Layers.wgsl"
+        try assertLayout("LayerFillVertex", in: layers, matches: LayerFillVertex.self, offsets: [
+            MemoryLayout<LayerFillVertex>.offset(of: \.position),
+            MemoryLayout<LayerFillVertex>.offset(of: \.color),
+        ])
+        try assertLayout("LayerLineVertex", in: layers, matches: LayerLineVertex.self, offsets: [
+            MemoryLayout<LayerLineVertex>.offset(of: \.start),
+            MemoryLayout<LayerLineVertex>.offset(of: \.end),
+            MemoryLayout<LayerLineVertex>.offset(of: \.corner),
+            MemoryLayout<LayerLineVertex>.offset(of: \.widthPoints),
+            MemoryLayout<LayerLineVertex>.offset(of: \.color),
+        ])
+        try assertLayout("LayerPointInstance", in: layers, matches: LayerPointInstance.self, offsets: [
+            MemoryLayout<LayerPointInstance>.offset(of: \.position),
+            MemoryLayout<LayerPointInstance>.offset(of: \.radiusPoints),
+            MemoryLayout<LayerPointInstance>.offset(of: \.strokeWidthPoints),
+            MemoryLayout<LayerPointInstance>.offset(of: \.color),
+            MemoryLayout<LayerPointInstance>.offset(of: \.strokeColor),
+        ])
+        try assertLayout("LayerDraw", in: layers, matches: LayerDrawUniform.self, offsets: [
+            MemoryLayout<LayerDrawUniform>.offset(of: \.modelMatrix),
+            MemoryLayout<LayerDrawUniform>.offset(of: \.uvOrigin),
+            MemoryLayout<LayerDrawUniform>.offset(of: \.uvScale),
+            MemoryLayout<LayerDrawUniform>.offset(of: \.referenceWorldX),
+            MemoryLayout<LayerDrawUniform>.offset(of: \.viewportSizePx),
+            MemoryLayout<LayerDrawUniform>.offset(of: \.pixelsPerPoint),
+            MemoryLayout<LayerDrawUniform>.offset(of: \.depth),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.
