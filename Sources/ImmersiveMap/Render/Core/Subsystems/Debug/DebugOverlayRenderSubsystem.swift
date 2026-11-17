@@ -6,6 +6,7 @@
 //  ImmersiveMap
 //
 
+import ImmersiveMapMetal
 import Metal
 
 final class DebugOverlayRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
@@ -39,7 +40,7 @@ final class DebugOverlayRenderSubsystem: RenderSubsystem, RenderPassAvailability
 
     func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
         guard layer == .debugOverlay else { return }
-        RendererDebugOverlayDrawer.draw(renderEncoder: encoder,
+        RendererDebugOverlayDrawer.draw(renderEncoder: MetalRenderEncoder(encoder),
                                         frameContext: frameContext,
                                         polygonPipeline: polygonPipeline,
                                         debugOverlayRenderer: debugOverlayRenderer,

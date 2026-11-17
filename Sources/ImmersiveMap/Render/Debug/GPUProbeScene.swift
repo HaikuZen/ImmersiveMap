@@ -17,7 +17,8 @@ import simd
 /// the tile's far corner (in the baker's vertex, its two faces' colours
 /// two layers of a texture array), a label painted
 /// on the ground beside it, a layer of the app's (a zone, a path and a
-/// point) and the horizon's sky over all of it, into the world pass's
+/// point), the debug overlay's axes and the horizon's sky over all of it,
+/// into the world pass's
 /// targets (multisampled colour resolved into a texture of the frame's
 /// size, depth and stencil), and the FXAA pass from there into the frame's
 /// target, as the map draws with FXAA on. It is not the map: it is what a new backend is proven
@@ -59,6 +60,8 @@ package final class GPUProbeScene {
     private let cascades: any GPUTexture
     private let tile: PlaceTile
     private let fxaa: FXAAPipeline
+    private let debugPolygons: PolygonsPipeline
+    private let debugOverlay: DebugOverlayRenderer
     private var targets: (width: Int, height: Int, color: any GPUTexture, depth: any GPUTexture, scene: any GPUTexture)?
 
     /// Nil where the device makes no resource, which no backend does for
@@ -124,6 +127,10 @@ package final class GPUProbeScene {
         modelTilePipeline = ModelTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         rasterPipeline = RasterTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         fxaa = FXAAPipeline(device: device, pixelFormat: .bgra8Unorm)
+        // The map draws the overlay in a pass of one sample, the probe in
+        // its world pass of four.
+        debugPolygons = PolygonsPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        debugOverlay = DebugOverlayRenderer(device: device)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
     }
 
@@ -591,6 +598,11 @@ package final class GPUProbeScene {
                                 },
                                 depthDisabledState: depthDisabledState,
                                 encoder: encoder)
+
+        // The debug overlay's axes, from the origin along x, y and z.
+        debugOverlay.drawAxes(renderEncoder: encoder,
+                              polygonPipeline: debugPolygons,
+                              cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0))
 
         // The horizon's sky side over what nothing painted, its band about
         // the view's vertical, the edge a little below it.

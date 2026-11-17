@@ -1,9 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import ImmersiveMapMetal
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 struct TileOverlayLineSegment {
@@ -30,12 +29,12 @@ struct TileProjectedTextPlacement {
 
 final class DebugOverlayRenderer {
     private var settings: ImmersiveMapSettings.DebugSettings
-    private let axesVertexBuffer: MTLBuffer
+    private let axesVertexBuffer: any GPUBuffer
     private let axesVerticesCount: Int
-    private let tileTextVertexBufferStore: FrameSlottedDynamicMetalBuffer<TextVertex>
+    private let tileTextVertexBufferStore: GPUFrameSlottedBuffer<TextVertex>
     private var textVertexCursor: (frameIndex: UInt64, count: Int) = (UInt64.max, 0)
     private var lineVertexCursor: (frameIndex: UInt64, count: Int) = (UInt64.max, 0)
-    private let lineVertexBufferStore: FrameSlottedDynamicMetalBuffer<PolygonsPipeline.Vertex>
+    private let lineVertexBufferStore: GPUFrameSlottedBuffer<PolygonsPipeline.Vertex>
     /// On the plane, not on the relief: the overlay is for reading.
     private let tilePointScreenProjector = TilePointScreenProjector(liftsByRelief: false)
     private var textVerticesScratch: [TextVertex] = []
@@ -88,17 +87,15 @@ final class DebugOverlayRenderer {
     private static let tileGridCellLineGapFraction: Float = 0.04
     private static let tileWatermarkUVs = makeTileWatermarkUVs()
 
-    init(metalDevice: MTLDevice,
-         settings: ImmersiveMapSettings.DebugSettings) {
+    init(device: any GPUDevice,
+          settings: ImmersiveMapSettings.DebugSettings) {
         self.settings = settings
-        self.tileTextVertexBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                        slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                        options: [.storageModeShared],
-                                                                        minimumCapacity: 512)
-        self.lineVertexBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                    slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                    options: [.storageModeShared],
-                                                                    minimumCapacity: 512)
+        self.tileTextVertexBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                               slotsCount: InFlightFramePool.inFlightFramesCount,
+                                                               minimumCapacity: 512)
+        self.lineVertexBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                           slotsCount: InFlightFramePool.inFlightFramesCount,
+                                                           minimumCapacity: 512)
         let axesVertices: [PolygonsPipeline.Vertex] = [
             PolygonsPipeline.Vertex(position: SIMD4<Float>(0.0, 0.0, 0.0, 1.0), color: SIMD4<Float>(1, 0, 0, 1)),
             PolygonsPipeline.Vertex(position: SIMD4<Float>(1.0, 0.0, 0.0, 1.0), color: SIMD4<Float>(1, 0, 0, 1)),
@@ -110,13 +107,14 @@ final class DebugOverlayRenderer {
             PolygonsPipeline.Vertex(position: SIMD4<Float>(0.0, 0.0, 1.0, 1.0), color: SIMD4<Float>(0, 0, 1, 1)),
         ]
         axesVerticesCount = axesVertices.count
-        axesVertexBuffer = metalDevice.makeBuffer(bytes: axesVertices,
-                                                  length: axesVertices.count * MemoryLayout<PolygonsPipeline.Vertex>.stride,
-                                                  options: [])!
+        guard let axesVertexBuffer = device.makeBuffer(axesVertices, storage: .shared) else {
+            fatalError("Failed to create the debug overlay's axes buffer")
+        }
+        self.axesVertexBuffer = axesVertexBuffer
     }
 
-    convenience init(metalDevice: MTLDevice) {
-        self.init(metalDevice: metalDevice, settings: ImmersiveMapSettings.default.debug)
+    convenience init(device: any GPUDevice) {
+        self.init(device: device, settings: ImmersiveMapSettings.default.debug)
     }
 
     func apply(settings: ImmersiveMapSettings.DebugSettings) {
@@ -129,17 +127,16 @@ final class DebugOverlayRenderer {
         DebugOverlayTextLines.makeCoordinateTextLines(zoom: zoom, latitude: latitude, longitude: longitude)
     }
 
-    func drawAxes(renderEncoder: MTLRenderCommandEncoder,
+    func drawAxes(renderEncoder: any GPURenderEncoder,
                   polygonPipeline: PolygonsPipeline,
                   cameraUniform: CameraUniform) {
         polygonPipeline.setPipelineState(renderEncoder: renderEncoder)
         renderEncoder.setVertexBuffer(axesVertexBuffer, offset: 0, index: 0)
-        var uniform = cameraUniform
-        renderEncoder.setVertexBytes(&uniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        renderEncoder.drawPrimitives(type: .line, vertexStart: 0, vertexCount: axesVerticesCount)
+        renderEncoder.setVertexValue(cameraUniform, index: 1)
+        renderEncoder.draw(.line, vertexStart: 0, vertexCount: axesVerticesCount, instanceCount: 1, baseInstance: 0)
     }
 
-    func drawTileOverlay(renderEncoder: MTLRenderCommandEncoder,
+    func drawTileOverlay(renderEncoder: any GPURenderEncoder,
                          polygonPipeline: PolygonsPipeline,
                          textRenderer: TextRenderer,
                          frameContext: FrameContext,
@@ -216,7 +213,7 @@ final class DebugOverlayRenderer {
     /// bounds. Only that one tile: the grid exists so a screenshot of a region names
     /// the slice of tile geometry to go read, and repeating it over every visible tile
     /// would bury the map it is drawn over.
-    func drawTileGridOverlay(renderEncoder: MTLRenderCommandEncoder,
+    func drawTileGridOverlay(renderEncoder: any GPURenderEncoder,
                              polygonPipeline: PolygonsPipeline,
                              textRenderer: TextRenderer,
                              frameContext: FrameContext,
@@ -274,7 +271,7 @@ final class DebugOverlayRenderer {
         }
     }
 
-    func drawRoadLabelTileOverlay(renderEncoder: MTLRenderCommandEncoder,
+    func drawRoadLabelTileOverlay(renderEncoder: any GPURenderEncoder,
                                   polygonPipeline: PolygonsPipeline,
                                   frameContext: FrameContext,
                                   placeTiles: [PlaceTile]) {
@@ -308,7 +305,7 @@ final class DebugOverlayRenderer {
     /// red, road labels (one glyph per frame) cyan and orange: they take part
     /// in the same collision solver. Gives a visual estimate of the total
     /// number of labels participating in the frame.
-    func drawLabelBoundsOverlay(renderEncoder: MTLRenderCommandEncoder,
+    func drawLabelBoundsOverlay(renderEncoder: any GPURenderEncoder,
                                 polygonPipeline: PolygonsPipeline,
                                 frameContext: FrameContext,
                                 boxesState: BaseLabelDebugBoxesState) {
@@ -358,7 +355,7 @@ final class DebugOverlayRenderer {
         }
     }
 
-    private func drawTextEntries(renderEncoder: MTLRenderCommandEncoder,
+    private func drawTextEntries(renderEncoder: any GPURenderEncoder,
                                  textRenderer: TextRenderer,
                                  screenMatrix: matrix_float4x4,
                                  frameSlotIndex: Int,
@@ -371,20 +368,18 @@ final class DebugOverlayRenderer {
         textVerticesScratch.append(contentsOf: projectedVertices)
         guard textVerticesScratch.isEmpty == false else { return }
 
-        var textStyle = style ?? TextStyleUniform(textColor: settings.textColor)
-        var matrix = screenMatrix
-        renderEncoder.setRenderPipelineState(textRenderer.pipelineState.metalPipeline)
+        renderEncoder.setPipeline(textRenderer.pipelineState)
         setTileTextVertices(renderEncoder: renderEncoder,
                             vertices: textVerticesScratch,
                             frameSlotIndex: frameSlotIndex,
                             frameIndex: frameIndex)
-        renderEncoder.setVertexBytes(&matrix, length: MemoryLayout<matrix_float4x4>.stride, index: 1)
-        renderEncoder.setFragmentTexture(textRenderer.texture.metalTexture, index: 0)
-        renderEncoder.setFragmentBytes(&textStyle, length: MemoryLayout<TextStyleUniform>.stride, index: 0)
-        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: textVerticesScratch.count)
+        renderEncoder.setVertexValue(screenMatrix, index: 1)
+        renderEncoder.setFragmentTexture(textRenderer.texture, index: 0)
+        renderEncoder.setFragmentValue(style ?? TextStyleUniform(textColor: settings.textColor), index: 0)
+        renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: textVerticesScratch.count, instanceCount: 1, baseInstance: 0)
     }
 
-    private func drawLineVertices(renderEncoder: MTLRenderCommandEncoder,
+    private func drawLineVertices(renderEncoder: any GPURenderEncoder,
                                   polygonPipeline: PolygonsPipeline,
                                   screenMatrix: matrix_float4x4,
                                   frameSlotIndex: Int,
@@ -396,11 +391,8 @@ final class DebugOverlayRenderer {
                         vertices: vertices,
                         frameSlotIndex: frameSlotIndex,
                         frameIndex: frameIndex)
-        var screenUniform = CameraUniform(matrix: screenMatrix,
-                                          eye: .zero,
-                                          padding: 0.0)
-        renderEncoder.setVertexBytes(&screenUniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count)
+        renderEncoder.setVertexValue(CameraUniform(matrix: screenMatrix, eye: .zero, padding: 0.0), index: 1)
+        renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: vertices.count, instanceCount: 1, baseInstance: 0)
     }
 
     static func makeOverlayDiagnosticsTextLines(cameraDebugLines: [String],
@@ -596,16 +588,13 @@ final class DebugOverlayRenderer {
     /// offset: the GPU reads the buffer when the frame runs, so a draw
     /// written over the last one's bytes would draw those instead, and
     /// of several batches of a frame only the last would show. The cursor
-    /// starts over with each frame.
-    private func setTileTextVertices(renderEncoder: MTLRenderCommandEncoder,
+    /// starts over with each frame. A batch goes into the buffer however
+    /// small: constant data (`setVertexBytes`) feeds no vertex buffer in
+    /// WebGPU.
+    private func setTileTextVertices(renderEncoder: any GPURenderEncoder,
                                      vertices: [TextVertex],
                                      frameSlotIndex: Int,
                                      frameIndex: UInt64) {
-        let length = MemoryLayout<TextVertex>.stride * vertices.count
-        if length <= 4096 {
-            renderEncoder.setVertexBytes(vertices, length: length, index: 0)
-            return
-        }
         if textVertexCursor.frameIndex != frameIndex {
             textVertexCursor = (frameIndex, 0)
         }
@@ -622,15 +611,10 @@ final class DebugOverlayRenderer {
 
     /// As `setTileTextVertices`: the frame's line draws share the slot's
     /// buffer at their own offsets.
-    private func setLineVertices(renderEncoder: MTLRenderCommandEncoder,
+    private func setLineVertices(renderEncoder: any GPURenderEncoder,
                                  vertices: [PolygonsPipeline.Vertex],
                                  frameSlotIndex: Int,
                                  frameIndex: UInt64) {
-        let length = MemoryLayout<PolygonsPipeline.Vertex>.stride * vertices.count
-        if length <= 4096 {
-            renderEncoder.setVertexBytes(vertices, length: length, index: 0)
-            return
-        }
         if lineVertexCursor.frameIndex != frameIndex {
             lineVertexCursor = (frameIndex, 0)
         }

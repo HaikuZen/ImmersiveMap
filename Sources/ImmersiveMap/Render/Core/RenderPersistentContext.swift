@@ -244,7 +244,7 @@ final class RenderPersistentContext {
         self.avatarsRenderer = AvatarsRenderer(metalDevice: metal.device,
                                                sharedResources: shared.avatars,
                                                config: config.avatars)
-        self.debugOverlayRenderer = DebugOverlayRenderer(metalDevice: metal.device, settings: config.debug)
+        self.debugOverlayRenderer = DebugOverlayRenderer(device: shared.gpuDevice, settings: config.debug)
     }
 
     // MARK: - Settings

@@ -66,9 +66,6 @@ Render/Core/Resources/RenderResourceRegistry.swift
 Render/Core/Subsystems/Debug/DebugOverlayRenderSubsystem.swift
 Render/Core/Subsystems/Infrastructure/RenderSubsystemRegistry.swift
 Render/Core/Subsystems/PostProcessing/PostProcessingRenderSubsystem.swift
-Render/Debug/DebugOverlayRenderer.swift
-Render/Debug/Pipelines/PolygonsPipeline.swift
-Render/Debug/RendererDebugOverlayDrawer.swift
 Render/Debug/Shaders
 Render/Export/OffscreenTextureImageReadback.swift
 Render/Export/RenderFrameOffscreenRequest.swift

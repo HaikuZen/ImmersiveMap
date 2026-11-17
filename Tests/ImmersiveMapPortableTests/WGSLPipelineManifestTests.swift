@@ -85,6 +85,7 @@ final class WGSLPipelineManifestTests: XCTestCase {
         _ = SceneModelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = ModelTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = FXAAPipeline(device: device, pixelFormat: .bgra8Unorm)
+        _ = PolygonsPipeline(device: device, pixelFormat: .bgra8Unorm)
         _ = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         // The starfield as WebGPU draws it, on a device without point sprites.
         let webGPU = RecordingGPUDevice(features: [.depthClamp])
