@@ -167,6 +167,9 @@ enum TreeDrawer {
 struct TreeTileUniform {
     var modelMatrix: matrix_float4x4
     var heightScale: Float
+    /// The gap before `padding`, which a `SIMD3` aligns to 16, named: Swift would leave its bytes as whatever
+    /// the stack held, and they would go to the GPU with the constant data.
+    var _gap0: Float = 0, _gap1: Float = 0, _gap2: Float = 0
     var padding: SIMD3<Float> = .zero
 
     init(modelMatrix: matrix_float4x4, heightScale: Float) {

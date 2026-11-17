@@ -10,8 +10,41 @@ import XCTest
 /// offsets and is as long as the bytes the engine sends
 /// (`setVertexValue` sends the value's stride). A field that moves on one
 /// side alone reads another field's bytes on the GPU, which no picture
-/// test would point to.
+/// test would point to. Every byte of a twin's stride is one of its named
+/// fields: Swift leaves a gap between fields, or after the last, as
+/// whatever the stack held, which goes to the GPU with the constant data
+/// and makes a WebGPU frame's stream differ from run to run, so a gap is
+/// named as zeroed fields (`HorizonUniform._gap0`).
 final class WGSLLayoutTests: XCTestCase {
+    /// The byte ranges of a value's stride that none of its stored fields
+    /// covers, its fields laid out in declaration order by their own sizes
+    /// and alignments, as Swift lays out a struct. The value is read from
+    /// zeroed memory, which a struct of numbers and vectors allows.
+    static func undefinedByteRanges<T>(of _: T.Type) -> [Range<Int>] {
+        let stride = MemoryLayout<T>.stride
+        let memory = UnsafeMutableRawPointer.allocate(byteCount: stride, alignment: MemoryLayout<T>.alignment)
+        defer { memory.deallocate() }
+        memory.initializeMemory(as: UInt8.self, repeating: 0, count: stride)
+        let value = memory.load(as: T.self)
+        func sizeAndAlignment<V>(_: V) -> (size: Int, alignment: Int) {
+            (MemoryLayout<V>.size, MemoryLayout<V>.alignment)
+        }
+        var gaps: [Range<Int>] = []
+        var offset = 0
+        for child in Mirror(reflecting: value).children {
+            let field = sizeAndAlignment(child.value)
+            let start = (offset + field.alignment - 1) / field.alignment * field.alignment
+            if start > offset {
+                gaps.append(offset ..< start)
+            }
+            offset = start + field.size
+        }
+        if offset < stride {
+            gaps.append(offset ..< stride)
+        }
+        return gaps
+    }
+
     private func layouts(_ path: String) throws -> [String: WGSLSources.Layout] {
         let url = WGSLSources.engineSources.appendingPathComponent(path)
         return try WGSLSources.layouts(in: String(contentsOf: url, encoding: .utf8))
@@ -24,6 +57,21 @@ final class WGSLLayoutTests: XCTestCase {
                        "\(name)'s fields at the Swift twin's offsets", file: file, line: line)
         XCTAssertEqual(layout.size, MemoryLayout<T>.stride,
                        "\(name) as long as the bytes the engine sends", file: file, line: line)
+        let gaps = Self.undefinedByteRanges(of: T.self)
+        XCTAssertEqual(gaps, [], "\(T.self) leaves bytes \(gaps) as whatever the stack held: name them as zeroed fields",
+                       file: file, line: line)
+    }
+
+    func testAGapNoFieldCoversIsFound() {
+        struct Gapped {
+            var a: Float
+            var b: SIMD2<Float>
+            var c: Float
+        }
+        XCTAssertEqual(Self.undefinedByteRanges(of: Gapped.self), [4 ..< 8, 20 ..< 24], "Before b's alignment, and at the stride's end")
+        XCTAssertEqual(Self.undefinedByteRanges(of: HorizonUniform.self), [], "Every gap named")
+        XCTAssertEqual(Self.undefinedByteRanges(of: LayerFillVertex.self), [])
+        XCTAssertEqual(Self.undefinedByteRanges(of: LabelVertex.self), [])
     }
 
     func testTheSharedUniformsMatchTheirSwiftTwins() throws {

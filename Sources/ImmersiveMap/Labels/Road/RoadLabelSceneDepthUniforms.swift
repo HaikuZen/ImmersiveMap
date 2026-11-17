@@ -11,4 +11,7 @@ struct RoadLabelSceneDepthUniforms {
     var eye: SIMD3<Float>
     var viewportSize: SIMD2<Float>
     var enabled: UInt32
+    /// The gap to the stride, which the matrices align to 16, named: Swift would leave its bytes as whatever
+    /// the stack held, and they would go to the GPU with the constant data.
+    var _gap0: UInt32 = 0
 }

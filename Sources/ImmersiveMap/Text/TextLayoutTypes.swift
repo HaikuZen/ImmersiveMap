@@ -91,6 +91,9 @@ struct TextStyleUniform: Equatable {
     var textColor: SIMD3<Float>
     /// How far the letters are grown past the font's outline, in pixels.
     var fillBiasPx: Float
+    /// The gap before `strokeColor`, which aligns to 16, and at the stride's end, named: Swift would leave its bytes as whatever
+    /// the stack held, and they would go to the GPU with the constant data.
+    var _gap0: Float = 0, _gap1: Float = 0, _gap2: Float = 0
     var strokeColor: SIMD3<Float>
     var strokeWidthPx: Float
     /// The opacity of the fill and the halo, 1 solid
@@ -99,6 +102,7 @@ struct TextStyleUniform: Equatable {
     /// The share of the halo's width over which it fades out, 0 solid to
     /// its edge (`LabelTextStyle.haloSoftness`).
     var haloSoftness: Float
+    var _gap3: Float = 0
 
     init(textColor: SIMD3<Float>,
          strokeColor: SIMD3<Float> = SIMD3<Float>(1.0, 1.0, 1.0),
