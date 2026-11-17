@@ -18,6 +18,9 @@ final class RenderPersistentContext {
     let metalContext: RenderMetalContext
     /// The shared device as the GPU interface (`SharedRenderResources.gpuDevice`).
     let gpuDevice: MetalDevice
+    /// `metalContext.commandQueue` as the GPU interface's: the queue every
+    /// frame's command buffer comes from.
+    let gpuCommandQueue: any GPUCommandQueue
 
     // MARK: - Pipelines
 
@@ -141,6 +144,7 @@ final class RenderPersistentContext {
         let metal = RendererSetup.buildMetal(layer: layer, sharedResources: shared)
         self.metalContext = metal
         self.gpuDevice = shared.gpuDevice
+        self.gpuCommandQueue = MetalCommandQueue(metal.commandQueue)
         self.tileTraceRecorder = tileTraceRecorder
         self.baseLabelTraceRecorder = baseLabelTraceRecorder
         self.tileLoadingStatusReporter = config.debug.enableDebugPanel ? TileLoadingStatusReporter() : nil

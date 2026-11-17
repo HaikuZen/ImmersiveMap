@@ -260,6 +260,10 @@ package final class RecordingCommandBuffer: GPUCommandBuffer {
         completedHandlers.append(handler)
     }
 
+    package func addCompletedHandler(reporting handler: @escaping @Sendable (GPUCommandBufferCompletion) -> Void) {
+        completedHandlers.append { handler(GPUCommandBufferCompletion(succeeded: true, gpuDuration: nil)) }
+    }
+
     /// Commits and runs the completed handlers at once: the recording GPU
     /// finishes as soon as it is asked.
     package func commit() {

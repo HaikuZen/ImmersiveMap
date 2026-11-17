@@ -136,6 +136,20 @@ package protocol GPUBlitEncoder: AnyObject {
     func endEncoding()
 }
 
+/// What the GPU tells of a command buffer it has finished.
+package struct GPUCommandBufferCompletion: Sendable {
+    /// False when the GPU stopped on an error.
+    package var succeeded: Bool
+    /// The GPU's time on the buffer's commands, in seconds, where the
+    /// backend can tell (Metal), nil where it cannot (WebGPU).
+    package var gpuDuration: Double?
+
+    package init(succeeded: Bool, gpuDuration: Double?) {
+        self.succeeded = succeeded
+        self.gpuDuration = gpuDuration
+    }
+}
+
 package protocol GPUCommandBuffer: AnyObject {
     var label: String? { get set }
 
@@ -144,6 +158,8 @@ package protocol GPUCommandBuffer: AnyObject {
     /// Runs once the GPU has finished the buffer's commands, on a thread of
     /// the backend's choosing.
     func addCompletedHandler(_ handler: @escaping @Sendable () -> Void)
+    /// As `addCompletedHandler(_:)`, with what the GPU tells of the buffer.
+    func addCompletedHandler(reporting handler: @escaping @Sendable (GPUCommandBufferCompletion) -> Void)
     func commit()
     func waitUntilCompleted()
 }

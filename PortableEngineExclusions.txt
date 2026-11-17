@@ -83,7 +83,6 @@ Tile/Overview/Resources
 Tile/Projection/FlatTileOriginCalculator.swift
 Tile/Raster/RasterTileRenderSubsystem.swift
 Tile/Relief/Frame/GroundReliefFrame+Metal.swift
-Tile/Relief/Frame/GroundReliefFrameState+Metal.swift
 Tile/Relief/Frame/GroundReliefUniform+Metal.swift
 Tile/Relief/Lifts/GroundRelief+Metal.swift
 Tile/Relief/Shaders

@@ -68,6 +68,12 @@ final class WebGPUCommandBuffer: GPUCommandBuffer {
         completedHandlers.append(handler)
     }
 
+    /// The host reports no error and no GPU time: the buffer succeeded, of
+    /// unknown duration.
+    func addCompletedHandler(reporting handler: @escaping @Sendable (GPUCommandBufferCompletion) -> Void) {
+        completedHandlers.append { handler(GPUCommandBufferCompletion(succeeded: true, gpuDuration: nil)) }
+    }
+
     func commit() {
         precondition(isCommitted == false, "A command buffer is committed once")
         isCommitted = true

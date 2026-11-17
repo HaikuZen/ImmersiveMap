@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import ImmersiveMapGPU
 import ImmersiveMapMetal
 import Metal
 import MetalKit
@@ -380,8 +381,8 @@ final class RenderFrameEngine {
         // The terrain tiles' edges welded to their neighbours' since the
         // last frame, written before this frame's command buffer, on the
         // same queue (`GroundReliefFrameState.beginFrame`).
-        groundRelief?.beginFrame(commandQueue: persistentContext.metalContext.commandQueue)
-        guard let commandBuffer = persistentContext.metalContext.makeCommandBuffer() else {
+        groundRelief?.beginFrame(commandQueue: persistentContext.gpuCommandQueue)
+        guard let commandBuffer = persistentContext.gpuCommandQueue.makeCommandBuffer() else {
             diagnostics.recordSkipReason(.missingCommandBuffer)
             currentDiagnostics = diagnostics
             return nil
@@ -507,7 +508,7 @@ final class RenderFrameEngine {
                             viewport: cameraFrameState.viewport,
                             cameraMatrices: cameraMatrices,
                             cameraEye: cameraEye,
-                            gpuCommandBuffer: MetalCommandBuffer(commandBuffer),
+                            gpuCommandBuffer: commandBuffer,
                             services: services,
                             mapCameraState: cameraFrameState.mapCameraState,
                             animatedZoom: animatedZoomValue,
@@ -584,7 +585,7 @@ final class RenderFrameEngine {
                               target: FrameRenderTarget?,
                               frameSlotIndex: Int,
                               onGPUComplete: (@Sendable (Bool) -> Void)?) -> Bool {
-        guard let commandBuffer = frameContext.commandBuffer,
+        guard let commandBuffer = frameContext.gpuCommandBuffer,
               let target else {
             return false
         }
@@ -593,28 +594,30 @@ final class RenderFrameEngine {
         let sceneModelSelectionSnapshot = frameContext.sharedState.sceneModelState.selectionSnapshot
         // The handler runs on a Metal thread, so it takes the engine's
         // thread-safe parts and never the engine itself.
-        commandBuffer.addCompletedHandler { [lastCompletedGPUFrameDuration, inFlightFramePool, eventSink] completedBuffer in
-            // Read the timestamps before entering the lock: withLock takes a
-            // @Sendable closure, and MTLCommandBuffer is not Sendable.
-            let gpuFrameDuration = completedBuffer.gpuEndTime - completedBuffer.gpuStartTime
-            lastCompletedGPUFrameDuration.withLock { $0 = gpuFrameDuration }
+        commandBuffer.addCompletedHandler(reporting: { [lastCompletedGPUFrameDuration, inFlightFramePool, eventSink] completion in
+            if let gpuFrameDuration = completion.gpuDuration {
+                lastCompletedGPUFrameDuration.withLock { $0 = gpuFrameDuration }
+            }
             inFlightFramePool.release(slot: frameSlotIndex)
             eventSink.updateAvatarSelectionSnapshot(avatarSelectionSnapshot)
             eventSink.updateSceneModelSelectionSnapshot(sceneModelSelectionSnapshot)
-            onGPUComplete?(completedBuffer.error == nil)
-        }
+            onGPUComplete?(completion.succeeded)
+        })
         if let drawable = target.drawable {
+            // The drawable is Core Animation's: it presents through Metal's
+            // own command buffer.
+            let metalCommandBuffer = commandBuffer.metalCommandBuffer
             if drawable.layer.presentsWithTransaction {
                 // Markers are on screen: commit, wait until the buffer is
                 // scheduled, then present, so the drawable rides the current
                 // CATransaction together with the marker view frames set right
                 // after `presentFrame` (Apple's transaction-synced pattern).
-                commandBuffer.commit()
-                commandBuffer.waitUntilScheduled()
+                metalCommandBuffer.commit()
+                metalCommandBuffer.waitUntilScheduled()
                 drawable.present()
             } else {
-                commandBuffer.present(drawable)
-                commandBuffer.commit()
+                metalCommandBuffer.present(drawable)
+                metalCommandBuffer.commit()
             }
         } else {
             commandBuffer.commit()

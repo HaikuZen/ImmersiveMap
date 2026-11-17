@@ -307,6 +307,13 @@ package final class MetalCommandBuffer: GPUCommandBuffer {
         commandBuffer.addCompletedHandler { _ in handler() }
     }
 
+    package func addCompletedHandler(reporting handler: @escaping @Sendable (GPUCommandBufferCompletion) -> Void) {
+        commandBuffer.addCompletedHandler { completed in
+            handler(GPUCommandBufferCompletion(succeeded: completed.error == nil,
+                                               gpuDuration: completed.gpuEndTime - completed.gpuStartTime))
+        }
+    }
+
     package func commit() { commandBuffer.commit() }
     package func waitUntilCompleted() { commandBuffer.waitUntilCompleted() }
 }
