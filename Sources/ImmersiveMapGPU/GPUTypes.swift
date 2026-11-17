@@ -43,6 +43,12 @@ package struct GPUTextureUsage: OptionSet, Hashable, Sendable {
 package enum GPUStorage: Hashable, Sendable {
     case shared
     case `private`
+    /// A render target's contents the GPU keeps on chip for one pass and
+    /// never writes to memory: the samples of a multisampled target that
+    /// the pass resolves. Textures only. Metal's memoryless storage on
+    /// Apple's GPUs, private storage on any other GPU and in WebGPU, which
+    /// has none.
+    case memoryless
 }
 
 package struct GPUTextureDescriptor: Hashable, Sendable {

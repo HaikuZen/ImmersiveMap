@@ -226,6 +226,20 @@ package final class MetalBlitEncoder: GPUBlitEncoder {
                      destinationOrigin: MTLOrigin(x: x, y: y, z: 0))
     }
 
+    package func copy(from source: any GPUTexture, slice: Int, mipmapLevel: Int, x: Int, y: Int,
+                      to destination: any GPUTexture, destinationSlice: Int, destinationMipmapLevel: Int,
+                      destinationX: Int, destinationY: Int, width: Int, height: Int) {
+        encoder.copy(from: metalObject(source, as: MetalTexture.self).texture,
+                     sourceSlice: slice,
+                     sourceLevel: mipmapLevel,
+                     sourceOrigin: MTLOrigin(x: x, y: y, z: 0),
+                     sourceSize: MTLSize(width: width, height: height, depth: 1),
+                     to: metalObject(destination, as: MetalTexture.self).texture,
+                     destinationSlice: destinationSlice,
+                     destinationLevel: destinationMipmapLevel,
+                     destinationOrigin: MTLOrigin(x: destinationX, y: destinationY, z: 0))
+    }
+
     package func generateMipmaps(for texture: any GPUTexture) {
         encoder.generateMipmaps(for: metalObject(texture, as: MetalTexture.self).texture)
     }
@@ -356,11 +370,15 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
     }
 
     /// A texture the CPU writes is shared where the GPU and the CPU share
-    /// memory, and managed on a Mac whose GPU has its own.
+    /// memory, and managed on a Mac whose GPU has its own. A memoryless one
+    /// is private where the GPU has no tile memory (a Mac's Intel or AMD
+    /// GPU).
     private func textureStorageMode(_ storage: GPUStorage) -> MTLStorageMode {
         switch storage {
         case .private:
             return .private
+        case .memoryless:
+            return device.supportsFamily(.apple2) ? .memoryless : .private
         case .shared:
             #if os(macOS)
             return device.hasUnifiedMemory ? .shared : .managed

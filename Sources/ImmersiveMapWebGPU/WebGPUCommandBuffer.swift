@@ -336,6 +336,24 @@ final class WebGPUBlitEncoder: GPUBlitEncoder {
         commandBuffer.writer.word(height)
     }
 
+    func copy(from source: any GPUTexture, slice: Int, mipmapLevel: Int, x: Int, y: Int,
+              to destination: any GPUTexture, destinationSlice: Int, destinationMipmapLevel: Int,
+              destinationX: Int, destinationY: Int, width: Int, height: Int) {
+        commandBuffer.writer.command(.copyTextureToTexture)
+        commandBuffer.writer.word(WebGPUCommandBuffer.handle(of: source))
+        commandBuffer.writer.word(slice)
+        commandBuffer.writer.word(mipmapLevel)
+        commandBuffer.writer.word(x)
+        commandBuffer.writer.word(y)
+        commandBuffer.writer.word(WebGPUCommandBuffer.handle(of: destination))
+        commandBuffer.writer.word(destinationSlice)
+        commandBuffer.writer.word(destinationMipmapLevel)
+        commandBuffer.writer.word(destinationX)
+        commandBuffer.writer.word(destinationY)
+        commandBuffer.writer.word(width)
+        commandBuffer.writer.word(height)
+    }
+
     func generateMipmaps(for texture: any GPUTexture) {
         commandBuffer.writer.command(.generateMipmaps)
         commandBuffer.writer.word(WebGPUCommandBuffer.handle(of: texture))

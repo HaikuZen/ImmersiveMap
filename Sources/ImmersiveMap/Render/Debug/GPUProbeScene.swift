@@ -8,7 +8,10 @@ import simd
 /// A small scene of features already moved onto the GPU interface, drawn
 /// through any backend: a sky of stars (instanced quads on a device without
 /// point sprites), the globe's polar caps turning over a square of
-/// flat ground with its fills and its line ribbons, a building standing
+/// flat ground with its fills and its line ribbons (its fills also drawn
+/// into a raster tile's texture in a pass of their own, copied out of the
+/// bake atlas, and that texture drawn on the tile's grid under them, as a
+/// raster slot of the map draws), a building standing
 /// on it (an extruded box, through the shadow cascades), a scene model
 /// beside it (a box of the models' own layout), a model tile's tower in
 /// the tile's far corner (in the baker's vertex, its two faces' colours
@@ -32,6 +35,13 @@ package final class GPUProbeScene {
     private let model: SceneModelMesh
     private let modelTilePipeline: ModelTilePipeline
     private let modelTile: ModelTileMesh
+    private let rasterPipeline: RasterTilePipeline
+    private let rasterGrid: RasterTileGrid
+    private let rasterSampler: any GPUSampler
+    private let rasterAtlas: RasterTileDrawer.BakeAtlas
+    private let rasterTexture: any GPUTexture
+    /// The raster tile's side, the smallest a ring rule gives.
+    private static let rasterSize = 256
     /// The text without its atlases, which the probe does not load: the
     /// label's glyph samples an empty atlas, covers nothing and draws no
     /// pixel, while its pipeline, bindings and draws are the map's.
@@ -71,7 +81,10 @@ package final class GPUProbeScene {
               let layer = Self.layer(device: device),
               let stars = device.makeBuffer(Self.stars(), storage: .shared),
               let model = Self.model(device: device),
-              let modelTile = Self.modelTile(device: device) else {
+              let modelTile = Self.modelTile(device: device),
+              let rasterAtlas = RasterTileDrawer.BakeAtlas.make(device: device, width: Self.rasterSize, height: Self.rasterSize),
+              let rasterTexture = RasterTileDrawer.makeTexture(device: device, size: Self.rasterSize),
+              let rasterSampler = Self.rasterSampler(device: device) else {
             return nil
         }
         self.device = device
@@ -86,6 +99,10 @@ package final class GPUProbeScene {
         self.stars = stars
         self.model = model
         self.modelTile = modelTile
+        self.rasterAtlas = rasterAtlas
+        self.rasterTexture = rasterTexture
+        self.rasterSampler = rasterSampler
+        rasterGrid = RasterTileGrid(device: device)
         caps = GlobeCapRenderer(sharedResources: GlobeCapRenderer.SharedResources.make(device: device,
                                                                                       pixelFormat: .bgra8Unorm,
                                                                                       sampleCount: 4,
@@ -103,6 +120,7 @@ package final class GPUProbeScene {
         starPipeline = StarfieldPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         modelPipeline = SceneModelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         modelTilePipeline = ModelTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        rasterPipeline = RasterTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
     }
 
@@ -234,6 +252,17 @@ package final class GPUProbeScene {
                              indexBuffer: indexBuffer,
                              texture: texture,
                              costInBytes: 0)
+    }
+
+    /// The raster tiles' sampler, as `RasterTileRenderSubsystem` makes it
+    /// at the settings' default anisotropy.
+    private static func rasterSampler(device: any GPUDevice) -> (any GPUSampler)? {
+        var descriptor = GPUSamplerDescriptor()
+        descriptor.minFilter = .linear
+        descriptor.magFilter = .linear
+        descriptor.mipFilter = .linear
+        descriptor.maxAnisotropy = 4
+        return device.makeSampler(descriptor)
     }
 
     /// A layer of the app's over the ground: a zone, a path across it and a
@@ -375,6 +404,17 @@ package final class GPUProbeScene {
     package func drawFrame(into target: any GPUTexture, width: Int, height: Int, turn: Float) {
         guard let world = worldTargets(width: width, height: height),
               let commandBuffer = queue.makeCommandBuffer() else { return }
+        // The ground tile's fills into the raster tile's texture, before
+        // the world pass, as `RasterTileRenderSubsystem.prepareGPU` draws a
+        // tile whose texture must be drawn again.
+        _ = RasterTileDrawer.bake([RasterTileDrawer.Bake(ground: tile.metalTile.tileBuffers.ground,
+                                                         size: Self.rasterSize,
+                                                         texture: rasterTexture)],
+                                  atlas: rasterAtlas,
+                                  commandBuffer: commandBuffer,
+                                  pipeline: rasterPipeline,
+                                  baseColor: SIMD4(0.09, 0.10, 0.13, 1),
+                                  planningZoom: 15)
         var colorAttachment = GPUColorAttachment(texture: world.color)
         colorAttachment.resolveTexture = target
         colorAttachment.store = .multisampleResolve
@@ -412,6 +452,29 @@ package final class GPUProbeScene {
             encoder.draw(.point, vertexStart: 0, vertexCount: Self.starCount)
         }
         caps.draw(renderEncoder: encoder, globeFrame: GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: camera), globe: globe)
+        // The raster texture on the tile's grid, first in the ground's
+        // layer, placed as the vector ground's tile is.
+        if let rasterMesh = rasterGrid.mesh(forTileZoom: 0) {
+            let origin = ImmersiveMapProjection.flatTileOriginAndSize(x: 0, y: 0, z: 0, worldWrap: 0,
+                                                                      flatRenderPan: .zero, renderMapSize: 1)
+            let scale = origin.z / 4096
+            RasterTileDrawer.drawFlat([RasterTileDrawer.FlatItem(texture: rasterTexture,
+                                                                 stencilReference: TileSourceStencilPriority.reference(sourceZoom: 0),
+                                                                 mesh: rasterMesh,
+                                                                 modelMatrix: Matrix.translationMatrix(x: origin.x, y: origin.y, z: 0)
+                                                                     * Matrix.scaleMatrix(sx: scale, sy: scale, sz: 1),
+                                                                 relief: nil)],
+                                      encoder: encoder,
+                                      cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),
+                                      groundShadow: RasterTileDrawer.GroundShadow(uniform: .disabled, mask: mask, cascades: cascades),
+                                      groundFog: .disabled,
+                                      groundRelief: nil,
+                                      renderMapSize: 1,
+                                      sampling: RasterTileDrawer.Sampling(sampler: rasterSampler, mipLevelBias: 0, wireframe: false),
+                                      pipeline: rasterPipeline,
+                                      groundOwnerState: groundState,
+                                      depthDisabledState: depthDisabledState)
+        }
         for part in [FlatMapSurfaceDrawer.Part.ground, .roads] {
             FlatMapSurfaceDrawer.draw(renderEncoder: encoder,
                                       cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),

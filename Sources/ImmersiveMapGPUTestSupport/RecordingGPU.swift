@@ -233,6 +233,9 @@ package final class RecordingBlitEncoder: GPUBlitEncoder {
     package func copy(from _: any GPUBuffer, sourceOffset _: Int, bytesPerRow _: Int,
                       to _: any GPUTexture, slice _: Int, mipmapLevel _: Int,
                       x _: Int, y _: Int, width _: Int, height _: Int) { copies += 1 }
+    package func copy(from _: any GPUTexture, slice _: Int, mipmapLevel _: Int, x _: Int, y _: Int,
+                      to _: any GPUTexture, destinationSlice _: Int, destinationMipmapLevel _: Int,
+                      destinationX _: Int, destinationY _: Int, width _: Int, height _: Int) { copies += 1 }
     package func generateMipmaps(for _: any GPUTexture) { mipmapGenerations += 1 }
     package func endEncoding() { ended = true }
 }

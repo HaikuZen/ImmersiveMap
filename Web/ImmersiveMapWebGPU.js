@@ -26,7 +26,7 @@ const opcodes = {
     beginRenderPass: 20, endPass: 21, setPipelineVariant: 22, setStencilReference: 23, setViewport: 24,
     setScissorRect: 25, setBuffer: 26, setBytes: 27, setTexture: 28, setSampler: 29, draw: 30,
     drawIndexed: 31, pushDebugGroup: 32, popDebugGroup: 33, copyBufferToBuffer: 34,
-    copyBufferToTexture: 35, generateMipmaps: 36, submit: 37,
+    copyBufferToTexture: 35, generateMipmaps: 36, submit: 37, copyTextureToTexture: 38,
 };
 
 const canvasHandle = 1;
@@ -205,6 +205,17 @@ export class ImmersiveMapWebGPUHost {
                 this.commandEncoder().copyBufferToTexture({ buffer: this.objects.get(source).gpu, offset, bytesPerRow },
                                                           { texture: this.objects.get(texture).gpu, mipLevel, origin: { x, y, z: slice } },
                                                           { width, height });
+                break;
+            }
+            case opcodes.copyTextureToTexture: {
+                const source = word(), slice = word(), mipLevel = word(), x = word(), y = word();
+                const destination = word(), destinationSlice = word(), destinationMipLevel = word();
+                const destinationX = word(), destinationY = word(), width = word(), height = word();
+                this.commandEncoder().copyTextureToTexture(
+                    { texture: this.objects.get(source).gpu, mipLevel, origin: { x, y, z: slice } },
+                    { texture: this.objects.get(destination).gpu, mipLevel: destinationMipLevel,
+                      origin: { x: destinationX, y: destinationY, z: destinationSlice } },
+                    { width, height });
                 break;
             }
             case opcodes.generateMipmaps: word(); this.warnOnce('generateMipmaps: not done yet, the texture keeps its first level'); break;

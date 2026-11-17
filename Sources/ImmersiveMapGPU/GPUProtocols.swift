@@ -120,6 +120,11 @@ package protocol GPUBlitEncoder: AnyObject {
     func copy(from source: any GPUBuffer, sourceOffset: Int, bytesPerRow: Int,
               to texture: any GPUTexture, slice: Int, mipmapLevel: Int,
               x: Int, y: Int, width: Int, height: Int)
+    /// A region of one slice and level of a texture into another of the
+    /// same format, both single-sampled.
+    func copy(from source: any GPUTexture, slice: Int, mipmapLevel: Int, x: Int, y: Int,
+              to destination: any GPUTexture, destinationSlice: Int, destinationMipmapLevel: Int,
+              destinationX: Int, destinationY: Int, width: Int, height: Int)
     func generateMipmaps(for texture: any GPUTexture)
     func endEncoding()
 }

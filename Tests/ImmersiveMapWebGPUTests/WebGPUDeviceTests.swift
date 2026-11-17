@@ -88,6 +88,7 @@ private struct StreamReader {
         case .pushDebugGroup: return [.string]
         case .copyBufferToBuffer: return Array(repeating: .word, count: 5)
         case .copyBufferToTexture: return Array(repeating: .word, count: 10)
+        case .copyTextureToTexture: return Array(repeating: .word, count: 12)
         }
     }
 

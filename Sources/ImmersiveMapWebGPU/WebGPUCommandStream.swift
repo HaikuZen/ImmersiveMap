@@ -93,6 +93,9 @@ package enum WebGPUOpcode: UInt32, CaseIterable, Sendable {
     case generateMipmaps = 36
     /// command buffer id. Ends the stream's commands for the queue.
     case submit = 37
+    /// source, slice, mip level, x, y, destination, slice, mip level, x, y,
+    /// width, height.
+    case copyTextureToTexture = 38
 }
 
 /// The names the stream gives the interface's values as words.
