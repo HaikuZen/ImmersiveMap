@@ -8,7 +8,9 @@
 // the ported features' pipelines as the engine describes them
 // (WGSLPipelineManifestTests writes it), against the WGSL entry points, so
 // an override left unset, a vertex format the shader cannot read or a
-// binding used twice by one entry point fails here. Exits 1 on any error.
+// binding used twice by one entry point fails here, on a device with the
+// optional features the engine asks for and again on one without them, as
+// the host would run them there. Exits 1 on any error.
 // Needs a GPU adapter: a Vulkan driver, or a software one (lavapipe) on a
 // machine without a GPU.
 
@@ -62,70 +64,99 @@ for (const path of wgslFiles()) {
     }
 }
 // The pipelines: each entry point is taken from the file that declares it.
-function moduleDeclaring(entryPoint) {
-    for (const [path, { module, code }] of modules) {
+function moduleDeclaring(modules, entryPoint) {
+    for (const [path, { module }] of modules) {
         const own = readFileSync(path, 'utf8');
         if (new RegExp(`\\bfn ${entryPoint}\\(`).test(own)) return { path, module };
     }
     return null;
 }
 
-const manifest = JSON.parse(readFileSync(join(repositoryRoot, 'Tools', 'WGSLCheck', 'pipelines.json'), 'utf8'));
-for (const pipeline of manifest.pipelines) {
-    const vertexModule = moduleDeclaring(pipeline.vertex.entryPoint);
-    const fragmentModule = pipeline.fragment ? moduleDeclaring(pipeline.fragment.entryPoint) : null;
-    if (!vertexModule || (pipeline.fragment && !fragmentModule)) {
-        console.error(`${pipeline.label}: an entry point is in no WGSL file`);
-        errors += 1;
-        continue;
-    }
-    const descriptor = {
-        label: pipeline.label,
-        layout: 'auto',
-        vertex: {
-            module: vertexModule.module,
-            entryPoint: pipeline.vertex.entryPoint,
-            constants: pipeline.vertex.constants,
-            buffers: pipeline.buffers,
-        },
-        primitive: { topology: pipeline.topology },
-        multisample: { count: pipeline.sampleCount },
-    };
-    if (pipeline.fragment) {
-        descriptor.fragment = {
-            module: fragmentModule.module,
-            entryPoint: pipeline.fragment.entryPoint,
-            constants: pipeline.fragment.constants,
-            targets: pipeline.targets.map((target) => ({
-                format: target.format,
-                blend: target.blend ?? undefined,
-                writeMask: target.writesColor ? GPUColorWrite.ALL : 0,
-            })),
+/// Builds every pipeline of the manifest on `device` from `modules`, the
+/// world pass's depth as `worldDepthFormat`, the format the host gives it
+/// on that device. Returns the pipelines built and the failures, each
+/// failure already printed.
+async function buildPipelines(device, modules, worldDepthFormat, printEach) {
+    let built = 0;
+    let failures = 0;
+    for (const pipeline of manifest.pipelines) {
+        const vertexModule = moduleDeclaring(modules, pipeline.vertex.entryPoint);
+        const fragmentModule = pipeline.fragment ? moduleDeclaring(modules, pipeline.fragment.entryPoint) : null;
+        if (!vertexModule || (pipeline.fragment && !fragmentModule)) {
+            console.error(`${pipeline.label}: an entry point is in no WGSL file`);
+            failures += 1;
+            continue;
+        }
+        const descriptor = {
+            label: pipeline.label,
+            layout: 'auto',
+            vertex: {
+                module: vertexModule.module,
+                entryPoint: pipeline.vertex.entryPoint,
+                constants: pipeline.vertex.constants,
+                buffers: pipeline.buffers,
+            },
+            primitive: { topology: pipeline.topology },
+            multisample: { count: pipeline.sampleCount },
         };
+        if (pipeline.fragment) {
+            descriptor.fragment = {
+                module: fragmentModule.module,
+                entryPoint: pipeline.fragment.entryPoint,
+                constants: pipeline.fragment.constants,
+                targets: pipeline.targets.map((target) => ({
+                    format: target.format,
+                    blend: target.blend ?? undefined,
+                    writeMask: target.writesColor ? GPUColorWrite.ALL : 0,
+                })),
+            };
+        }
+        if (pipeline.depthStencilFormat) {
+            // The depth state is set per draw (GPURenderStateTracker), so any
+            // valid one builds the pipeline.
+            const format = pipeline.depthStencilFormat === 'depth32float-stencil8' ? worldDepthFormat : pipeline.depthStencilFormat;
+            descriptor.depthStencil = { format, depthWriteEnabled: false, depthCompare: 'always' };
+        }
+        // A pipeline the device refuses rejects the call, and a validation
+        // error the call does not throw lands in the scope: either fails it.
+        device.pushErrorScope('validation');
+        let failure = null;
+        try {
+            await device.createRenderPipelineAsync(descriptor);
+        } catch (error) {
+            failure = error.message;
+        }
+        const scope = await device.popErrorScope();
+        failure ??= scope?.message ?? null;
+        if (failure) {
+            console.error(`pipeline ${pipeline.label} (${relative(repositoryRoot, vertexModule.path)}) on ${worldDepthFormat}: ${failure}`);
+            failures += 1;
+        } else {
+            built += 1;
+            if (printEach) console.log(`ok pipeline ${pipeline.label}`);
+        }
     }
-    if (pipeline.depthStencilFormat) {
-        // The depth state is set per draw (GPURenderStateTracker), so any
-        // valid one builds the pipeline.
-        descriptor.depthStencil = { format: pipeline.depthStencilFormat, depthWriteEnabled: false, depthCompare: 'always' };
-    }
-    // A pipeline the device refuses rejects the call, and a validation
-    // error the call does not throw lands in the scope: either fails it.
-    device.pushErrorScope('validation');
-    let failure = null;
-    try {
-        await device.createRenderPipelineAsync(descriptor);
-    } catch (error) {
-        failure = error.message;
-    }
-    const scope = await device.popErrorScope();
-    failure ??= scope?.message ?? null;
-    if (failure) {
-        console.error(`pipeline ${pipeline.label} (${relative(repositoryRoot, vertexModule.path)}): ${failure}`);
-        errors += 1;
-    } else {
-        console.log(`ok pipeline ${pipeline.label}`);
-    }
+    return { built, failures };
 }
+
+const manifest = JSON.parse(readFileSync(join(repositoryRoot, 'Tools', 'WGSLCheck', 'pipelines.json'), 'utf8'));
+errors += (await buildPipelines(device, modules, 'depth32float-stencil8', true)).failures;
+
+// The same pipelines on a device without the optional features, as a
+// browser that offers neither runs them: the world pass's depth is
+// depth24plus-stencil8, and no pipeline asks for unclippedDepth.
+// An adapter makes one device: the second comes from an adapter of its own.
+const plainDevice = await (await gpu.requestAdapter()).requestDevice();
+const plainModules = new Map();
+for (const path of wgslFiles()) {
+    plainModules.set(path, { module: plainDevice.createShaderModule({ code: compose(path).code, label: relative(repositoryRoot, path) }) });
+}
+const plain = await buildPipelines(plainDevice, plainModules, 'depth24plus-stencil8', false);
+errors += plain.failures;
+if (plain.failures === 0) {
+    console.log(`ok ${plain.built} pipelines without depth32float-stencil8 and depth-clip-control`);
+}
+plainDevice.destroy();
 
 device.destroy();
 process.exit(errors > 0 ? 1 : 0);
