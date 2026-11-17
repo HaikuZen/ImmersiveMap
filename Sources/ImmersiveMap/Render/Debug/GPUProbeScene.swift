@@ -31,7 +31,8 @@ package final class GPUProbeScene {
     private let textRenderer: TextRenderer
     private let label: SurfaceLabelDrawing.Item
     private let horizon: HorizonRenderer
-    private let stars: StarfieldRenderer
+    private let starPipeline: StarfieldPipeline
+    private let stars: any GPUBuffer
     private let layerPipeline: LayerPipeline
     private let layer: LayerMesh
     private let groundState: any GPUDepthStencilState
@@ -60,7 +61,8 @@ package final class GPUProbeScene {
               let depthDisabledState = device.makeDepthStencilState(GPUDepthStencilDescriptor()),
               let tile = Self.groundTile(device: device),
               let label = Self.label(device: device, tile: tile.metalTile.tile),
-              let layer = Self.layer(device: device) else {
+              let layer = Self.layer(device: device),
+              let stars = device.makeBuffer(Self.stars(), storage: .shared) else {
             return nil
         }
         self.device = device
@@ -72,6 +74,7 @@ package final class GPUProbeScene {
         self.tile = tile
         self.label = label
         self.layer = layer
+        self.stars = stars
         caps = GlobeCapRenderer(sharedResources: GlobeCapRenderer.SharedResources.make(device: device,
                                                                                       pixelFormat: .bgra8Unorm,
                                                                                       sampleCount: 4,
@@ -86,13 +89,34 @@ package final class GPUProbeScene {
         surfaceLabelPipeline = SurfaceLabelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         textRenderer = TextRenderer(device: device, resource: { _, _ in nil }, sampleCount: 4)
         horizon = HorizonRenderer(pipeline: HorizonPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4))
-        // A small sky: the model is seeded, so every frame's stars are the same.
-        var sky = ImmersiveMapSettings.default.scene.starfield
-        sky.starCount = 64
-        stars = StarfieldRenderer(device: device,
-                                  pipeline: StarfieldPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4),
-                                  config: sky)
+        starPipeline = StarfieldPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+    }
+
+    /// The probe's sky: 64 stars on a spiral over the unit sphere, made with
+    /// `+ - * /` and `sqrt` alone, which IEEE rounds the same everywhere.
+    /// The engine's model (`StarfieldModel`) places its stars with `pow`,
+    /// `sin` and `cos`, which Apple's and other C libraries round apart in
+    /// the last bit, and the frame's stream is compared byte for byte
+    /// across platforms (`WebGPUFrameStreamTests`).
+    private static let starCount = 64
+
+    private static func stars() -> [StarfieldStarVertex] {
+        let count = starCount
+        return (0 ..< count).map { index in
+            let z = 1 - Float(2 * index + 1) / Float(count)
+            let radial = (1 - z * z).squareRoot()
+            // A point on the unit circle by its rational parametrisation,
+            // the slope stepping through -2...2 in a scattered order.
+            let t = Float((index * 37) % count) / 16 - 2
+            let circle = SIMD2<Float>((1 - t * t) / (1 + t * t), 2 * t / (1 + t * t))
+            return StarfieldStarVertex(position: SIMD3(radial * circle.x, radial * circle.y, z),
+                                       size: 6 + Float(index % 5) * 3,
+                                       brightness: 0.45 + Float(index % 7) / 12,
+                                       temperature: Float(index % 11) / 10,
+                                       twinklePhase: Float(index) / 8,
+                                       halo: Float(index % 3) / 2)
+        }
     }
 
     /// A layer of the app's over the ground: a zone, a path across it and a
@@ -252,13 +276,24 @@ package final class GPUProbeScene {
                                                SIMD4(0, 0, -0.5, 0),
                                                SIMD4(0, 0, 0.5, 1)))
         let globe = GlobeUniform(panX: turn, panY: -0.2, radius: 0.7, transition: 0)
-        // The stars first, the background at the far plane.
-        stars.draw(renderEncoder: encoder,
-                   globe: globe,
-                   cameraView: matrix_identity_float4x4,
-                   cameraEye: SIMD3(0, 0, 3),
-                   drawSize: CGSize(width: width, height: height),
-                   nowTime: turn)
+        // The stars first, the background at the far plane: the calls of
+        // StarfieldRenderer.draw, with the probe's camera and no pan
+        // rotation in place of its perspective and the pan's, which `tan`,
+        // `sin` and `cos` make (see `stars()`).
+        starPipeline.selectStarsPipeline(renderEncoder: encoder)
+        encoder.setVertexBuffer(stars, offset: 0, index: 0)
+        encoder.setVertexValue(CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0), index: 1)
+        encoder.setVertexValue(globe, index: 2)
+        encoder.setVertexValue(StarfieldParamsUniform(rotation: matrix_identity_float4x4, radiusScale: 1.25,
+                                                      padding: SIMD3<Float>(repeating: 0)),
+                               index: 3)
+        encoder.setFragmentValue(turn, index: 0)
+        if starPipeline.drawsQuads {
+            encoder.setVertexValue(StarfieldQuadUniform(viewportSizePx: SIMD2(Float(width), Float(height))), index: 4)
+            encoder.draw(.triangle, vertexStart: 0, vertexCount: 6, instanceCount: Self.starCount, baseInstance: 0)
+        } else {
+            encoder.draw(.point, vertexStart: 0, vertexCount: Self.starCount)
+        }
         caps.draw(renderEncoder: encoder, globeFrame: GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: camera), globe: globe)
         for part in [FlatMapSurfaceDrawer.Part.ground, .roads] {
             FlatMapSurfaceDrawer.draw(renderEncoder: encoder,
