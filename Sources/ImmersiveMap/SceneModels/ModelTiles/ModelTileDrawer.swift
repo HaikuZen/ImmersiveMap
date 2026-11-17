@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// One model tile, placed for the frame and ready to encode.
@@ -23,54 +23,44 @@ enum ModelTileDrawer {
     /// `depthBias`, a share of their distance from the eye
     /// (`ModelArchiveSettings.depthBias`). A tile binds its buffer and its
     /// texture array once and draws every model it holds in one call.
-    static func draw(renderEncoder: MTLRenderCommandEncoder,
+    static func draw(renderEncoder: any GPURenderEncoder,
                      cameraUniform: CameraUniform,
-                     shadowBinding: ShadowReceiverBinding,
+                     shadowUniform: ShadowUniform,
+                     shadowMap: any GPUTexture,
                      items: [ModelTileDrawItem],
                      depthBias: Float,
                      pipeline: ModelTilePipeline,
-                     surfaceMaskState: MTLDepthStencilState,
-                     depthDisabledState: MTLDepthStencilState) {
+                     surfaceMaskState: any GPUDepthStencilState,
+                     depthDisabledState: any GPUDepthStencilState) {
         guard items.isEmpty == false else { return }
 
-        var cameraUniformValue = cameraUniform
         renderEncoder.setCullMode(.back)
         // The models are counterclockwise-wound; Metal defaults to clockwise.
         renderEncoder.setFrontFacing(.counterClockwise)
-        renderEncoder.setVertexBytes(&cameraUniformValue, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        var depthBiasValue = depthBias
-        renderEncoder.setVertexBytes(&depthBiasValue, length: MemoryLayout<Float>.stride, index: 3)
+        renderEncoder.setVertexValue(cameraUniform, index: 1)
+        renderEncoder.setVertexValue(depthBias, index: 3)
 
-        var shadowUniformValue = shadowBinding.uniform
-        renderEncoder.setFragmentBytes(&shadowUniformValue, length: MemoryLayout<ShadowUniform>.stride, index: 4)
-        renderEncoder.setFragmentTexture(shadowBinding.texture, index: 1)
-        renderEncoder.setFragmentSamplerState(pipeline.baseColorSampler, index: 0)
+        renderEncoder.setFragmentValue(shadowUniform, index: 4)
+        renderEncoder.setFragmentTexture(shadowMap, index: 1)
+        renderEncoder.setFragmentSampler(pipeline.baseColorSampler, index: 0)
 
         // Every standing tile under one pipeline and one state: one draw
         // a tile.
-        renderEncoder.setRenderPipelineState(pipeline.pipelineState)
+        renderEncoder.setPipeline(pipeline.pipelineState)
         renderEncoder.setDepthStencilState(surfaceMaskState)
-        renderEncoder.setStencilReferenceValue(TileSourceStencilPriority.surfaceMaskBit)
+        renderEncoder.setStencilReference(TileSourceStencilPriority.surfaceMaskBit)
         for item in items where item.mesh.indexCount > 0 && item.isRising == false {
             bind(item, renderEncoder: renderEncoder, withTextures: true)
-            renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                indexCount: item.mesh.indexCount,
-                                                indexType: .uint32,
-                                                indexBuffer: item.mesh.indexBuffer,
-                                                indexBufferOffset: 0)
+            drawTile(item, renderEncoder: renderEncoder)
         }
 
         // A tile coming up out of the ground, with what is still below the
         // ground dropped.
         if items.contains(where: \.isRising) {
-            renderEncoder.setRenderPipelineState(pipeline.belowGroundClippedPipelineState)
+            renderEncoder.setPipeline(pipeline.belowGroundClippedPipelineState)
             for item in items where item.isRising && item.mesh.indexCount > 0 {
                 bind(item, renderEncoder: renderEncoder, withTextures: true)
-                renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                    indexCount: item.mesh.indexCount,
-                                                    indexType: .uint32,
-                                                    indexBuffer: item.mesh.indexBuffer,
-                                                    indexBufferOffset: 0)
+                drawTile(item, renderEncoder: renderEncoder)
             }
         }
 
@@ -81,28 +71,22 @@ enum ModelTileDrawer {
 
     /// Depth-only replay of the tiles from the light's orthographic camera,
     /// cull `.none`, like the scene models' casters: one draw a tile.
-    static func drawShadowCasters(renderEncoder: MTLRenderCommandEncoder,
+    static func drawShadowCasters(renderEncoder: any GPURenderEncoder,
                                   lightProjectionView: matrix_float4x4,
                                   items: [ModelTileDrawItem],
                                   pipeline: ModelTilePipeline,
-                                  extrudedDepthState: MTLDepthStencilState) {
+                                  extrudedDepthState: any GPUDepthStencilState) {
         guard items.isEmpty == false else { return }
 
-        renderEncoder.setRenderPipelineState(pipeline.shadowPipelineState)
+        renderEncoder.setPipeline(pipeline.shadowPipelineState)
         renderEncoder.setCullMode(.none)
         renderEncoder.setDepthStencilState(extrudedDepthState)
         renderEncoder.setDepthClipMode(.clamp)
-
-        var castersValue = ShadowCasterUniform(lightProjectionView: lightProjectionView)
-        renderEncoder.setVertexBytes(&castersValue, length: MemoryLayout<ShadowCasterUniform>.stride, index: 1)
+        renderEncoder.setVertexValue(ShadowCasterUniform(lightProjectionView: lightProjectionView), index: 1)
 
         for item in items {
             bind(item, renderEncoder: renderEncoder, withTextures: false)
-            renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                indexCount: item.mesh.indexCount,
-                                                indexType: .uint32,
-                                                indexBuffer: item.mesh.indexBuffer,
-                                                indexBufferOffset: 0)
+            drawTile(item, renderEncoder: renderEncoder)
         }
 
         renderEncoder.setDepthClipMode(.clip)
@@ -111,13 +95,24 @@ enum ModelTileDrawer {
     /// A tile's vertex buffer and matrix, and its texture array for a
     /// colour pass.
     private static func bind(_ item: ModelTileDrawItem,
-                             renderEncoder: MTLRenderCommandEncoder,
+                             renderEncoder: any GPURenderEncoder,
                              withTextures: Bool) {
-        var modelMatrix = item.modelMatrix
         renderEncoder.setVertexBuffer(item.mesh.vertexBuffer, offset: 0, index: 0)
-        renderEncoder.setVertexBytes(&modelMatrix, length: MemoryLayout<matrix_float4x4>.stride, index: 2)
+        renderEncoder.setVertexValue(item.modelMatrix, index: 2)
         if withTextures {
             renderEncoder.setFragmentTexture(item.mesh.texture, index: 0)
         }
+    }
+
+    /// Every index of the tile, in one call.
+    private static func drawTile(_ item: ModelTileDrawItem, renderEncoder: any GPURenderEncoder) {
+        renderEncoder.drawIndexed(.triangle,
+                                  indexCount: item.mesh.indexCount,
+                                  indexType: .uint32,
+                                  indexBuffer: item.mesh.indexBuffer,
+                                  indexBufferOffset: 0,
+                                  instanceCount: 1,
+                                  baseVertex: 0,
+                                  baseInstance: 0)
     }
 }

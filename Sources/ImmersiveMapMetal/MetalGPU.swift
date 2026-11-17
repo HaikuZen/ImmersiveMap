@@ -77,7 +77,16 @@ package final class MetalTexture: GPUTexture {
                         slice: slice,
                         withBytes: bytes,
                         bytesPerRow: bytesPerRow,
-                        bytesPerImage: texture.textureType == .type2DArray ? bytesPerRow * height : 0)
+                        bytesPerImage: texture.textureType == .type2DArray ? bytesPerRow * rowCount(height: height) : 0)
+    }
+
+    /// The rows of bytes an image of the height takes: a block-compressed
+    /// format's rows are rows of blocks.
+    private func rowCount(height: Int) -> Int {
+        if case let .astc(_, blockHeight) = format {
+            return (height + blockHeight - 1) / blockHeight
+        }
+        return height
     }
 }
 

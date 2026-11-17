@@ -10,7 +10,9 @@ import simd
 /// point sprites), the globe's polar caps turning over a square of
 /// flat ground with its fills and its line ribbons, a building standing
 /// on it (an extruded box, through the shadow cascades), a scene model
-/// beside it (a box of the models' own layout), a label painted
+/// beside it (a box of the models' own layout), a model tile's tower in
+/// the tile's far corner (in the baker's vertex, its two faces' colours
+/// two layers of a texture array), a label painted
 /// on the ground beside it, a layer of the app's (a zone, a path and a
 /// point) and the horizon's sky over all of it, into the world pass's
 /// targets (multisampled colour resolved into the frame's target, depth
@@ -28,6 +30,8 @@ package final class GPUProbeScene {
     private let surfaceLabelPipeline: SurfaceLabelPipeline
     private let modelPipeline: SceneModelPipeline
     private let model: SceneModelMesh
+    private let modelTilePipeline: ModelTilePipeline
+    private let modelTile: ModelTileMesh
     /// The text without its atlases, which the probe does not load: the
     /// label's glyph samples an empty atlas, covers nothing and draws no
     /// pixel, while its pipeline, bindings and draws are the map's.
@@ -66,7 +70,8 @@ package final class GPUProbeScene {
               let label = Self.label(device: device, tile: tile.metalTile.tile),
               let layer = Self.layer(device: device),
               let stars = device.makeBuffer(Self.stars(), storage: .shared),
-              let model = Self.model(device: device) else {
+              let model = Self.model(device: device),
+              let modelTile = Self.modelTile(device: device) else {
             return nil
         }
         self.device = device
@@ -80,6 +85,7 @@ package final class GPUProbeScene {
         self.layer = layer
         self.stars = stars
         self.model = model
+        self.modelTile = modelTile
         caps = GlobeCapRenderer(sharedResources: GlobeCapRenderer.SharedResources.make(device: device,
                                                                                       pixelFormat: .bgra8Unorm,
                                                                                       sampleCount: 4,
@@ -96,6 +102,7 @@ package final class GPUProbeScene {
         horizon = HorizonRenderer(pipeline: HorizonPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4))
         starPipeline = StarfieldPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         modelPipeline = SceneModelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        modelTilePipeline = ModelTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
     }
 
@@ -163,6 +170,70 @@ package final class GPUProbeScene {
                                                                           baseColor: SIMD4(0.85, 0.55, 0.3, 1))]],
                               localBounds: SceneModelBounds(minimum: SIMD3(repeating: -1), maximum: SIMD3(repeating: 1)),
                               costInBytes: 0)
+    }
+
+    /// A model tile of the whole world: one tower in the tile's units, in
+    /// the baker's vertex (`ModelTileContents`), four corners a face wound
+    /// counterclockwise seen from outside, the walls on the texture's first
+    /// layer and the roof and floor on its second. The texture is RGBA, a
+    /// format every backend samples, where an archive's is ASTC, which
+    /// WebGPU offers only as an optional feature: the pipeline samples
+    /// either alike.
+    private static func modelTile(device: any GPUDevice) -> ModelTileMesh? {
+        let low = SIMD3<Float>(600, 3000, 0), high = SIMD3<Float>(1000, 3400, 800)
+        let center = (low + high) / 2, half = (high - low) / 2
+        // Each face by its normal and two tangents whose cross product is it.
+        let faces: [(normal: SIMD3<Float>, u: SIMD3<Float>, v: SIMD3<Float>)] = [
+            (SIMD3(1, 0, 0), SIMD3(0, 1, 0), SIMD3(0, 0, 1)),
+            (SIMD3(-1, 0, 0), SIMD3(0, 0, 1), SIMD3(0, 1, 0)),
+            (SIMD3(0, 1, 0), SIMD3(0, 0, 1), SIMD3(1, 0, 0)),
+            (SIMD3(0, -1, 0), SIMD3(1, 0, 0), SIMD3(0, 0, 1)),
+            (SIMD3(0, 0, 1), SIMD3(1, 0, 0), SIMD3(0, 1, 0)),
+            (SIMD3(0, 0, -1), SIMD3(0, 1, 0), SIMD3(1, 0, 0)),
+        ]
+        var vertices: [UInt8] = []
+        var indices: [UInt32] = []
+        for face in faces {
+            let first = UInt32(vertices.count / ModelTileContents.vertexStride)
+            let layer: UInt8 = face.normal.z == 0 ? 0 : 1
+            for (a, b) in [(Float(-1), Float(-1)), (1, -1), (1, 1), (-1, 1)] {
+                let position = center + (face.normal + face.u * a + face.v * b) * half
+                withUnsafeBytes(of: position.x) { vertices += $0 }
+                withUnsafeBytes(of: position.y) { vertices += $0 }
+                withUnsafeBytes(of: position.z) { vertices += $0 }
+                vertices += [face.normal.x, face.normal.y, face.normal.z].map { UInt8(bitPattern: Int8($0 * 127)) }
+                vertices.append(layer)
+                withUnsafeBytes(of: a < 0 ? UInt16.min : UInt16.max) { vertices += $0 }
+                withUnsafeBytes(of: b < 0 ? UInt16.max : UInt16.min) { vertices += $0 }
+            }
+            indices += [first, first + 1, first + 2, first, first + 2, first + 3]
+        }
+        assert(vertices.count == 24 * ModelTileContents.vertexStride)
+        var descriptor = GPUTextureDescriptor(format: .rgba8Unorm, width: 2, height: 2)
+        descriptor.type = .type2DArray
+        descriptor.arrayLength = 2
+        // Filled from the CPU below, which Metal allows only on shared storage.
+        descriptor.storage = .shared
+        guard let vertexBuffer = device.makeBuffer(vertices, storage: .shared),
+              let indexBuffer = device.makeBuffer(indices, storage: .shared),
+              let texture = device.makeTexture(descriptor) else { return nil }
+        let layers: [[UInt8]] = [[200, 190, 170, 255, 180, 170, 150, 255, 180, 170, 150, 255, 200, 190, 170, 255],
+                                 [90, 60, 50, 255, 90, 60, 50, 255, 90, 60, 50, 255, 90, 60, 50, 255]]
+        for (slice, texels) in layers.enumerated() {
+            texels.withUnsafeBytes { bytes in
+                texture.replace(x: 0, y: 0, width: 2, height: 2, mipmapLevel: 0, slice: slice,
+                                bytes: bytes.baseAddress!, bytesPerRow: 8)
+            }
+        }
+        return ModelTileMesh(tile: Tile(x: 0, y: 0, z: 0),
+                             indexCount: indices.count,
+                             replacedBuildingIDs: [:],
+                             boundsMinimum: low,
+                             boundsMaximum: high,
+                             vertexBuffer: vertexBuffer,
+                             indexBuffer: indexBuffer,
+                             texture: texture,
+                             costInBytes: 0)
     }
 
     /// A layer of the app's over the ground: a zone, a path across it and a
@@ -393,6 +464,23 @@ package final class GPUProbeScene {
                               groundCutStates: SceneModelGroundCutStates(holeWrite: groundState, holeClear: groundState,
                                                                          holeTest: groundState),
                               depthDisabledState: depthDisabledState)
+        // The model tile, placed as the map's buildings of its tile are
+        // (`ModelTileRenderSubsystem.placement`): a translation and a
+        // uniform scale, a power of two.
+        let tileOrigin = ImmersiveMapProjection.flatTileOriginAndSize(x: 0, y: 0, z: 0, worldWrap: 0,
+                                                                      flatRenderPan: .zero, renderMapSize: 1)
+        let tileScale = tileOrigin.z / ModelTileContents.tileExtent
+        ModelTileDrawer.draw(renderEncoder: encoder,
+                             cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),
+                             shadowUniform: .disabled,
+                             shadowMap: cascades,
+                             items: [ModelTileDrawItem(mesh: modelTile,
+                                                       modelMatrix: Matrix.translationMatrix(x: tileOrigin.x, y: tileOrigin.y, z: 0)
+                                                           * Matrix.scaleMatrix(sx: tileScale, sy: tileScale, sz: tileScale))],
+                             depthBias: 1.0 / 1024,
+                             pipeline: modelTilePipeline,
+                             surfaceMaskState: groundState,
+                             depthDisabledState: depthDisabledState)
         let labelFrame = SurfaceLabelDrawing.Frame(cameraUniform: CameraUniform(matrix: camera, eye: SIMD3(0, 0, 3), padding: 0),
                                                    groundFog: .disabled,
                                                    tileScreenPoints: Double(min(width, height)) * 0.45,

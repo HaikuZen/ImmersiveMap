@@ -219,7 +219,8 @@ final class RenderPersistentContext {
         self.modelTilePipeline = shared.modelTilePipeline
         self.placementStencilPipeline = shared.placementStencilPipeline
         self.modelTileStore = ModelTileStore.make(settings: config,
-                                                  device: metal.device,
+                                                  device: shared.gpuDevice,
+                                                  fileLoader: ModelTileMesh.metalFileLoader(device: metal.device),
                                                   schema: styleRuntime.schema)
         self.modelTileStore?.eventSink = eventSink
         self.groundRelief = GroundReliefFrameState.make(settings: config,

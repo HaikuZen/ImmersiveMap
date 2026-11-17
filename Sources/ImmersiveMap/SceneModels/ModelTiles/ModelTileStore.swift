@@ -1,10 +1,10 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
 import os
 import PMTiles
+import PortableFoundation
 
 /// Loads the model tiles a frame wants and releases the ones it has left.
 ///
@@ -55,7 +55,8 @@ final class ModelTileStore: @unchecked Sendable {
 
     weak var eventSink: RenderFrameEventSink?
 
-    private let device: MTLDevice
+    private let device: any GPUDevice
+    private let fileLoader: ModelTileMesh.FileLoader?
     private let schema: any ImmersiveMapTileSchema
     private let loadTile: @Sendable (Tile) async throws -> ModelTileSource.Outcome
     private let discardCachedTile: @Sendable (Tile) -> Void
@@ -68,11 +69,13 @@ final class ModelTileStore: @unchecked Sendable {
     private var emptyTiles: Set<Tile> = []
     private var wantedTiles: Set<Tile> = []
 
-    convenience init(device: MTLDevice,
+    convenience init(device: any GPUDevice,
+                     fileLoader: ModelTileMesh.FileLoader?,
                      schema: any ImmersiveMapTileSchema,
                      source: ModelTileSource,
                      costLimitBytes: Int) {
         self.init(device: device,
+                  fileLoader: fileLoader,
                   schema: schema,
                   costLimitBytes: costLimitBytes,
                   loadTile: { tile in try await source.tileBytes(tile) },
@@ -82,8 +85,12 @@ final class ModelTileStore: @unchecked Sendable {
     /// The store of a map's settings: nil for a map without a model
     /// archive, and for a device whose GPU does not sample the textures a
     /// model tile carries, where the map keeps its own buildings.
+    /// `fileLoader` is the backend's way to load a cached tile's file
+    /// straight into the GPU's memory, if it has one
+    /// (`ModelTileMesh.FileLoader`).
     static func make(settings: ImmersiveMapSettings,
-                     device: MTLDevice,
+                     device: any GPUDevice,
+                     fileLoader: ModelTileMesh.FileLoader?,
                      schema: any ImmersiveMapTileSchema) -> ModelTileStore? {
         let archive = settings.modelArchive
         guard let archiveURL = archive.archiveURL else {
@@ -96,6 +103,7 @@ final class ModelTileStore: @unchecked Sendable {
             return nil
         }
         return ModelTileStore(device: device,
+                              fileLoader: fileLoader,
                               schema: schema,
                               source: ModelTileSource(archiveURL: archiveURL,
                                                       settings: archive,
@@ -104,13 +112,15 @@ final class ModelTileStore: @unchecked Sendable {
     }
 
     /// The test seam: the tile bytes from a closure, and a clock.
-    init(device: MTLDevice,
+    init(device: any GPUDevice,
+         fileLoader: ModelTileMesh.FileLoader? = nil,
          schema: any ImmersiveMapTileSchema,
          costLimitBytes: Int,
          loadTile: @escaping @Sendable (Tile) async throws -> ModelTileSource.Outcome,
          discardCachedTile: @escaping @Sendable (Tile) -> Void = { _ in },
          now: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSinceReferenceDate }) {
         self.device = device
+        self.fileLoader = fileLoader
         self.schema = schema
         self.costLimitBytes = max(0, costLimitBytes)
         self.cache = LRUMemoryCache(costLimit: max(0, costLimitBytes))
@@ -252,6 +262,7 @@ final class ModelTileStore: @unchecked Sendable {
                                                       data: data,
                                                       fileURL: fileURL,
                                                       device: device,
+                                                      fileLoader: fileLoader,
                                                       schema: schema))
         } catch let error as ModelTileFormatError {
             // The bytes may be a cached file cut short: without it the next

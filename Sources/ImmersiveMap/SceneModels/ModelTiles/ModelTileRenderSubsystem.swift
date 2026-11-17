@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import simd
 
@@ -43,9 +45,9 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
 
     private let store: ModelTileStore?
     private let pipeline: ModelTilePipeline
-    private let extrudedDepthState: MTLDepthStencilState
-    private let surfaceMaskState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let extrudedDepthState: any GPUDepthStencilState
+    private let surfaceMaskState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     private let shadowMapTextureProvider: () -> MTLTexture?
     private let shadowFallbackTexture: MTLTexture
     private var drawItems: [ModelTileDrawItem] = []
@@ -62,9 +64,9 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
     /// does nothing.
     init(store: ModelTileStore?,
          pipeline: ModelTilePipeline,
-         extrudedDepthState: MTLDepthStencilState,
-         surfaceMaskState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
+         extrudedDepthState: any GPUDepthStencilState,
+         surfaceMaskState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
          shadowMapTextureProvider: @escaping () -> MTLTexture?,
          shadowFallbackTexture: MTLTexture,
          minimumZoom: Double = 0,
@@ -233,7 +235,8 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder metalEncoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+        let encoder = MetalRenderEncoder(metalEncoder)
         switch layer {
         case .sceneModels:
             guard drawItems.isEmpty == false else { return }
@@ -247,7 +250,10 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
             let depthBias = frameContext.services.settings.modelArchive.depthBias(atZoom: frameContext.planningZoom)
             ModelTileDrawer.draw(renderEncoder: encoder,
                                  cameraUniform: frameContext.cameraUniform,
-                                 shadowBinding: shadowBinding,
+                                 shadowUniform: shadowBinding.uniform,
+                                 // The render core's shadow map or its
+                                 // fallback, both in the shadow map's format.
+                                 shadowMap: MetalTexture(shadowBinding.texture, format: ShadowCascadeAtlas.depthFormat),
                                  items: drawItems,
                                  depthBias: depthBias,
                                  pipeline: pipeline,

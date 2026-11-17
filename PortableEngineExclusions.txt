@@ -81,11 +81,8 @@ Render/RenderFrameEngine.swift
 Render/RenderFrameEngineHelpers.swift
 Render/RenderFramePassEncoder.swift
 Render/Shaders
-SceneModels/ModelTiles/ModelTileDrawer.swift
-SceneModels/ModelTiles/ModelTileMesh.swift
-SceneModels/ModelTiles/ModelTilePipeline.swift
+SceneModels/ModelTiles/ModelTileMesh+Metal.swift
 SceneModels/ModelTiles/ModelTileRenderSubsystem.swift
-SceneModels/ModelTiles/ModelTileStore.swift
 SceneModels/SceneModelAssetLoader.swift
 SceneModels/SceneModelRenderSubsystem.swift
 SceneModels/Shaders

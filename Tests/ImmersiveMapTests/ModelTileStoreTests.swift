@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import XCTest
 
@@ -32,10 +33,13 @@ final class ModelTileStoreTests: XCTestCase {
     private static let tileA = Tile(x: 9904, y: 5121, z: 14)
     private static let tileB = Tile(x: 9905, y: 5121, z: 14)
 
-    private func makeDevice() throws -> MTLDevice {
-        guard let device = MTLCreateSystemDefaultDevice() else {
+    /// The store makes buffers and textures alone and no pipeline, so the
+    /// device's shader library does not matter.
+    private func makeDevice() throws -> MetalDevice {
+        guard let metalDevice = MTLCreateSystemDefaultDevice() else {
             throw XCTSkip("Metal device is unavailable")
         }
+        let device = reliefGPUDevice(metalDevice)
         guard ModelTileMesh.isSupported(device: device) else {
             throw XCTSkip("This GPU has no ASTC textures")
         }
@@ -92,9 +96,9 @@ final class ModelTileStoreTests: XCTestCase {
                                  schema.tileFeatureID(of: .way(84_653_688)),
                                  schema.tileFeatureID(of: .relation(6_233_742))].compactMap { $0 })],
                        "the tile hides every building its models list, in the map tiles of the zoom listed")
-        XCTAssertEqual(mesh.texture.textureType, .type2DArray)
-        XCTAssertEqual(mesh.texture.pixelFormat, .astc_8x8_ldr)
-        XCTAssertEqual(mesh.texture.mipmapLevelCount, 5)
+        XCTAssertEqual(mesh.texture.metalTexture.textureType, .type2DArray)
+        XCTAssertEqual(mesh.texture.metalTexture.pixelFormat, .astc_8x8_ldr)
+        XCTAssertEqual(mesh.texture.metalTexture.mipmapLevelCount, 5)
         XCTAssertEqual(store.residentCostInBytes, mesh.costInBytes)
     }
 
@@ -294,11 +298,11 @@ final class ModelTileStoreTests: XCTestCase {
         return (fileURL, hollow, contents)
     }
 
-    private func requireIOQueue(_ device: MTLDevice) throws {
+    private func requireIOQueue(_ device: MetalDevice) throws {
 #if targetEnvironment(simulator)
         throw XCTSkip("The simulator has no IO command queue")
 #else
-        guard MetalIOCommandQueues.shared(for: device) != nil else {
+        guard MetalIOCommandQueues.shared(for: device.device) != nil else {
             throw XCTSkip("This device has no IO command queue")
         }
 #endif
@@ -317,6 +321,7 @@ final class ModelTileStoreTests: XCTestCase {
                                                 data: file.hollow,
                                                 fileURL: file.fileURL,
                                                 device: device,
+                                                fileLoader: ModelTileMesh.metalFileLoader(device: device.device),
                                                 schema: ProtomapsBasemapSchema())
 
         XCTAssertEqual(Data(bytes: mesh.vertexBuffer.contents(), count: file.contents.vertexRange.count),
@@ -328,14 +333,14 @@ final class ModelTileStoreTests: XCTestCase {
             let byteCount = file.contents.texture.layerByteCount(level: level)
             for layer in 0..<file.contents.texture.layerCount {
                 var bytes = [UInt8](repeating: 0, count: byteCount)
-                mesh.texture.getBytes(&bytes,
-                                      bytesPerRow: file.contents.texture.bytesPerRow(level: level),
-                                      bytesPerImage: byteCount,
-                                      from: MTLRegionMake2D(0, 0,
-                                                            max(1, file.contents.texture.width >> level),
-                                                            max(1, file.contents.texture.height >> level)),
-                                      mipmapLevel: level,
-                                      slice: layer)
+                mesh.texture.metalTexture.getBytes(&bytes,
+                                                   bytesPerRow: file.contents.texture.bytesPerRow(level: level),
+                                                   bytesPerImage: byteCount,
+                                                   from: MTLRegionMake2D(0, 0,
+                                                                         max(1, file.contents.texture.width >> level),
+                                                                         max(1, file.contents.texture.height >> level)),
+                                                   mipmapLevel: level,
+                                                   slice: layer)
                 texture.append(contentsOf: bytes)
             }
         }
@@ -357,6 +362,7 @@ final class ModelTileStoreTests: XCTestCase {
         let sink = CountingEventSink()
         let discarded = Locked([Tile]())
         let store = ModelTileStore(device: device,
+                                   fileLoader: ModelTileMesh.metalFileLoader(device: device.device),
                                    schema: ProtomapsBasemapSchema(),
                                    costLimitBytes: 1 << 20,
                                    loadTile: { _ in .tile(tile, fileURL: file.fileURL) },

@@ -48,9 +48,9 @@ enum RenderGraphFactory {
                                                             shadowFallbackTexture: context.shadowFallbackTexture)
         let modelTileSubsystem = ModelTileRenderSubsystem(store: context.modelTileStore,
                                                           pipeline: context.modelTilePipeline,
-                                                          extrudedDepthState: context.extrudedDepthState,
-                                                          surfaceMaskState: context.sceneModelSurfaceMaskState,
-                                                          depthDisabledState: context.depthDisabledState,
+                                                          extrudedDepthState: MetalDepthStencilState(context.extrudedDepthState),
+                                                          surfaceMaskState: MetalDepthStencilState(context.sceneModelSurfaceMaskState),
+                                                          depthDisabledState: MetalDepthStencilState(context.depthDisabledState),
                                                           shadowMapTextureProvider: shadowMapTextureProvider,
                                                           shadowFallbackTexture: context.shadowFallbackTexture,
                                                           minimumZoom: settings.modelArchive.minimumZoom,
