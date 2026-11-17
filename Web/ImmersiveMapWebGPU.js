@@ -19,6 +19,8 @@
 //   constant compiles out unbound.
 // - Constant data goes into uniform chunks at 256-byte offsets, written to
 //   the GPU before the submission that reads it.
+// - WebGPU makes no mip levels: the host draws each level of a texture
+//   from the one above it (generateMipmaps).
 
 const opcodes = {
     createBuffer: 1, writeBuffer: 2, createTexture: 3, writeTexture: 4, createSampler: 5,
@@ -40,6 +42,38 @@ const uniformAlignment = 256;
 const uniformChunkSize = 1 << 20;
 const placeholderBufferSize = 1 << 16;
 const maxUniformBindingSize = 1 << 16;
+
+/// Whether the host draws a format's mip levels: the colour formats a
+/// render pass writes and a float texture samples. Not depth, not ASTC.
+function mipmappable(format) {
+    return ['rgba8unorm', 'bgra8unorm', 'r8unorm', 'r16float'].includes(format);
+}
+
+/// One triangle over the target, its texture coordinates 0 to 1 across
+/// it, sampling the level above.
+const mipmapShader = `
+struct MipmapVertex {
+    @builtin(position) position: vec4f,
+    @location(0) uv: vec2f,
+}
+
+@vertex
+fn mipmapVertex(@builtin(vertex_index) index: u32) -> MipmapVertex {
+    let corner = vec2f(f32((index << 1u) & 2u), f32(index & 2u));
+    var out: MipmapVertex;
+    out.position = vec4f(corner * 2.0 - 1.0, 0.0, 1.0);
+    out.uv = vec2f(corner.x, 1.0 - corner.y);
+    return out;
+}
+
+@group(0) @binding(0) var source: texture_2d<f32>;
+@group(0) @binding(1) var sourceSampler: sampler;
+
+@fragment
+fn mipmapFragment(in: MipmapVertex) -> @location(0) vec4f {
+    return textureSampleLevel(source, sourceSampler, in.uv, 0.0);
+}
+`;
 
 /// The device's optional features the engine asks for, of those the
 /// adapter offers, and the depth format the world pass takes on it.
@@ -218,7 +252,7 @@ export class ImmersiveMapWebGPUHost {
                     { width, height });
                 break;
             }
-            case opcodes.generateMipmaps: word(); this.warnOnce('generateMipmaps: not done yet, the texture keeps its first level'); break;
+            case opcodes.generateMipmaps: this.generateMipmaps(word()); break;
             case opcodes.submit: this.finish(word()); break;
             default:
                 throw new Error(`unknown opcode ${opcode} at byte ${position - 4}`);
@@ -248,6 +282,8 @@ export class ImmersiveMapWebGPUHost {
         let usage = descriptor.shaderRead || isDepth || multisampled ? GPUTextureUsage.TEXTURE_BINDING : 0;
         if (descriptor.renderTarget || isDepth || multisampled) usage |= GPUTextureUsage.RENDER_ATTACHMENT;
         if (!isDepth && !multisampled) usage |= GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC;
+        // A colour texture with levels has them drawn (generateMipmaps).
+        if (descriptor.mipLevelCount > 1 && mipmappable(format)) usage |= GPUTextureUsage.RENDER_ATTACHMENT;
         if (format.startsWith('astc') && !this.device.features.has('texture-compression-astc')) {
             this.warnOnce(`${format}: the device has no ASTC, the texture is left out`);
             return;
@@ -260,6 +296,63 @@ export class ImmersiveMapWebGPUHost {
             usage,
         });
         this.objects.set(handle, { kind: 'texture', gpu, descriptor, format, views: new Map() });
+    }
+
+    /// Each level of every slice drawn from the level above it, sampled
+    /// linearly at the centre of each texel it covers: for a level half the
+    /// size, the average of the 2 by 2 texels above, the box filter Metal's
+    /// generateMipmaps uses. Outside any pass, on the submission's encoder,
+    /// in the stream's order. These passes are the host's own and are not
+    /// counted with the engine's.
+    generateMipmaps(handle) {
+        const texture = this.objects.get(handle);
+        if (!texture || texture.descriptor.mipLevelCount <= 1) return;
+        if (!mipmappable(texture.format) || texture.descriptor.sampleCount > 1) {
+            this.warnOnce(`generateMipmaps: ${texture.format} is not drawn into, the texture keeps its first level`);
+            return;
+        }
+        const pipeline = this.mipmapPipeline(texture.format);
+        const encoder = this.commandEncoder();
+        const levels = texture.descriptor.mipLevelCount;
+        const slices = texture.descriptor.depthOrArrayLayers ?? 1;
+        for (let slice = 0; slice < slices; slice += 1) {
+            for (let level = 1; level < levels; level += 1) {
+                const view = (mipLevel) => texture.gpu.createView({
+                    dimension: '2d', baseMipLevel: mipLevel, mipLevelCount: 1, baseArrayLayer: slice, arrayLayerCount: 1,
+                });
+                const bindGroup = this.device.createBindGroup({
+                    layout: pipeline.getBindGroupLayout(0),
+                    entries: [{ binding: 0, resource: view(level - 1) }, { binding: 1, resource: this.linearSampler }],
+                });
+                const pass = encoder.beginRenderPass({
+                    colorAttachments: [{ view: view(level), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+                    label: `mip ${level} of slice ${slice}`,
+                });
+                pass.setPipeline(pipeline);
+                pass.setBindGroup(0, bindGroup);
+                pass.draw(3);
+                pass.end();
+            }
+        }
+    }
+
+    /// The pipeline that draws a level of the format from the one above:
+    /// one triangle over the target, made once a format.
+    mipmapPipeline(format) {
+        this.mipmapPipelines ??= new Map();
+        let pipeline = this.mipmapPipelines.get(format);
+        if (!pipeline) {
+            this.mipmapModule ??= this.device.createShaderModule({ code: mipmapShader, label: 'mipmaps' });
+            pipeline = this.device.createRenderPipeline({
+                layout: 'auto',
+                vertex: { module: this.mipmapModule, entryPoint: 'mipmapVertex' },
+                fragment: { module: this.mipmapModule, entryPoint: 'mipmapFragment', targets: [{ format }] },
+                primitive: { topology: 'triangle-list' },
+                label: `mipmaps ${format}`,
+            });
+            this.mipmapPipelines.set(format, pipeline);
+        }
+        return pipeline;
     }
 
     writeTexture(handle, region, data) {
