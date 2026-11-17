@@ -342,4 +342,9 @@ package struct GPUDeviceFeatures: OptionSet, Hashable, Sendable {
     package static let astc = GPUDeviceFeatures(rawValue: 1 << 0)
     package static let depthClamp = GPUDeviceFeatures(rawValue: 1 << 1)
     package static let triangleEdges = GPUDeviceFeatures(rawValue: 1 << 2)
+    /// A `.point` draw with a size and a sprite coordinate, Metal's
+    /// `point_size` and `point_coord`. WebGPU draws one-pixel points: a
+    /// feature that draws sprites draws instanced quads where the device
+    /// lacks this (`StarfieldPipeline`).
+    package static let pointSprites = GPUDeviceFeatures(rawValue: 1 << 3)
 }

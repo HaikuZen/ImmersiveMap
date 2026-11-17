@@ -61,6 +61,27 @@ final class StarfieldDrawTests: XCTestCase {
         XCTAssertEqual(encoder.fragmentValue(at: 0, as: Float.self), 12.5)
     }
 
+    func testADeviceWithoutPointSpritesDrawsAQuadAStar() throws {
+        let device = RecordingGPUDevice(features: [.depthClamp])
+        let renderer = makeRenderer(device: device, starCount: 5)
+        let pipeline = try XCTUnwrap(device.pipelines.first)
+        XCTAssertEqual(pipeline.label, "StarfieldQuads")
+        XCTAssertEqual(pipeline.vertexFunction.name, "starfieldQuadVertexShader")
+        XCTAssertNil(pipeline.vertexLayout, "The stars are read from storage by the instance")
+        XCTAssertEqual(pipeline.topology, .triangle)
+        let encoder = RecordingRenderEncoder()
+        renderer.draw(renderEncoder: encoder,
+                      globe: GlobeUniform(panX: 0, panY: 0, radius: 1, transition: 0),
+                      cameraView: matrix_identity_float4x4,
+                      cameraEye: SIMD3<Float>(0, 0, 3),
+                      drawSize: CGSize(width: 400, height: 200),
+                      nowTime: 1)
+        XCTAssertTrue(encoder.commands.contains(.setVertexBuffer("buffer 0", offset: 0, index: 0)))
+        XCTAssertEqual(encoder.vertexValue(at: 4, as: StarfieldQuadUniform.self)?.viewportSizePx, SIMD2(400, 200))
+        XCTAssertEqual(encoder.commands.last, .draw(.triangle, vertexStart: 0, vertexCount: 6, instanceCount: 5, baseInstance: 0),
+                       "Six vertices a star, a star an instance")
+    }
+
     func testAnEmptySkyDrawsNothing() {
         let device = RecordingGPUDevice()
         let renderer = makeRenderer(device: device, starCount: 0)

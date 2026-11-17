@@ -407,6 +407,26 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testTheStarsMatchTheirSwiftTwins() throws {
+        let stars = "Starfield/Shaders/StarfieldStars.wgsl"
+        try assertLayout("StarVertex", in: stars, matches: StarfieldStarVertex.self, offsets: [
+            MemoryLayout<StarfieldStarVertex>.offset(of: \.position),
+            MemoryLayout<StarfieldStarVertex>.offset(of: \.size),
+            MemoryLayout<StarfieldStarVertex>.offset(of: \.brightness),
+            MemoryLayout<StarfieldStarVertex>.offset(of: \.temperature),
+            MemoryLayout<StarfieldStarVertex>.offset(of: \.twinklePhase),
+            MemoryLayout<StarfieldStarVertex>.offset(of: \.halo),
+        ])
+        try assertLayout("StarfieldParams", in: stars, matches: StarfieldParamsUniform.self, offsets: [
+            MemoryLayout<StarfieldParamsUniform>.offset(of: \.rotation),
+            MemoryLayout<StarfieldParamsUniform>.offset(of: \.radiusScale),
+            MemoryLayout<StarfieldParamsUniform>.offset(of: \.padding),
+        ])
+        try assertLayout("StarfieldQuad", in: stars, matches: StarfieldQuadUniform.self, offsets: [
+            MemoryLayout<StarfieldQuadUniform>.offset(of: \.viewportSizePx),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.

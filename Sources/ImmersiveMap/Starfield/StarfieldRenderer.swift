@@ -12,21 +12,6 @@ import PortableFoundation
 import simd
 
 final class StarfieldRenderer {
-    private struct StarVertex {
-        let position: SIMD3<Float>
-        let size: Float
-        let brightness: Float
-        let temperature: Float
-        let twinklePhase: Float
-        let halo: Float
-    }
-
-    private struct StarfieldParams {
-        let rotation: matrix_float4x4
-        let radiusScale: Float
-        let padding: SIMD3<Float>
-    }
-
     private let pipeline: StarfieldPipeline
     /// Nil when the model is empty (`starCount == 0`) or the buffer allocation failed:
     /// the star pass is then skipped, space (the pass clear color) still shows.
@@ -60,12 +45,12 @@ final class StarfieldRenderer {
         guard !stars.isEmpty else { return nil }
 
         let vertices = stars.map { star in
-            StarVertex(position: star.position,
-                       size: star.size,
-                       brightness: star.brightness,
-                       temperature: star.temperature,
-                       twinklePhase: star.twinklePhase,
-                       halo: star.halo)
+            StarfieldStarVertex(position: star.position,
+                                size: star.size,
+                                brightness: star.brightness,
+                                temperature: star.temperature,
+                                twinklePhase: star.twinklePhase,
+                                halo: star.halo)
         }
         return device.makeBuffer(vertices, storage: .shared)
     }
@@ -101,9 +86,9 @@ final class StarfieldRenderer {
             panLatitude: globe.panY * Float(ImmersiveMapProjection.maxMercatorLatitude),
             panLongitude: globe.panX * Float.pi
         )
-        let params = StarfieldParams(rotation: rotation,
-                                     radiusScale: config.radiusScale,
-                                     padding: SIMD3<Float>(repeating: 0))
+        let params = StarfieldParamsUniform(rotation: rotation,
+                                            radiusScale: config.radiusScale,
+                                            padding: SIMD3<Float>(repeating: 0))
 
         pipeline.selectStarsPipeline(renderEncoder: renderEncoder)
         renderEncoder.setVertexBuffer(verticesBuffer, offset: 0, index: 0)
@@ -111,6 +96,14 @@ final class StarfieldRenderer {
         renderEncoder.setVertexValue(globe, index: 2)
         renderEncoder.setVertexValue(params, index: 3)
         renderEncoder.setFragmentValue(nowTime, index: 0)
-        renderEncoder.draw(.point, vertexStart: 0, vertexCount: verticesCount)
+        if pipeline.drawsQuads {
+            // Six vertices a star, the star by the instance: the quad a point
+            // sprite of its size covers.
+            renderEncoder.setVertexValue(StarfieldQuadUniform(viewportSizePx: SIMD2(Float(drawSize.width), Float(drawSize.height))),
+                                         index: 4)
+            renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: 6, instanceCount: verticesCount, baseInstance: 0)
+        } else {
+            renderEncoder.draw(.point, vertexStart: 0, vertexCount: verticesCount)
+        }
     }
 }

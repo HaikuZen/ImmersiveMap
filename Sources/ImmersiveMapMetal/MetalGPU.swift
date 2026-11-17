@@ -305,10 +305,11 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
         self.library = library
     }
 
-    /// Metal clamps depth and draws triangle edges on every device. ASTC is
-    /// on Apple's own GPUs, not on the Intel and AMD ones of older Macs.
+    /// Metal clamps depth, draws triangle edges and sizes its points on every
+    /// device. ASTC is on Apple's own GPUs, not on the Intel and AMD ones of
+    /// older Macs.
     package var features: GPUDeviceFeatures {
-        var features: GPUDeviceFeatures = [.depthClamp, .triangleEdges]
+        var features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .pointSprites]
         if device.supportsFamily(.apple2) {
             features.insert(.astc)
         }

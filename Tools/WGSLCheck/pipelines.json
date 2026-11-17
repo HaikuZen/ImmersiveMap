@@ -918,6 +918,45 @@
     },
     {
       "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "starfieldQuadFragmentShader"
+      },
+      "label" : "StarfieldQuads",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "starfieldQuadVertexShader"
+      }
+    },
+    {
+      "buffers" : [
         {
           "arrayStride" : 32,
           "attributes" : [

@@ -30,7 +30,8 @@ final class ShaderLibraryContentsTests: XCTestCase {
 
         let named = try Self.literalFunctionNames()
         XCTAssertGreaterThan(named.count, 30, "the Swift sources were found and read")
-        XCTAssertEqual(named.subtracting(functions), [], "functions the renderer asks for by name but missing from the library")
+        XCTAssertEqual(named.subtracting(functions).subtracting(Self.webGPUOnlyFunctionNames), [],
+                       "functions the renderer asks for by name but missing from the library")
         XCTAssertTrue(functions.contains(RendererSetup.engineFunctionName))
     }
 
@@ -55,6 +56,11 @@ final class ShaderLibraryContentsTests: XCTestCase {
             XCTAssertEqual(URL(fileURLWithPath: bundlePath).lastPathComponent, ImmersiveMapResourceBundle.bundleName)
         }
     }
+
+    /// Functions the code names only for a device without what Metal has,
+    /// which have a WGSL twin and no Metal one: the starfield's quads, for a
+    /// device without point sprites (`StarfieldPipeline`).
+    private static let webGPUOnlyFunctionNames: Set<String> = ["starfieldQuadVertexShader", "starfieldQuadFragmentShader"]
 
     // MARK: - The sources
 

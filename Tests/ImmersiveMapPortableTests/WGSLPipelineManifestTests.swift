@@ -83,7 +83,10 @@ final class WGSLPipelineManifestTests: XCTestCase {
         _ = PlacementStencilPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = HorizonPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
-        return device.pipelines
+        // The starfield as WebGPU draws it, on a device without point sprites.
+        let webGPU = RecordingGPUDevice(features: [.depthClamp])
+        _ = StarfieldPipeline(device: webGPU, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        return device.pipelines + webGPU.pipelines
     }
 
     private static func stage(_ function: GPUShaderFunction) -> Pipeline.Stage {
