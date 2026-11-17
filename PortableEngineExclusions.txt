@@ -56,7 +56,6 @@ Render/Core/Context/FrameContextSharedState+Metal.swift
 Render/Core/Contracts/FrameRenderTarget.swift
 Render/Core/Contracts/RenderPassNode.swift
 Render/Core/Contracts/RenderSubsystem.swift
-Render/Core/FrameAttachmentStore.swift
 Render/Core/RenderGraph.swift
 Render/Core/RenderGraphFactory.swift
 Render/Core/RenderPassGraph.swift

@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import QuartzCore
 
@@ -74,7 +76,7 @@ final class RenderPassGraph {
                                       target _: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
             guard let shadowState = ShadowPassGateResolver.resolve(frameContext: frameContext),
                   shadowState.slots.contains(slot),
-                  let shadowMapTexture = attachments.ensureShadowMapTexture(resolution: shadowState.mapResolution) else {
+                  let shadowMapTexture = attachments.ensureShadowMapTexture(resolution: shadowState.mapResolution)?.metalTexture else {
                 return nil
             }
 
@@ -97,7 +99,7 @@ final class RenderPassGraph {
                                       target _: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
             guard frameContext.renderSurfaceMode == .flat,
                   ShadowPassGateResolver.resolve(frameContext: frameContext) != nil,
-                  let maskTexture = attachments.ensureGroundShadowMaskTexture(drawSize: frameContext.drawSize) else {
+                  let maskTexture = attachments.ensureGroundShadowMaskTexture(drawSize: frameContext.drawSize)?.metalTexture else {
                 return nil
             }
 
@@ -140,19 +142,17 @@ final class RenderPassGraph {
             case .drawable:
                 outputTexture = target.texture
             case .postProcessingInput:
-                outputTexture = attachments.ensurePostProcessingInputTexture(
-                    drawSize: frameContext.drawSize,
-                    pixelFormat: target.texture.pixelFormat
-                )
+                outputTexture = GPUPixelFormat(metal: target.texture.pixelFormat).flatMap {
+                    attachments.ensurePostProcessingInputTexture(drawSize: frameContext.drawSize, pixelFormat: $0)?.metalTexture
+                }
             }
             guard let outputTexture else { return nil }
 
             let descriptor = MTLRenderPassDescriptor()
             if outputPlan.usesMultisampleResolve {
-                guard let colorTexture = attachments.ensureColorTexture(
-                    drawSize: frameContext.drawSize,
-                    pixelFormat: target.texture.pixelFormat
-                ) else {
+                guard let pixelFormat = GPUPixelFormat(metal: target.texture.pixelFormat),
+                      let colorTexture = attachments.ensureColorTexture(drawSize: frameContext.drawSize,
+                                                                        pixelFormat: pixelFormat)?.metalTexture else {
                     return nil
                 }
                 descriptor.colorAttachments[0].texture = colorTexture
@@ -213,7 +213,7 @@ final class RenderPassGraph {
                                       attachments: FrameAttachmentStore,
                                       target: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
             guard let target,
-                  let depthTexture = attachments.ensureOverlayDepthTexture(drawSize: frameContext.drawSize) else {
+                  let depthTexture = attachments.ensureOverlayDepthTexture(drawSize: frameContext.drawSize)?.metalTexture else {
                 return nil
             }
 
@@ -247,14 +247,14 @@ final class RenderPassGraph {
         let keepsSceneDepth = frameContext.sharedState.sceneDepthForLabelsRequested
             && attachments.supportsSceneDepth
         let depthTexture = attachments.ensureDepthTexture(drawSize: frameContext.drawSize,
-                                                          keptForLabels: keepsSceneDepth)
+                                                          keptForLabels: keepsSceneDepth)?.metalTexture
         if let depthTexture {
             resourceRegistry.setTexture(depthTexture, named: .depthTexture)
         }
         var sceneDepthTexture: MTLTexture?
         if keepsSceneDepth {
             sceneDepthTexture = attachments.sampleCount > 1
-                ? attachments.ensureSceneDepthResolveTexture(drawSize: frameContext.drawSize)
+                ? attachments.ensureSceneDepthResolveTexture(drawSize: frameContext.drawSize)?.metalTexture
                 : depthTexture
         }
         frameContext.sharedState.sceneDepthTexture = sceneDepthTexture
@@ -273,7 +273,7 @@ final class RenderPassGraph {
         // or the frame has no casters, and the receivers then bind the fallback
         // texture with a disabled uniform (same resolver on both sides).
         if let shadowState = ShadowPassGateResolver.resolve(frameContext: frameContext),
-           let shadowMapTexture = attachments.ensureShadowMapTexture(resolution: shadowState.mapResolution) {
+           let shadowMapTexture = attachments.ensureShadowMapTexture(resolution: shadowState.mapResolution)?.metalTexture {
             resourceRegistry.setTexture(shadowMapTexture, named: .shadowMapTexture)
             // The sun is static and the buildings do not move: a window's
             // caster pass runs only when its rendered slice went stale
@@ -295,7 +295,7 @@ final class RenderPassGraph {
             // windows), read by every blended ground layer of the world
             // pass instead of a lookup per layer.
             if frameContext.renderSurfaceMode == .flat,
-               let maskTexture = attachments.ensureGroundShadowMaskTexture(drawSize: frameContext.drawSize) {
+               let maskTexture = attachments.ensureGroundShadowMaskTexture(drawSize: frameContext.drawSize)?.metalTexture {
                 resourceRegistry.setTexture(maskTexture, named: .groundShadowMaskTexture)
                 nodes.append(RenderPassNode(name: .groundShadowMask,
                                             descriptorProvider: GroundShadowMaskDescriptorProvider(),

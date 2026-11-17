@@ -336,6 +336,9 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
         if device.supportsFamily(.apple2) {
             features.insert(.astc)
         }
+        if device.supportsFamily(.apple3) || device.supportsFamily(.mac2) {
+            features.insert(.depthResolve)
+        }
         return features
     }
 
@@ -366,19 +369,25 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
         metal.sampleCount = descriptor.sampleCount
         metal.usage = descriptor.usage.metal
         metal.storageMode = textureStorageMode(descriptor.storage)
-        return device.makeTexture(descriptor: metal).map { MetalTexture($0, format: descriptor.format) }
+        let texture = device.makeTexture(descriptor: metal)
+        texture?.label = descriptor.label
+        return texture.map { MetalTexture($0, format: descriptor.format) }
     }
 
     /// A texture the CPU writes is shared where the GPU and the CPU share
     /// memory, and managed on a Mac whose GPU has its own. A memoryless one
     /// is private where the GPU has no tile memory (a Mac's Intel or AMD
-    /// GPU).
+    /// GPU) and in the iOS Simulator, which has no memoryless textures.
     private func textureStorageMode(_ storage: GPUStorage) -> MTLStorageMode {
         switch storage {
         case .private:
             return .private
         case .memoryless:
+            #if targetEnvironment(simulator)
+            return .private
+            #else
             return device.supportsFamily(.apple2) ? .memoryless : .private
+            #endif
         case .shared:
             #if os(macOS)
             return device.hasUnifiedMemory ? .shared : .managed

@@ -120,20 +120,20 @@ final class RenderFrameEngine {
                                                             eventSink: eventSink,
                                                             tileTraceRecorder: tileTraceRecorder,
                                                             baseLabelTraceRecorder: baseLabelTraceRecorder)
-        let attachments = FrameAttachmentStore(metalDevice: persistentContext.metalContext.device,
+        let attachments = FrameAttachmentStore(device: persistentContext.gpuDevice,
                                                renderSampleCount: persistentContext.metalContext.renderSampleCount)
 
         let renderGraph = RenderGraphFactory.makeDefaultGraph(context: persistentContext,
                                                               settings: settings,
                                                               debugOverlayControls: debugOverlayControls,
                                                               postProcessingInputTextureProvider: { [attachments] in
-                                                                  attachments.currentPostProcessingInputTexture
+                                                                  attachments.currentPostProcessingInputTexture?.metalTexture
                                                               },
                                                               shadowMapTextureProvider: { [attachments] in
-                                                                  attachments.currentShadowMapTexture
+                                                                  attachments.currentShadowMapTexture?.metalTexture
                                                               },
                                                               groundShadowMaskTextureProvider: { [attachments] in
-                                                                  attachments.currentGroundShadowMaskTexture
+                                                                  attachments.currentGroundShadowMaskTexture?.metalTexture
                                                               })
 
         self.settings = settings

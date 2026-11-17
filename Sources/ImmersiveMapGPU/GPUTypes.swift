@@ -61,6 +61,8 @@ package struct GPUTextureDescriptor: Hashable, Sendable {
     package var sampleCount: Int = 1
     package var usage: GPUTextureUsage = .shaderRead
     package var storage: GPUStorage = .private
+    /// A name for GPU captures and debuggers. No effect on drawing.
+    package var label: String?
 
     package init(format: GPUPixelFormat, width: Int, height: Int) {
         self.format = format
@@ -353,4 +355,8 @@ package struct GPUDeviceFeatures: OptionSet, Hashable, Sendable {
     /// feature that draws sprites draws instanced quads where the device
     /// lacks this (`StarfieldPipeline`).
     package static let pointSprites = GPUDeviceFeatures(rawValue: 1 << 3)
+    /// A multisampled depth resolved to one sample at a pass's end, for a
+    /// later pass to read: Metal's depth resolve, on Apple3 and Mac2 GPUs.
+    /// WebGPU resolves colour alone.
+    package static let depthResolve = GPUDeviceFeatures(rawValue: 1 << 4)
 }

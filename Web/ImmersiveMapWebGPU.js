@@ -294,6 +294,7 @@ export class ImmersiveMapWebGPUHost {
             mipLevelCount: descriptor.mipLevelCount,
             sampleCount: descriptor.sampleCount,
             usage,
+            label: descriptor.label,
         });
         this.objects.set(handle, { kind: 'texture', gpu, descriptor, format, views: new Map() });
     }

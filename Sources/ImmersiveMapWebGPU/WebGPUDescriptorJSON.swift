@@ -75,13 +75,15 @@ enum WebGPUJSON {
 }
 
 extension GPUTextureDescriptor {
+    /// The label goes along only where there is one, so a texture without
+    /// one writes the stream it always wrote.
     var webGPUJSON: WebGPUJSON {
         let dimension: String
         switch type {
         case .type2D, .type2DMultisample: dimension = "2d"
         case .type2DArray: dimension = "2d-array"
         }
-        return .object([
+        var fields: [(String, WebGPUJSON)] = [
             ("format", .string(format.webGPU)),
             ("width", .number(Double(width))),
             ("height", .number(Double(height))),
@@ -91,7 +93,11 @@ extension GPUTextureDescriptor {
             ("sampleCount", .number(Double(sampleCount))),
             ("shaderRead", .bool(usage.contains(.shaderRead))),
             ("renderTarget", .bool(usage.contains(.renderTarget))),
-        ])
+        ]
+        if let label {
+            fields.append(("label", .string(label)))
+        }
+        return .object(fields)
     }
 }
 

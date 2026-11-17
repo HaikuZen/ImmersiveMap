@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import XCTest
 
@@ -65,9 +66,9 @@ final class ShadowMapAttachmentTests: XCTestCase {
     @MainActor
     func testTheShadowMapAttachmentHasASlicePerWindow() throws {
         let device = try makeDevice()
-        let attachments = FrameAttachmentStore(metalDevice: device, renderSampleCount: 1)
+        let attachments = FrameAttachmentStore(device: reliefGPUDevice(device), renderSampleCount: 1)
 
-        let texture = try XCTUnwrap(attachments.ensureShadowMapTexture(resolution: 512))
+        let texture = try XCTUnwrap(attachments.ensureShadowMapTexture(resolution: 512)?.metalTexture)
 
         XCTAssertEqual(texture.textureType, .type2DArray)
         XCTAssertEqual(texture.arrayLength, ShadowCascadeAtlas.sliceCount)
