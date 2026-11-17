@@ -18,8 +18,9 @@ import simd
 /// two layers of a texture array), a label painted
 /// on the ground beside it, a layer of the app's (a zone, a path and a
 /// point) and the horizon's sky over all of it, into the world pass's
-/// targets (multisampled colour resolved into the frame's target, depth
-/// and stencil). It is not the map: it is what a new backend is proven
+/// targets (multisampled colour resolved into a texture of the frame's
+/// size, depth and stencil), and the FXAA pass from there into the frame's
+/// target, as the map draws with FXAA on. It is not the map: it is what a new backend is proven
 /// with before the render core runs on it. `WebGPUFrameStreamTests` holds
 /// its WebGPU stream, and the browser probe (`ImmersiveMapWebProbe`,
 /// `Web/probe/`) draws it every frame.
@@ -57,7 +58,8 @@ package final class GPUProbeScene {
     private let mask: any GPUTexture
     private let cascades: any GPUTexture
     private let tile: PlaceTile
-    private var targets: (width: Int, height: Int, color: any GPUTexture, depth: any GPUTexture)?
+    private let fxaa: FXAAPipeline
+    private var targets: (width: Int, height: Int, color: any GPUTexture, depth: any GPUTexture, scene: any GPUTexture)?
 
     /// Nil where the device makes no resource, which no backend does for
     /// these sizes.
@@ -121,6 +123,7 @@ package final class GPUProbeScene {
         modelPipeline = SceneModelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         modelTilePipeline = ModelTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         rasterPipeline = RasterTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        fxaa = FXAAPipeline(device: device, pixelFormat: .bgra8Unorm)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
     }
 
@@ -379,11 +382,12 @@ package final class GPUProbeScene {
         return PlaceTile(metalTile: MetalTile(tile: tile, tileBuffers: buffers), placeIn: VisibleTile(tile: tile))
     }
 
-    /// The world pass's multisampled targets for the size, made again when
-    /// it changes.
-    private func worldTargets(width: Int, height: Int) -> (color: any GPUTexture, depth: any GPUTexture)? {
+    /// The world pass's multisampled targets for the size, and the texture
+    /// its colour resolves into for the FXAA pass, made again when the size
+    /// changes.
+    private func worldTargets(width: Int, height: Int) -> (color: any GPUTexture, depth: any GPUTexture, scene: any GPUTexture)? {
         if let targets, targets.width == width, targets.height == height {
-            return (targets.color, targets.depth)
+            return (targets.color, targets.depth, targets.scene)
         }
         var color = GPUTextureDescriptor(format: .bgra8Unorm, width: width, height: height)
         color.type = .type2DMultisample
@@ -393,9 +397,13 @@ package final class GPUProbeScene {
         depth.type = .type2DMultisample
         depth.sampleCount = 4
         depth.usage = .renderTarget
-        guard let colorTexture = device.makeTexture(color), let depthTexture = device.makeTexture(depth) else { return nil }
-        targets = (width, height, colorTexture, depthTexture)
-        return (colorTexture, depthTexture)
+        var scene = GPUTextureDescriptor(format: .bgra8Unorm, width: width, height: height)
+        scene.usage = [.shaderRead, .renderTarget]
+        guard let colorTexture = device.makeTexture(color),
+              let depthTexture = device.makeTexture(depth),
+              let sceneTexture = device.makeTexture(scene) else { return nil }
+        targets = (width, height, colorTexture, depthTexture, sceneTexture)
+        return (colorTexture, depthTexture, sceneTexture)
     }
 
     /// Draws one frame into `target`, a `.bgra8Unorm` texture of the size,
@@ -416,7 +424,7 @@ package final class GPUProbeScene {
                                   baseColor: SIMD4(0.09, 0.10, 0.13, 1),
                                   planningZoom: 15)
         var colorAttachment = GPUColorAttachment(texture: world.color)
-        colorAttachment.resolveTexture = target
+        colorAttachment.resolveTexture = world.scene
         colorAttachment.store = .multisampleResolve
         colorAttachment.clearColor = GPUClearColor(red: 0.02, green: 0.03, blue: 0.06, alpha: 1)
         var pass = GPURenderPassDescriptor(colorAttachments: [colorAttachment],
@@ -603,6 +611,13 @@ package final class GPUProbeScene {
                      groundSide: false)
         encoder.setDepthStencilState(depthDisabledState)
         encoder.endEncoding()
+
+        // The FXAA pass: the resolved frame, smoothed into the target.
+        var post = GPURenderPassDescriptor(colorAttachments: [GPUColorAttachment(texture: target)])
+        post.label = "postProcessing"
+        guard let postEncoder = commandBuffer.makeRenderEncoder(post) else { return }
+        fxaa.draw(renderEncoder: postEncoder, sourceTexture: world.scene, width: Float(width), height: Float(height))
+        postEncoder.endEncoding()
         commandBuffer.commit()
     }
 }

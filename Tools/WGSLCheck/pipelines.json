@@ -188,6 +188,32 @@
     },
     {
       "buffers" : [
+
+      ],
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "fxaaFragmentShader"
+      },
+      "label" : "FXAA",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "postProcessingVertexShader"
+      }
+    },
+    {
+      "buffers" : [
         {
           "arrayStride" : 8,
           "attributes" : [

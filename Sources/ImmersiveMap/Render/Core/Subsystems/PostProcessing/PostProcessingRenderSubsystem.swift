@@ -1,6 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 
 final class PostProcessingRenderSubsystem: RenderSubsystem {
@@ -21,13 +23,16 @@ final class PostProcessingRenderSubsystem: RenderSubsystem {
 
     func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
         guard layer == .postProcessing,
-              let inputTexture = inputTextureProvider() else {
+              let inputTexture = inputTextureProvider(),
+              // The frame's own colour, in the drawable's format.
+              let format = GPUPixelFormat(metal: inputTexture.pixelFormat) else {
             return
         }
 
-        fxaaPipeline.draw(renderEncoder: encoder,
-                          sourceTexture: inputTexture,
-                          drawSize: frameContext.drawSize)
+        fxaaPipeline.draw(renderEncoder: MetalRenderEncoder(encoder),
+                          sourceTexture: MetalTexture(inputTexture, format: format),
+                          width: Float(frameContext.drawSize.width),
+                          height: Float(frameContext.drawSize.height))
     }
 
     func handleMemoryWarning() {}

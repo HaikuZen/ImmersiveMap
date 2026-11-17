@@ -441,6 +441,12 @@ final class WGSLLayoutTests: XCTestCase {
         XCTAssertEqual(Self.undefinedByteRanges(of: SceneModelNormalMatrixUniform.self), [])
     }
 
+    func testTheFXAAUniformMatchesItsSwiftTwin() throws {
+        try assertLayout("FXAAUniform", in: "Render/PostProcessing/Shaders/FXAA.wgsl", matches: FXAAPipeline.Uniform.self, offsets: [
+            MemoryLayout<FXAAPipeline.Uniform>.offset(of: \.inverseViewportSize),
+        ])
+    }
+
     func testAPlainVec3MovesTheFieldAfterIt() throws {
         // The rule the shared structs' @size(16) is for: without it, WGSL
         // puts the next field at 12 bytes past a vec3f, Swift at 16.

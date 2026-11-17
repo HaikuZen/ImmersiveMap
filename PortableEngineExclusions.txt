@@ -75,7 +75,6 @@ Render/Export/RenderFrameOffscreenRequest.swift
 Render/Export/VideoExportPixelBufferTextureCache.swift
 Render/Metal/Buffers/DynamicMetalBuffer.swift
 Render/Metal/Buffers/FrameSlottedDynamicMetalBuffer.swift
-Render/PostProcessing/FXAAPipeline.swift
 Render/PostProcessing/Shaders
 Render/RenderFrameEngine.swift
 Render/RenderFrameEngineHelpers.swift
