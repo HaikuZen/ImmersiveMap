@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 
 /// Draws the trees of the flat map's woods and parks: the engine's tree
 /// model (`TreeModelStore`), instanced over each tile's trees

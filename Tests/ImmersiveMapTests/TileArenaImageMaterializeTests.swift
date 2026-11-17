@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import XCTest
 
@@ -145,7 +146,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
         let tile = Tile(x: 1, y: 2, z: 12)
         let preparedTile = makeRichPreparedTile(tile: tile)
 
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let metalTile = try XCTUnwrap(factory.makeTile(from: preparedTile))
 
         let plan = TileArenaImageMath.plan(for: preparedTile)
@@ -174,7 +175,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
                                                    cacheIdentity: cacheIdentity,
                                                    blobFileURL: URL(fileURLWithPath: "/nonexistent"))
 
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let parsed = try XCTUnwrap(factory.makeTile(from: preparedTile))
         let result = try await makeTileGuardingDriverWedge(factory, image: hit.image)
         guard case .tile(let materialized) = result else {
@@ -225,7 +226,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
             return XCTFail("The file-transport entry must carry a file blob")
         }
 
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let result = try await makeTileGuardingDriverWedge(factory, image: hit.image)
         guard case .tile(let materialized) = result else {
             return XCTFail("The MTLIO load must materialize, got \(result)")
@@ -252,7 +253,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
                                                    cacheIdentity: cacheIdentity,
                                                    blobFileURL: URL(fileURLWithPath: "/nonexistent/gone.ptgeo"))
 
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let result = try await makeTileGuardingDriverWedge(factory, image: hit.image)
         guard case .imageUnreadable = result else {
             return XCTFail("A missing container must be reported unreadable, got \(result)")
@@ -298,7 +299,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
                                                    expectedTile: tile,
                                                    cacheIdentity: cacheIdentity,
                                                    blobFileURL: blobURL)
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let result = try await makeTileGuardingDriverWedge(factory, image: hit.image)
         guard case .tile(let materialized) = result else {
             return XCTFail("The raw MTLIO load must materialize, got \(result)")
@@ -362,7 +363,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
                                                    expectedTile: tile,
                                                    cacheIdentity: cacheIdentity,
                                                    blobFileURL: blobURL)
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let result = try await makeTileGuardingDriverWedge(factory, image: hit.image)
         guard case .imageUnreadable = result else {
             return XCTFail("A torn pair must be reported unreadable, got \(result)")
@@ -407,7 +408,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
                                                    expectedTile: tile,
                                                    cacheIdentity: cacheIdentity,
                                                    blobFileURL: blobURL)
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let result = try await makeTileGuardingDriverWedge(factory, image: hit.image)
         guard case .imageUnreadable = result else {
             return XCTFail("A bit-flipped container must be reported unreadable, got \(result)")
@@ -446,7 +447,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
                                                    expectedTile: tile,
                                                    cacheIdentity: cacheIdentity,
                                                    blobFileURL: blobURL)
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let result = try await makeTileGuardingDriverWedge(factory, image: hit.image)
         guard case .imageUnreadable = result else {
             return XCTFail("A truncated container must be reported unreadable, got \(result)")
@@ -476,7 +477,7 @@ final class TileArenaImageMaterializeTests: XCTestCase {
         )
         let cacheIdentity = makeCacheIdentity()
 
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device), fileBlobLoader: MetalTileFactory.metalFileBlobLoader(device: device))
         let parsed = try XCTUnwrap(factory.makeTile(from: preparedTile))
         XCTAssertEqual(parsed.tileBuffers.ground.gpuIndexType, .uint32,
                        "Geometry above the narrowing ceiling must keep 32-bit indices")

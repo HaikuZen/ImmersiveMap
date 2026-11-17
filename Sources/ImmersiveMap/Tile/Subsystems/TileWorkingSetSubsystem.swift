@@ -1,9 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
 import ImmersiveMapGPU
-import Metal
+import PortableFoundation
 import simd
 
 /// Keeps the tiles' working set in step with the frame's coverage. The

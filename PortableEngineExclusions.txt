@@ -88,14 +88,11 @@ Tile/Relief/Lifts/GroundRelief+Metal.swift
 Tile/Relief/Shaders
 Tile/Relief/Store/GroundReliefTile+Metal.swift
 Tile/Shaders
+Tile/Store/MetalTileFactory+Metal.swift
 Tile/Store/MTLIOPreparedTileGeometryTransport.swift
-Tile/Store/MetalTileFactory.swift
-Tile/Store/TileRenderStore.swift
 Tile/Subsystems/BuildingExtrusionRenderSubsystem.swift
 Tile/Subsystems/FlatMapSurfaceRenderSubsystem.swift
 Tile/Subsystems/TileProjectionIndexSubsystem.swift
-Tile/Subsystems/TileWorkingSetSubsystem.swift
-Tile/Subsystems/TreeRenderSubsystem.swift
 Tile/Trees/Resources
 Tile/Trees/TreeModelMesh+Metal.swift
 UI

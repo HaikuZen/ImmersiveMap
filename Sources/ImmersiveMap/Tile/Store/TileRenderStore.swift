@@ -1,8 +1,18 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import MetalKit
+import ImmersiveMapGPU
+import PortableFoundation
+
+/// A backend's tile geometry kept in files and loaded straight into GPU
+/// memory: the transport that writes the file entries and the loader that
+/// reads them, which go together (Metal's IO queue,
+/// `TileFileGeometry.metal(device:compressionEnabled:)`). Without it the
+/// tiles are cached inline.
+struct TileFileGeometry {
+    let transport: any PreparedTileGeometryTransporting
+    let load: MetalTileFactory.FileBlobLoader
+}
 
 /// Thread-safe (`@unchecked Sendable`): references are assigned during wiring
 /// before loads start, `workingSet` is internally synchronized and mutated
@@ -23,7 +33,8 @@ final class TileRenderStore: TileMaterializing, @unchecked Sendable {
 
     init(
         styleRuntime: MapStyleRuntime,
-        metalDevice: MTLDevice,
+        device: any GPUDevice,
+        fileGeometry: TileFileGeometry?,
         textRenderer: TextRenderer,
         config: ImmersiveMapSettings,
         tileTraceRecorder: TileTraceRecorder,
@@ -67,17 +78,14 @@ final class TileRenderStore: TileMaterializing, @unchecked Sendable {
                                                            textLabelsBuilder: textLabelsBuilder,
                                                            roadLabelsBuilder: roadLabelsBuilder,
                                                            surfaceLabelsBuilder: TileSurfaceLabelsBuilder(textRenderer: textRenderer))
-        self.metalTileFactory = MetalTileFactory(metalDevice: metalDevice)
+        self.metalTileFactory = MetalTileFactory(device: device, fileBlobLoader: fileGeometry?.load)
         workingSet = TileWorkingSetStore(tileTraceRecorder: tileTraceRecorder)
-        // The factory owns the MTLIO capability decision: the transport that
-        // writes file entries is selected only when the queue that loads them
-        // actually exists, so a queue-creation failure degrades to inline
-        // entries instead of a cache no hit can read.
+        // File entries are written only with the loader that reads them
+        // (`TileFileGeometry`), so a backend without one, or a queue that
+        // could not be made, degrades to inline entries instead of a cache
+        // no hit can read.
         let geometryTransport: any PreparedTileGeometryTransporting =
-            metalTileFactory.loadsFileBlobs
-                ? MTLIOPreparedTileGeometryTransport(
-                    compressionEnabled: config.tiles.cache.preparedDiskCompressionEnabled)
-                : InlinePreparedTileGeometryTransport()
+            fileGeometry?.transport ?? InlinePreparedTileGeometryTransport()
         mapNeedsTile = ImmersiveMapNeedsTile(tileRenderStore: self,
                                              config: config,
                                              preparedTileCacheIdentity: preparedTileCacheIdentity,

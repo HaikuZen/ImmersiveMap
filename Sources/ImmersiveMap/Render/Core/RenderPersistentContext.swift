@@ -199,7 +199,9 @@ final class RenderPersistentContext {
         self.textRenderer = shared.textRenderer
         self.poiSpriteAtlas = shared.poiSpriteAtlas
         self.tileRenderStore = TileRenderStore(styleRuntime: styleRuntime,
-                                               metalDevice: metal.device,
+                                               device: shared.gpuDevice,
+                                               fileGeometry: .metal(device: metal.device,
+                                                                    compressionEnabled: config.tiles.cache.preparedDiskCompressionEnabled),
                                                textRenderer: textRenderer,
                                                config: config,
                                                tileTraceRecorder: tileTraceRecorder,
