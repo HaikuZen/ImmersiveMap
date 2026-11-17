@@ -4,6 +4,9 @@
 import ImmersiveMapGPU
 import os
 import PortableFoundation
+#if canImport(QuartzCore)
+import QuartzCore
+#endif
 
 /// The `Render` folder: the frame engine and nothing feature-specific. It
 /// owns the frame loop, the render graph and its passes, the frame context

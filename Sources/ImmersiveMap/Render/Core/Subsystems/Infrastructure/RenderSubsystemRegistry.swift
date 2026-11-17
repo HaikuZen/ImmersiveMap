@@ -8,6 +8,9 @@
 
 import ImmersiveMapGPU
 import PortableFoundation
+#if canImport(QuartzCore)
+import QuartzCore
+#endif
 
 final class RenderSubsystemRegistry {
     private let subsystems: [any RenderSubsystem]

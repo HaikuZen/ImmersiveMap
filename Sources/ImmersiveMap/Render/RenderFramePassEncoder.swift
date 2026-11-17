@@ -3,6 +3,9 @@
 
 import ImmersiveMapGPU
 import PortableFoundation
+#if canImport(QuartzCore)
+import QuartzCore
+#endif
 
 /// Encodes the render passes of one frame: acquires the render target, prepares attachments and the pass plan, and invokes subsystem encoders.
 final class RenderFramePassEncoder {

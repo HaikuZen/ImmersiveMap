@@ -3,6 +3,9 @@
 
 import ImmersiveMapGPU
 import PortableFoundation
+#if canImport(QuartzCore)
+import QuartzCore
+#endif
 
 enum RenderFrameStageMeasurer {
     static func measure(_ stage: FrameStage,
