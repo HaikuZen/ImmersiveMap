@@ -80,6 +80,8 @@ final class SceneModelPipeline {
 
         var white = GPUTextureDescriptor(format: .rgba8Unorm, width: 1, height: 1)
         white.usage = .shaderRead
+        // Filled from the CPU below, which Metal allows only on shared storage.
+        white.storage = .shared
         do {
             pipelineState = try device.makeRenderPipeline(main(clipsBelowGround: false))
             belowGroundClippedPipelineState = try device.makeRenderPipeline(main(clipsBelowGround: true))
