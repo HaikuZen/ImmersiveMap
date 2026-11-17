@@ -1,27 +1,27 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// Prepares per-tile flat world-space origin and size data for GPU screen projection.
 /// Compute kernels use this payload to convert tile-local UV points into world/screen coordinates.
 final class FlatTileOriginCalculator {
-    private let tileOriginDataBufferStore: FrameSlottedDynamicMetalBuffer<FlatTileOriginData>
+    private let tileOriginDataBufferStore: GPUFrameSlottedBuffer<FlatTileOriginData>
     private var tileOriginData: [FlatTileOriginData] = []
 
     var currentTileOriginData: [FlatTileOriginData] {
         tileOriginData
     }
 
-    init(metalDevice: MTLDevice) {
-        self.tileOriginDataBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                        slotsCount: InFlightFramePool.inFlightFramesCount)
+    init(device: any GPUDevice) {
+        self.tileOriginDataBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                               slotsCount: InFlightFramePool.inFlightFramesCount)
     }
 
     func update(slot: Int = 0,
                 tiles: [VisibleTile],
-                flatRenderState: FlatRenderState) -> MTLBuffer {
+                flatRenderState: FlatRenderState) -> any GPUBuffer {
         tileOriginData.removeAll(keepingCapacity: true)
         tileOriginData.reserveCapacity(tiles.count)
         tileOriginData = tiles.map { tile in

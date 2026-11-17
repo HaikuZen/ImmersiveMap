@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
-import QuartzCore
+import PortableFoundation
 
 final class RenderPassGraph {
     static func isWorldLayer(_ layer: RenderLayer) -> Bool {
@@ -131,7 +129,7 @@ final class RenderPassGraph {
         func makeRenderPassDescriptor(frameContext: FrameContext,
                                       attachments: FrameAttachmentStore,
                                       target: FrameRenderTarget?) -> GPURenderPassDescriptor? {
-            guard let target, let targetTexture = target.gpuTexture else {
+            guard let targetTexture = target?.texture else {
                 return nil
             }
 
@@ -191,7 +189,7 @@ final class RenderPassGraph {
         func makeRenderPassDescriptor(frameContext _: FrameContext,
                                       attachments _: FrameAttachmentStore,
                                       target: FrameRenderTarget?) -> GPURenderPassDescriptor? {
-            guard let targetTexture = target?.gpuTexture else {
+            guard let targetTexture = target?.texture else {
                 return nil
             }
 
@@ -206,7 +204,7 @@ final class RenderPassGraph {
         func makeRenderPassDescriptor(frameContext: FrameContext,
                                       attachments: FrameAttachmentStore,
                                       target: FrameRenderTarget?) -> GPURenderPassDescriptor? {
-            guard let targetTexture = target?.gpuTexture,
+            guard let targetTexture = target?.texture,
                   let depthTexture = attachments.ensureOverlayDepthTexture(drawSize: frameContext.drawSize) else {
                 return nil
             }
@@ -249,11 +247,9 @@ final class RenderPassGraph {
         }
         frameContext.sharedState.gpuSceneDepthTexture = sceneDepthTexture
 
-        let metalClearColor = RenderFrameClearColor.make(transition: frameContext.transition,
-                                                         settings: settings,
-                                                         mapColor: frameContext.services.baseColors.map)
-        let clearColor = GPUClearColor(red: metalClearColor.red, green: metalClearColor.green,
-                                       blue: metalClearColor.blue, alpha: metalClearColor.alpha)
+        let clearColor = RenderFrameClearColor.make(transition: frameContext.transition,
+                                                    settings: settings,
+                                                    mapColor: frameContext.services.baseColors.map)
         let layerAvailability = renderGraph.passAvailability(settings: settings,
                                                              renderSurfaceMode: frameContext.renderSurfaceMode)
         let layerPlan = RenderLayerPlanner.plan(availability: layerAvailability)

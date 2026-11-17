@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 ImmersiveMap contributors.
 // SPDX-License-Identifier: MIT
 
-import Metal
-import QuartzCore
+import ImmersiveMapGPU
+import PortableFoundation
 
 enum RenderFrameStageMeasurer {
     static func measure(_ stage: FrameStage,
@@ -28,7 +28,7 @@ enum RenderFrameStageMeasurer {
 enum RenderFrameClearColor {
     static func make(transition: Float,
                      settings: ImmersiveMapSettings,
-                     mapColor: SIMD4<Float>) -> MTLClearColor {
+                     mapColor: SIMD4<Float>) -> GPUClearColor {
         let transitionMix = Double(settings.presentation.airHandover(atTransition: transition))
         let mapColor = SIMD4<Double>(Double(mapColor.x), Double(mapColor.y), Double(mapColor.z), Double(mapColor.w))
         // Transparent space clears to a fully transparent pixel and reaches the
@@ -46,7 +46,7 @@ enum RenderFrameClearColor {
             : mapColor
         let clearColorValue = spaceColor + (targetColor - spaceColor) * transitionMix
 
-        return MTLClearColor(red: clearColorValue.x,
+        return GPUClearColor(red: clearColorValue.x,
                              green: clearColorValue.y,
                              blue: clearColorValue.z,
                              alpha: clearColorValue.w)

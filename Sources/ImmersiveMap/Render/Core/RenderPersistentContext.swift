@@ -2,22 +2,20 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
-import MetalKit
-import QuartzCore
+import PortableFoundation
 
-/// Long-lived renderer lifecycle context: gathers Metal resources, caches and renderer services
+/// Long-lived renderer lifecycle context: gathers GPU resources, caches and renderer services
 /// reused by the subsystem graph and frame pipeline across frames.
 /// Immutable GPU resources (library, pipelines, atlases, static geometry) come
 /// from the process-wide ``SharedRenderResources`` and are only referenced
 /// here; everything mutable is created per renderer.
 final class RenderPersistentContext {
-    // MARK: - Metal Core
+    // MARK: - GPU Core
 
-    let metalContext: RenderMetalContext
     /// The shared device as the GPU interface (`SharedRenderResources.gpuDevice`).
-    let gpuDevice: MetalDevice
+    let gpuDevice: any GPUDevice
+    /// The world pass's sample count (`RenderResources.renderSampleCount`).
+    let renderSampleCount: Int
     /// `metalContext.commandQueue` as the GPU interface's: the queue every
     /// frame's command buffer comes from.
     let gpuCommandQueue: any GPUCommandQueue
@@ -85,7 +83,8 @@ final class RenderPersistentContext {
 
     let tileRenderStore: TileRenderStore
     let textRenderer: TextRenderer
-    let poiSpriteAtlas: PoiSpriteAtlas
+    /// The POI icons' atlas texture, the host's (`RenderHost`).
+    let poiSpriteTexture: any GPUTexture
     let baseLabelCache: BaseLabelCache
     let roadLabelCache: RoadLabelCache
 
@@ -119,9 +118,10 @@ final class RenderPersistentContext {
 
     // MARK: - Avatar and Debug Resources
 
-    let avatarSource: AvatarRenderSource
     let markerSource: MarkerRenderSource
-    let avatarsRenderer: AvatarsRenderer
+    /// The host's own subsystem, drawn in the avatars' slot
+    /// (`RenderHost.makeAvatarSubsystem`).
+    let makeAvatarSubsystem: (() -> any RenderSubsystem & RenderPassAvailabilityProvider)?
     let debugOverlayRenderer: DebugOverlayRenderer
     let tileTraceRecorder: TileTraceRecorder
     let baseLabelTraceRecorder: BaseLabelTraceRecorder
@@ -130,8 +130,7 @@ final class RenderPersistentContext {
     // MARK: - Initialization
 
     @MainActor
-    init(layer: CAMetalLayer,
-         avatarSource: AvatarRenderSource,
+    init(host: RenderHost,
          markerSource: MarkerRenderSource,
          sceneModelSource: SceneModelRenderSource,
          layerSource: LayerRenderSource,
@@ -139,12 +138,11 @@ final class RenderPersistentContext {
          config: ImmersiveMapSettings,
          eventSink: RenderFrameEventSink,
          tileTraceRecorder: TileTraceRecorder,
-         baseLabelTraceRecorder: BaseLabelTraceRecorder) throws {
-        let shared = try SharedRenderResources.shared(sampleCount: config.postProcessing.multisampleCount)
-        let metal = RendererSetup.buildMetal(layer: layer, sharedResources: shared)
-        self.metalContext = metal
-        self.gpuDevice = shared.gpuDevice
-        self.gpuCommandQueue = MetalCommandQueue(metal.commandQueue)
+         baseLabelTraceRecorder: BaseLabelTraceRecorder) {
+        let shared = host.resources
+        self.gpuDevice = shared.device
+        self.renderSampleCount = shared.renderSampleCount
+        self.gpuCommandQueue = host.commandQueue
         self.tileTraceRecorder = tileTraceRecorder
         self.baseLabelTraceRecorder = baseLabelTraceRecorder
         self.tileLoadingStatusReporter = config.debug.enableDebugPanel ? TileLoadingStatusReporter() : nil
@@ -184,74 +182,65 @@ final class RenderPersistentContext {
         self.fxaaPipeline = shared.fxaaPipeline
         // The starfield renderer bakes the star-generation settings, so it
         // stays per renderer; only its pipeline is shared.
-        self.starfieldRenderer = StarfieldRenderer(device: shared.gpuDevice,
+        self.starfieldRenderer = StarfieldRenderer(device: shared.device,
                                                    pipeline: shared.starfieldPipeline,
                                                    config: config.scene.starfield)
 
         self.horizonRenderer = HorizonRenderer(pipeline: shared.horizonPipeline)
 
-        self.flatTileOriginCalculator = FlatTileOriginCalculator(metalDevice: metal.device)
+        self.flatTileOriginCalculator = FlatTileOriginCalculator(device: shared.device)
         // The cap palette bakes style colors; grids and pipeline come from
         // the shared set.
         self.globeCapRenderer = GlobeCapRenderer(sharedResources: shared.globeCap,
                                                  maxLatitude: WebMercatorMath.maxLatitudeRadians,
                                                  baseColors: styleRuntime.baseColors)
         self.textRenderer = shared.textRenderer
-        self.poiSpriteAtlas = shared.poiSpriteAtlas
+        self.poiSpriteTexture = host.poiSpriteTexture
         self.tileRenderStore = TileRenderStore(styleRuntime: styleRuntime,
-                                               device: shared.gpuDevice,
-                                               fileGeometry: .metal(device: metal.device,
-                                                                    compressionEnabled: config.tiles.cache.preparedDiskCompressionEnabled),
+                                               device: shared.device,
+                                               fileGeometry: host.tileFileGeometry,
                                                textRenderer: textRenderer,
                                                config: config,
                                                tileTraceRecorder: tileTraceRecorder,
                                                tileLoadingStatusReporter: tileLoadingStatusReporter)
         self.tileRenderStore.eventSink = eventSink
-        self.baseLabelCache = BaseLabelCache(device: shared.gpuDevice)
+        self.baseLabelCache = BaseLabelCache(device: shared.device)
         // On the relief the labels' paths are cut where the roads' ribbons
         // were, so the names ride the relief with the roads.
         let parseOptions = TileParseOptions(settings: config)
-        self.roadLabelCache = RoadLabelCache(device: shared.gpuDevice,
+        self.roadLabelCache = RoadLabelCache(device: shared.device,
                                              reliefSubdivisionStep: { parseOptions.reliefSubdivisionStep(tileZoom: $0) })
 
         self.sceneModelSource = sceneModelSource
-        // Metal's device is safe to use from any thread, the loads' queue
-        // included.
-        nonisolated(unsafe) let modelDevice = metal.device
-        self.sceneModelMeshStore = SceneModelMeshStore(loadAsset: { url in
-            try SceneModelAssetLoader.load(url: url, device: modelDevice)
-        })
+        self.sceneModelMeshStore = SceneModelMeshStore(loadAsset: host.loadSceneModelAsset)
         self.sceneModelMeshStore.eventSink = eventSink
         self.sceneModelPipeline = shared.sceneModelPipeline
         self.modelTilePipeline = shared.modelTilePipeline
         self.placementStencilPipeline = shared.placementStencilPipeline
         self.modelTileStore = ModelTileStore.make(settings: config,
-                                                  device: shared.gpuDevice,
-                                                  fileLoader: ModelTileMesh.metalFileLoader(device: metal.device),
+                                                  device: shared.device,
+                                                  fileLoader: host.modelTileFileLoader,
                                                   schema: styleRuntime.schema)
         self.modelTileStore?.eventSink = eventSink
         self.groundRelief = GroundReliefFrameState.make(settings: config,
                                                         hillshade: styleRuntime.hillshade,
                                                         occlusion: styleRuntime.terrainOcclusion,
-                                                        device: shared.gpuDevice)
+                                                        device: shared.device)
         self.groundRelief?.store.eventSink = eventSink
         self.treePipeline = shared.treePipeline
         self.treePalette = styleRuntime.treePalette
         self.labelOpacity = styleRuntime.labelOpacity
-        self.treeModelStore = TreeModelStore(device: shared.gpuDevice,
-                                             fileLoader: TreeModelMesh.metalFileLoader(device: metal.device))
+        self.treeModelStore = TreeModelStore(device: shared.device,
+                                             fileLoader: host.treeFileLoader)
         self.treeModelStore.eventSink = eventSink
         self.layerSource = layerSource
         self.layerPipeline = shared.layerPipeline
-        self.layerMeshStore = LayerMeshStore(device: shared.gpuDevice)
+        self.layerMeshStore = LayerMeshStore(device: shared.device)
         self.layerMeshStore.eventSink = eventSink
 
-        self.avatarSource = avatarSource
         self.markerSource = markerSource
-        self.avatarsRenderer = AvatarsRenderer(metalDevice: metal.device,
-                                               sharedResources: shared.avatars,
-                                               config: config.avatars)
-        self.debugOverlayRenderer = DebugOverlayRenderer(device: shared.gpuDevice, settings: config.debug)
+        self.makeAvatarSubsystem = host.makeAvatarSubsystem
+        self.debugOverlayRenderer = DebugOverlayRenderer(device: shared.device, settings: config.debug)
     }
 
     // MARK: - Settings

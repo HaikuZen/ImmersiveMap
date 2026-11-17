@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
 
 enum RenderGraphFactory {
     static func makeDefaultGraph(context: RenderPersistentContext,
@@ -24,7 +22,7 @@ enum RenderGraphFactory {
                                                            settings: settings.labels,
                                                            debugOverlayControls: debugOverlayControls)
         let baseLabelDrawSubsystem = BaseLabelDrawSubsystem(textRenderer: context.textRenderer,
-                                                            poiSpriteTexture: context.poiSpriteAtlas.texture,
+                                                            poiSpriteTexture: context.poiSpriteTexture,
                                                             labelDepthState: context.labelDepthState,
                                                             depthDisabledState: context.depthDisabledState)
         let roadLabelDrawSubsystem = RoadLabelDrawSubsystem(textRenderer: context.textRenderer,
@@ -32,9 +30,9 @@ enum RenderGraphFactory {
                                                             depthDisabledState: context.depthDisabledState,
                                                             fallbackDepthTexture: context.sceneDepthFallbackTexture,
                                                             hidesBehindBuildingsFromZoom: settings.labels.road.hidesBehindBuildingsFromZoom)
-        let avatarSubsystem = AvatarRenderSubsystem(avatarsRenderer: context.avatarsRenderer,
-                                                    avatarSource: context.avatarSource,
-                                                    depthDisabledState: context.depthDisabledState.metalState)
+        // The host's own layer (the avatars, on Apple's platforms), if it
+        // has one.
+        let avatarSubsystem = context.makeAvatarSubsystem?()
         let markerSubsystem = MarkerRenderSubsystem(markerSource: context.markerSource)
         let sceneModelSubsystem = SceneModelRenderSubsystem(sceneModelSource: context.sceneModelSource,
                                                             meshStore: context.sceneModelMeshStore,
@@ -154,7 +152,7 @@ enum RenderGraphFactory {
             baseLabelSubsystem,
             baseLabelDrawSubsystem,
             roadLabelDrawSubsystem,
-            avatarSubsystem,
+        ] + (avatarSubsystem.map { [$0] } ?? []) + [
             markerSubsystem,
             groundShadowMaskSubsystem,
             // Before the ground of either surface: the planner's decision
@@ -188,7 +186,7 @@ enum RenderGraphFactory {
         let availabilityProviders: [any RenderPassAvailabilityProvider] = [
             baseLabelDrawSubsystem,
             roadLabelDrawSubsystem,
-            avatarSubsystem,
+        ] + (avatarSubsystem.map { [$0] } ?? []) + [
             sceneModelSubsystem,
             modelTileSubsystem,
             starfieldSubsystem,

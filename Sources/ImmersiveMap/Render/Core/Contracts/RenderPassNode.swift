@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import Metal
-import QuartzCore
 
 protocol RenderPassDescriptorProvider: AnyObject {
     func makeRenderPassDescriptor(frameContext: FrameContext,

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
 import simd
 
 /// The labels painted on the map (`LabelPlacement.surface`): drawn in the

@@ -6,10 +6,8 @@
 //  ImmersiveMap
 //
 
-import Foundation
 import ImmersiveMapGPU
-import ImmersiveMapMetal
-import Metal
+import PortableFoundation
 
 final class TileProjectionIndexSubsystem: RenderSubsystem {
     let name: String = "TileProjectionIndex"
@@ -17,7 +15,7 @@ final class TileProjectionIndexSubsystem: RenderSubsystem {
     private let flatTileOriginCalculator: FlatTileOriginCalculator
 
     private var sourceProjectionTiles: [VisibleTile] = []
-    private var tileOriginDataBuffer: MTLBuffer?
+    private var tileOriginDataBuffer: (any GPUBuffer)?
     private var tileIndexAllocator: VisibleTileIndexAllocator = VisibleTileIndexAllocator(indexedTiles: [])
     private var sourceProjectionTracker = StagedHashChangeTracker()
     private var requiresAllocatorRebuildAfterReset: Bool = true
@@ -60,7 +58,7 @@ final class TileProjectionIndexSubsystem: RenderSubsystem {
         guard let tileOriginDataBuffer else {
             return
         }
-        resourceRegistry.setBuffer(MetalBuffer(tileOriginDataBuffer), named: .tileOriginDataBuffer)
+        resourceRegistry.setBuffer(tileOriginDataBuffer, named: .tileOriginDataBuffer)
     }
 
     func encode(layer _: RenderLayer, encoder _: any GPURenderEncoder, frameContext _: FrameContext) {}

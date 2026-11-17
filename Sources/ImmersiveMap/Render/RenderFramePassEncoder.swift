@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
-import QuartzCore
+import PortableFoundation
 
 /// Encodes the render passes of one frame: acquires the render target, prepares attachments and the pass plan, and invokes subsystem encoders.
 final class RenderFramePassEncoder {

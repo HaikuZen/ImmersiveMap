@@ -46,10 +46,16 @@ protocol RenderFrameEventSink: AnyObject, Sendable {
     /// this is called synchronously from the render loop on the main thread so
     /// that marker positions apply in the same CA transaction as the frame.
     func updateMarkerProjectionSnapshot(_ snapshot: MarkerProjectionSnapshot)
+    /// The engine is being discarded while the process lives on: late
+    /// deliveries from its in-flight frames are dropped from here on, so they
+    /// never resurrect state a successor has just reset. Called on the main
+    /// thread. A sink that delivers nothing late ignores it.
+    func invalidateDelivery()
 }
 
 extension RenderFrameEventSink {
     func attachTileLoadingStatus(provider: (@Sendable () -> TileLoadingStatusSnapshot?)?) {}
     func tileLoadingStatusDidChange() {}
     func debugOverlayHUDContentRequest() -> DebugOverlayHUDContentRequest { .all }
+    func invalidateDelivery() {}
 }
