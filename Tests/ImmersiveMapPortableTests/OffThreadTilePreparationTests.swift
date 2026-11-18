@@ -10,7 +10,9 @@ import Testing
 /// `PortableTilePreparer`) comes back as an entry the loader reads like a
 /// disk hit, under the map's identity, and an entry of other settings is
 /// refused, so the loader parses the tile itself rather than draw it
-/// wrong. Offline: the tile is a synthetic city tile, no network.
+/// wrong. Offline: the tile is a synthetic city tile, no network. One test
+/// at a time: they read the counts, which are the process's.
+@Suite(.serialized)
 struct OffThreadTilePreparationTests {
     private static let tile = Tile(x: 9, y: 5, z: 4)
     private static let bytes = MvtFixtureTileMessages.denseCity().serializedData()

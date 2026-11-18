@@ -149,9 +149,18 @@ var targets: [Target] = [
     // The engine's tests that need no Metal, no Apple framework and no
     // picture (the drawing recorded by ImmersiveMapGPUTestSupport, the text
     // layout), run on every platform the engine builds for.
+    //
+    // On WebAssembly the test binary gets an 8 MiB stack: a debug build's
+    // frames are large, and a whole tile's parse (OffThreadTilePreparationTests)
+    // runs deeper than the default stack, which WasmKit reports as an out of
+    // bounds memory access in the runtime's metadata lookup. The release
+    // module a page loads parses the same tile in the default one.
     .testTarget(
         name: "ImmersiveMapPortableTests",
-        dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapWebGPU", "MvtTestSupport"]
+        dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapWebGPU", "MvtTestSupport"],
+        // Only in the portable package: an app's dependency must carry no
+        // unsafe flags, and Apple's platforms read the other one.
+        linkerSettings: portable ? [.unsafeFlags(["-Xlinker", "-z", "-Xlinker", "stack-size=8388608"], .when(platforms: [.wasi]))] : []
     ),
     // Holds PortableEngineExclusions.txt to the engine's own imports.
     .testTarget(
