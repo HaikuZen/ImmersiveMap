@@ -41,8 +41,16 @@ if [ -z "$module" ]; then
     echo "error: no ImmersiveMapWebMap.wasm under $scratch" >&2
     exit 1
 fi
-toolchain=$(dirname "$(command -v swift)")
-"$toolchain/llvm-objcopy" --strip-debug "$module" "$output/ImmersiveMapWebMap.wasm"
+# The toolchain's objcopy, beside swift or on the path. Without one the
+# module keeps its debug information, larger but the same program.
+objcopy=$(dirname "$(command -v swift)")/llvm-objcopy
+[ -x "$objcopy" ] || objcopy=$(command -v llvm-objcopy || true)
+if [ -n "$objcopy" ]; then
+    "$objcopy" --strip-debug "$module" "$output/ImmersiveMapWebMap.wasm"
+else
+    echo "warning: no llvm-objcopy, the module keeps its debug information" >&2
+    cp "$module" "$output/ImmersiveMapWebMap.wasm"
+fi
 node "$root/Tools/WGSLCheck/bundle.mjs" "$output/shaders.json"
 
 # The resources, flat, as the engine looks them up by name.
