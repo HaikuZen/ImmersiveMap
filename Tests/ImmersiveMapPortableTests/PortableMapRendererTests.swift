@@ -86,4 +86,56 @@ struct PortableMapRendererTests {
         #expect(map.cameraPosition.pitch > start.pitch)
         #expect(map.render(into: target, width: 64, height: 48, pixelsPerPoint: 2))
     }
+
+    @Test func aFrameRequestIsTakenOnce() {
+        var demand = PortableFrameDemand()
+        // A new map has never drawn.
+        let first = demand.take()
+        let second = demand.take()
+        #expect(first)
+        #expect(second == false)
+        demand.request()
+        demand.request()
+        #expect(demand.isRequested)
+        let third = demand.take()
+        #expect(third)
+        #expect(demand.isRequested == false)
+    }
+
+    @Test func aNewMapAndANewSizeNeedAFrame() throws {
+        let device = RecordingGPUDevice()
+        let map = try PortableMapRenderer(device: device, settings: Self.offlineSettings())
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm, width: 64, height: 48)
+        descriptor.usage = [.renderTarget]
+        let target = try #require(device.makeTexture(descriptor))
+        #expect(map.needsFrame(width: 64, height: 48, pixelsPerPoint: 2))
+        #expect(map.render(into: target, width: 64, height: 48, pixelsPerPoint: 2))
+        #expect(map.needsFrame(width: 32, height: 48, pixelsPerPoint: 2))
+        #expect(map.needsFrame(width: 64, height: 48, pixelsPerPoint: 1))
+    }
+
+    /// A marker where the camera looks straight down lands on the drawing's
+    /// centre, in points, and one on the far side of the globe is left out.
+    @Test func markersArePlacedWhereTheFrameProjectsThem() throws {
+        let device = RecordingGPUDevice()
+        let map = try PortableMapRenderer(device: device, settings: Self.offlineSettings())
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm, width: 64, height: 48)
+        descriptor.usage = [.renderTarget]
+        let target = try #require(device.makeTexture(descriptor))
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: 5)
+        map.setMarker(id: 7, latitudeDegrees: 45.46, longitudeDegrees: 9.19)
+        map.setMarker(id: 8, latitudeDegrees: -45.46, longitudeDegrees: -170.81)
+        #expect(map.markerPositions.isEmpty)
+
+        #expect(map.render(into: target, width: 64, height: 48, pixelsPerPoint: 2))
+        let centre = try #require(map.markerPositions.first { $0.id == 7 })
+        #expect(abs(centre.x - 16) < 0.5)
+        #expect(abs(centre.y - 12) < 0.5)
+        #expect(centre.alpha > 0)
+        #expect(map.markerPositions.contains { $0.id == 8 } == false)
+
+        map.removeMarker(id: 7)
+        #expect(map.markerPositions.contains { $0.id == 7 } == false)
+        #expect(map.needsFrame(width: 64, height: 48, pixelsPerPoint: 2))
+    }
 }

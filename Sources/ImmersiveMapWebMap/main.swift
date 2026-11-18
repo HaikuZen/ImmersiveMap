@@ -5,9 +5,11 @@
 // drawing through the WebGPU backend and the page's host, its archives read
 // through the page's `fetch` (BrowserFetch.swift). A WebAssembly reactor:
 // the page calls `_initialize`, then `immersivemap_map_start` once,
-// `immersivemap_map_frame` every animation frame and the camera's exports
-// on input. Nothing here runs off WebAssembly, where the target builds
-// empty.
+// `immersivemap_map_frame` on the animation frames it asks for and the
+// camera's and the markers' exports on input. Rendering is on demand: a
+// frame call draws only when something changed, and says whether the page
+// should ask for another animation frame. Nothing here runs off
+// WebAssembly, where the target builds empty.
 //
 // A page has one thread and no run loop of Swift's: the tasks the engine
 // starts (the tile loads, the archives' requests) wait on the runtime's
@@ -70,18 +72,74 @@ func mapStart(_ features: UInt32, _ multisample: Int32, _ archive: UnsafePointer
     }
 }
 
-/// Draws one frame into the canvas, of its size in pixels, a point being
-/// `pixelsPerPoint` of them, after running the tasks that are ready.
+/// After running the tasks that are ready, draws a frame into the canvas
+/// when one is needed (`PortableMapRenderer.needsFrame`), of its size in
+/// pixels, a point being `pixelsPerPoint` of them. Returns bit 1 when the
+/// page should ask for another animation frame and bit 2 when a frame was
+/// drawn, after which `immersivemap_map_markers` holds the markers' new
+/// positions. A frame not needed leaves the canvas's texture untouched,
+/// so the page keeps showing the last one.
 @_expose(wasm, "immersivemap_map_frame")
 @_cdecl("immersivemap_map_frame")
-func mapFrame(_ width: Int32, _ height: Int32, _ pixelsPerPoint: Double) {
+func mapFrame(_ width: Int32, _ height: Int32, _ pixelsPerPoint: Double) -> Int32 {
     runReadyTasks()
-    guard let device, width > 0, height > 0 else { return }
-    MainActor.assumeIsolated {
-        _ = map?.render(into: device.canvasTexture(format: .bgra8Unorm, width: Int(width), height: Int(height)),
-                        width: Int(width), height: Int(height), pixelsPerPoint: pixelsPerPoint)
+    guard let device, width > 0, height > 0 else { return 0 }
+    let size = (width: Int(width), height: Int(height))
+    return MainActor.assumeIsolated {
+        guard let map else { return 0 }
+        var drew = false
+        if map.needsFrame(width: size.width, height: size.height, pixelsPerPoint: pixelsPerPoint) {
+            drew = map.render(into: device.canvasTexture(format: .bgra8Unorm, width: size.width, height: size.height),
+                              width: size.width, height: size.height, pixelsPerPoint: pixelsPerPoint)
+        }
+        let needsAnother = map.needsFrame(width: size.width, height: size.height, pixelsPerPoint: pixelsPerPoint)
+        return (needsAnother ? 1 : 0) | (drew ? 2 : 0)
     }
 }
+
+/// Places the marker of the page's id at the point, or moves it there.
+@_expose(wasm, "immersivemap_map_set_marker")
+@_cdecl("immersivemap_map_set_marker")
+func mapSetMarker(_ id: UInt32, _ latitude: Double, _ longitude: Double) {
+    MainActor.assumeIsolated {
+        map?.setMarker(id: UInt64(id), latitudeDegrees: latitude, longitudeDegrees: longitude)
+    }
+}
+
+/// Takes the marker of the page's id away.
+@_expose(wasm, "immersivemap_map_remove_marker")
+@_cdecl("immersivemap_map_remove_marker")
+func mapRemoveMarker(_ id: UInt32) {
+    MainActor.assumeIsolated { map?.removeMarker(id: UInt64(id)) }
+}
+
+/// The markers' positions on the last frame drawn
+/// (`PortableMapRenderer.markerPositions`), as doubles: their count, then
+/// the id, x, y and opacity of each, x and y in points from the canvas's top
+/// left corner. A marker beyond the horizon is absent. The memory is the
+/// module's and holds until the next call.
+@_expose(wasm, "immersivemap_map_markers")
+@_cdecl("immersivemap_map_markers")
+func mapMarkers() -> UnsafeMutableRawPointer? {
+    let positions = MainActor.assumeIsolated { map?.markerPositions ?? [] }
+    let count = 1 + positions.count * 4
+    if markerBuffer.count < count {
+        markerBuffer.deallocate()
+        markerBuffer = .allocate(capacity: max(count, 64))
+    }
+    markerBuffer[0] = Double(positions.count)
+    for (index, position) in positions.enumerated() {
+        let base = 1 + index * 4
+        markerBuffer[base] = Double(position.id)
+        markerBuffer[base + 1] = position.x
+        markerBuffer[base + 2] = position.y
+        markerBuffer[base + 3] = position.alpha
+    }
+    return UnsafeMutableRawPointer(markerBuffer.baseAddress)
+}
+
+/// The memory `immersivemap_map_markers` hands the page, grown as needed.
+nonisolated(unsafe) private var markerBuffer = UnsafeMutableBufferPointer<Double>.allocate(capacity: 64)
 
 /// A drag of the points, `ended` 1 when the pointer is up.
 @_expose(wasm, "immersivemap_map_pan")

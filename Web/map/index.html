@@ -11,17 +11,29 @@
   canvas:active { cursor: grabbing; }
   #status { position: fixed; left: 12px; bottom: 12px; right: 12px; white-space: pre-wrap; pointer-events: none; }
   #status.error { color: #ff8a80; }
+  /* The markers lie over the canvas and let the pointer through to it. */
+  #markers { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+  .marker { position: absolute; left: 0; top: 0; display: none; align-items: center; gap: 4px;
+            text-shadow: 0 1px 2px #000; white-space: nowrap; will-change: transform; }
+  .marker::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #ffcc4d;
+                    box-shadow: 0 0 0 2px #05080f; }
 </style>
 </head>
 <body>
 <canvas id="canvas"></canvas>
+<div id="markers"></div>
 <div id="status">Loading…</div>
 <script type="module">
 // The engine in a browser: the map drawn by the Swift module through the
 // page's WebGPU host, its tiles read with the page's fetch. Drag to move,
 // the wheel to zoom, a right drag or a shift drag to turn and tilt.
-// `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA off.
-// Built and served by build.sh.
+// `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA off,
+// `?markers=0` leaves out the sample markers. Built and served by build.sh.
+//
+// Frames are drawn on demand: the page asks for animation frames while the
+// map says it needs them, and stops when it is still. Then a slow tick asks
+// again a few times a second, so the module's timers (a download's retry)
+// still run, and any input, request answered or resize asks at once.
 import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
 import { startMap, fetchResources } from './map.mjs';
 
@@ -51,13 +63,63 @@ try {
     ]);
     const query = new URLSearchParams(location.search);
     const notes = [];
+    // How often a still map runs the module's due work, in milliseconds.
+    const idleTickInterval = 250;
+    let frameAsked = false;
+    let idleTick = null;
+    const wake = () => {
+        if (idleTick !== null) {
+            clearTimeout(idleTick);
+            idleTick = null;
+        }
+        if (!frameAsked) {
+            frameAsked = true;
+            requestAnimationFrame(frame);
+        }
+    };
     const map = await startMap({
         device, module, shaders, resources,
         canvasTexture: () => context.getCurrentTexture(),
         archiveURL: query.get('archive') ?? '',
         multisample: query.get('msaa') !== '0',
         warn: (message) => notes.push(message),
+        wake,
     });
+    new ResizeObserver(wake).observe(canvas);
+
+    // Markers: an element of the page each, moved to where each frame
+    // drawn puts its point, centred on it, faded at the globe's horizon and
+    // hidden beyond it.
+    const markerLayer = document.getElementById('markers');
+    const markerElements = new Map();
+    const addMarker = (id, latitude, longitude, name) => {
+        const element = document.createElement('div');
+        element.className = 'marker';
+        element.textContent = name;
+        markerLayer.append(element);
+        markerElements.set(id, element);
+        map.setMarker(id, latitude, longitude);
+    };
+    const placeMarkers = () => {
+        const shown = new Set();
+        for (const { id, x, y, alpha } of map.markers()) {
+            const element = markerElements.get(id);
+            if (!element) continue;
+            shown.add(id);
+            element.style.display = 'flex';
+            element.style.opacity = alpha;
+            // Centred on the dot, the name to its right.
+            element.style.transform = `translate(${x - 4}px, ${y}px) translateY(-50%)`;
+        }
+        for (const [id, element] of markerElements) {
+            if (!shown.has(id)) element.style.display = 'none';
+        }
+    };
+    if (query.get('markers') !== '0') {
+        [[55.7558, 37.6173, 'Moscow'], [48.8566, 2.3522, 'Paris'], [41.9028, 12.4964, 'Rome'],
+         [35.6762, 139.6503, 'Tokyo'], [-33.8688, 151.2093, 'Sydney'], [40.7128, -74.006, 'New York']]
+            .forEach(([latitude, longitude, name], index) => addMarker(index + 1, latitude, longitude, name));
+    }
 
     // Input, in points (CSS pixels).
     let drag = null;
@@ -109,11 +171,20 @@ try {
             canvas.width = width;
             canvas.height = height;
         }
-        map.frame(width, height, scale);
+        frameAsked = false;
+        const { needsFrame, drew } = map.frame(width, height, scale);
+        if (drew) placeMarkers();
         if (errors.length === 0) say([downloadStatus(), ...notes.slice(-3)].filter(Boolean).join('\n'));
-        requestAnimationFrame(frame);
+        if (needsFrame) {
+            wake();
+        } else if (idleTick === null) {
+            idleTick = setTimeout(() => {
+                idleTick = null;
+                wake();
+            }, idleTickInterval);
+        }
     }
-    requestAnimationFrame(frame);
+    wake();
 } catch (error) {
     // Chrome's stack starts with the message, Firefox's leaves it out.
     const stack = error.stack ?? '';

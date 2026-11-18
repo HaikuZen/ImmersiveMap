@@ -7,8 +7,10 @@
 // archive is the overview archive the engine ships, its ranges answered
 // from the file, so the tiles travel the whole path from `fetch` to the
 // GPU. `node map.mjs [module.wasm]` here, after `npm ci`. Fails on any
-// WebGPU validation error, a trap in the module, or no request reaching
-// the archive. Looks at no pixel: the page is judged in a browser.
+// WebGPU validation error, a trap in the module, no request reaching the
+// archive, a first frame not drawn, or a marker at the camera's centre not
+// placed at the canvas's centre. Looks at no pixel: the page is judged in a
+// browser.
 
 import { create, globals } from 'webgpu';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -65,6 +67,7 @@ const canvas = device.createTexture({ size, format: 'bgra8unorm', usage: GPUText
 const notes = [];
 const output = [];
 let map = null;
+const frames = { drawn: 0 };
 try {
     map = await startMap({
         device,
@@ -78,16 +81,33 @@ try {
         print: (stream, line) => output.push(`${stream === 2 ? 'stderr' : 'stdout'}: ${line}`),
     });
     map.look(45.46, 9.19, 5);
+    // A marker where the camera looks, and one on the far side of the globe.
+    map.setMarker(1, 45.46, 9.19);
+    map.setMarker(2, -45.46, -170.81);
     // Frames with the event loop turning between them, so the requests'
-    // answers and the GPU's completions arrive as on a page.
+    // answers and the GPU's completions arrive as on a page. Every one is
+    // offered, as a page that keeps asking would: a frame not needed draws
+    // nothing.
     for (let frame = 0; frame < 90; frame += 1) {
-        map.frame(size[0], size[1], 1);
+        const { drew } = map.frame(size[0], size[1], 1);
+        if (drew) frames.drawn += 1;
+        if (frame === 0) {
+            if (!drew) errors.push('map: the first frame was not drawn');
+            const places = map.markers();
+            const centre = places.find((place) => place.id === 1);
+            if (!centre || Math.abs(centre.x - size[0] / 2) > 1 || Math.abs(centre.y - size[1] / 2) > 1) {
+                errors.push(`map: the marker at the camera's centre is at ${JSON.stringify(centre)}, not the canvas's centre`);
+            }
+            if (places.some((place) => place.id === 2)) errors.push('map: a marker beyond the horizon was placed');
+        }
         if (frame === 30) map.pan(40, 10, true);
         if (frame === 50) map.zoom(1);
         if (frame === 60) map.orbit(0.3, 0.4);
+        if (frame === 70) map.removeMarker(1);
         await device.queue.onSubmittedWorkDone();
         await new Promise((resolve) => setTimeout(resolve, 5));
     }
+    if (map.markers().some((place) => place.id === 1)) errors.push('map: a removed marker is still placed');
 } catch (error) {
     errors.push(`map: ${error.stack ?? error.message}`);
 }
@@ -99,7 +119,7 @@ for (const error of errors.slice(0, 20)) console.error(error);
 if (errors.length > 20) console.error(`… and ${errors.length - 20} more errors`);
 if (map) {
     console.log(Object.entries(map.host.counts).map(([key, value]) => `${value} ${key}`).join(', '));
-    console.log(`${requests.archive} archive requests, ${requests.other} refused`);
+    console.log(`${requests.archive} archive requests, ${requests.other} refused, ${frames.drawn} of 90 frames drawn`);
 }
 canvas.destroy();
 device.destroy();
