@@ -199,6 +199,13 @@ if (errors.length > 20) console.error(`… and ${errors.length - 20} more errors
 if (map) {
     console.log(Object.entries(map.host.counts).map(([key, value]) => `${value} ${key}`).join(', '));
     console.log(`${requests.archive} archive requests, ${requests.other} refused, ${frames.drawn} of 90 frames drawn`);
+    // The page's thread held by the module: how much the tiles' parsing
+    // and the frames cost it, to judge a worker pool by. Overview tiles
+    // only, lighter than a city's at high zoom.
+    const describe = (name, { calls, total, longest, overBudget }) =>
+        `${name} ${calls} calls, longest ${longest.toFixed(1)} ms, total ${total.toFixed(0)} ms, ${overBudget} over 16.7 ms`;
+    console.log(`page thread (first map): ${describe('frames', map.timings.frames)}; ${describe('answers', map.timings.answers)}; `
+        + `${describe('WebGPU submissions', map.timings.submissions)}`);
     console.log(`tile cache: ${cache.counts.stored} stored, ${cache.counts.hits} answered, ${cache.counts.dropped} dropped; `
         + `loads again: ${loads.map(({ network, cached }) => `${network} from the network and ${cached} from the cache`).join(', then ')}`);
 }

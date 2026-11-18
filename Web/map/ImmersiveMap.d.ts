@@ -28,6 +28,26 @@ export interface Downloads {
     firstFailure: string | null;
 }
 
+/** How long one kind of the module's calls held the page's thread, in milliseconds. */
+export interface CallTimings {
+    calls: number;
+    total: number;
+    longest: number;
+    /** The calls longer than a frame at 60 Hz (16.7 ms). */
+    overBudget: number;
+}
+
+/**
+ * The module's calls: the frames, the requests answered (which run the tasks
+ * they wake, the tiles' parsing among them), each without the WebGPU
+ * submissions inside them, and the submissions apart.
+ */
+export interface Timings {
+    frames: CallTimings;
+    answers: CallTimings;
+    submissions: CallTimings;
+}
+
 export interface ImmersiveMapOptions {
     /**
      * The folder Web/map/build.sh writes: the module, the shader bundle and
@@ -127,6 +147,8 @@ export declare class ImmersiveMap {
     readonly camera: CameraPosition | null;
     /** The tile archive's requests so far. */
     readonly downloads: Downloads;
+    /** How long the module's calls have held the page's thread, null once destroyed. */
+    readonly timings: Timings | null;
 
     /** Puts the camera over the point at the zoom (the current one if left out), looking straight down. */
     lookAt(position: Coordinate & { zoom?: number }): void;

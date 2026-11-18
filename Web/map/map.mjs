@@ -73,6 +73,12 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   threw, as it does when the archive's host refuses the page's origin, or
 ///   an HTTP error) and the first failure's text, for the page to show, as
 ///   the engine only logs them.
+/// - `timings`: how long the module's calls held the page's thread, in
+///   milliseconds, as `{ calls, total, longest, overBudget }` each:
+///   `frames` and `answers` (a request answered, which runs the tasks it
+///   wakes, the tiles' parsing among them) the module's own time, and
+///   `submissions` the WebGPU host's inside them, apart. `overBudget`
+///   counts the calls longer than a frame at 60 Hz.
 /// - `host`, the WebGPU host, and `poiAtlasLayout`, the layout the icons
 ///   were drawn to.
 export async function startMap({
@@ -100,6 +106,26 @@ export async function startMap({
         if (pointer !== 0) new Uint8Array(memory(), pointer, bytes.length).set(bytes);
     };
     const downloads = { answered: 0, cached: 0, failed: 0, firstFailure: null };
+
+    // The page's thread held by the module, its calls timed apart from the
+    // WebGPU host's submissions inside them.
+    const frameBudget = 1000 / 60;
+    const stat = () => ({ calls: 0, total: 0, longest: 0, overBudget: 0 });
+    const timings = { frames: stat(), answers: stat(), submissions: stat() };
+    const note = (entry, milliseconds) => {
+        entry.calls += 1;
+        entry.total += milliseconds;
+        entry.longest = Math.max(entry.longest, milliseconds);
+        if (milliseconds > frameBudget) entry.overBudget += 1;
+    };
+    let submitting = 0;
+    const timed = (entry, call) => {
+        submitting = 0;
+        const start = performance.now();
+        const result = call();
+        note(entry, performance.now() - start - submitting);
+        return result;
+    };
     const noteFailure = (text) => {
         downloads.failed += 1;
         downloads.firstFailure ??= text;
@@ -112,13 +138,13 @@ export async function startMap({
         if (status >= 400) noteFailure(`HTTP ${status}`);
         hand(id, 0, body);
         hand(id, 1, encoder.encode(headers));
-        instance.exports.immersivemap_fetch_finish(id, status);
+        timed(timings.answers, () => instance.exports.immersivemap_fetch_finish(id, status));
         wake();
     };
     const fail = (id, error) => {
         noteFailure(String(error?.message ?? error));
         hand(id, 1, encoder.encode(String(error?.message ?? error)));
-        instance.exports.immersivemap_fetch_finish(id, 0);
+        timed(timings.answers, () => instance.exports.immersivemap_fetch_finish(id, 0));
         wake();
     };
 
@@ -126,7 +152,11 @@ export async function startMap({
         ...wasi.imports,
         immersivemap_webgpu: {
             submit(pointer, length) {
+                const start = performance.now();
                 host.submit(new Uint8Array(memory(), pointer, length));
+                const milliseconds = performance.now() - start;
+                submitting += milliseconds;
+                note(timings.submissions, milliseconds);
             },
         },
         immersivemap_fetch: {
@@ -193,8 +223,9 @@ export async function startMap({
         host,
         poiAtlasLayout,
         downloads,
+        timings,
         frame(width, height, pixelsPerPoint) {
-            const result = exports.immersivemap_map_frame(width, height, pixelsPerPoint);
+            const result = timed(timings.frames, () => exports.immersivemap_map_frame(width, height, pixelsPerPoint));
             return { needsFrame: (result & 1) !== 0, drew: (result & 2) !== 0 };
         },
         pan: changing((dx, dy) => exports.immersivemap_map_pan(dx, dy)),

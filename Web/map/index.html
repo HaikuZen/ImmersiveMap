@@ -29,7 +29,8 @@
 // tilt. `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA
 // off, `?markers=0` leaves out the sample markers, `?tilecache=0` reads
 // every range from the network, `?credit=<text>` credits another archive's
-// data in place of OpenStreetMap (`&creditlink=<url>` its license page).
+// data in place of OpenStreetMap (`&creditlink=<url>` its license page),
+// `?stats=1` shows how long the module holds the page's thread.
 // Built and served by build.sh.
 import { ImmersiveMap } from './ImmersiveMap.mjs';
 
@@ -46,11 +47,23 @@ const downloadStatus = ({ answered, failed, firstFailure }) => failed === 0 ? ''
     + 'If the archive is on another site, its host must allow this page\'s origin (CORS), '
     + 'or serve the archive from this site and open the page with ?archive=/<file>.pmtiles.';
 let map = null;
+// The module's hold on the page's thread, for judging whether tile parsing
+// needs workers: the longest and the total of each kind of call.
+const showStats = query.get('stats') === '1';
+const statsLine = () => {
+    const timings = map?.timings;
+    if (!timings) return '';
+    const describe = (name, { calls, total, longest, overBudget }) =>
+        `${name}: ${calls} calls, longest ${longest.toFixed(1)} ms, total ${total.toFixed(0)} ms, ${overBudget} over 16.7 ms`;
+    return [describe('frames', timings.frames), describe('answers', timings.answers),
+            describe('WebGPU submissions', timings.submissions)].join('\n');
+};
 const show = () => {
     if (errors.length > 0) {
         say(`WebGPU error:\n${errors.slice(-3).join('\n')}`, true);
     } else {
-        say([map ? downloadStatus(map.downloads) : '', ...notes.slice(-3)].filter(Boolean).join('\n'));
+        say([map ? downloadStatus(map.downloads) : '', showStats ? statsLine() : '', ...notes.slice(-3)]
+            .filter(Boolean).join('\n'));
     }
 };
 
@@ -68,6 +81,7 @@ try {
         onDownloadFailure: show,
     });
     show();
+    if (showStats) setInterval(show, 1000);
     if (query.get('markers') !== '0') {
         for (const [latitude, longitude, name] of [
             [55.7558, 37.6173, 'Moscow'], [48.8566, 2.3522, 'Paris'], [41.9028, 12.4964, 'Rome'],

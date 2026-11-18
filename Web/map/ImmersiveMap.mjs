@@ -294,6 +294,14 @@ export class ImmersiveMap {
         return this.#map ? { ...this.#map.downloads } : { answered: 0, cached: 0, failed: 0, firstFailure: null };
     }
 
+    /// How long the module's calls held the page's thread, in milliseconds
+    /// (map.mjs, `timings`): `frames`, `answers` and the WebGPU
+    /// `submissions` inside them, each `{ calls, total, longest,
+    /// overBudget }`.
+    get timings() {
+        return this.#map ? structuredClone(this.#map.timings) : null;
+    }
+
     /// Stops drawing, lets go of the input and the GPU device, and takes the
     /// canvas and the markers out of the element.
     destroy() {
