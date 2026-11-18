@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -24,11 +24,13 @@ final class LayerDrawTests: XCTestCase {
                           polygons: [ImmersiveMapPolygon]? = nil,
                           polylines: [ImmersiveMapPolyline]? = nil,
                           points: [ImmersiveMapPoint]? = nil) throws -> LayerMesh {
-        let layer = ImmersiveMapLayer(id: "layer",
-                                      polygons: polygons ?? [zone],
-                                      polylines: polylines ?? [path],
-                                      points: points ?? [spot])
-        return try XCTUnwrap(LayerMesh(key: layer.meshKey, data: LayerMeshBuilder.build(layer: layer), device: device))
+        let layer = ImmersiveMapLayer(id: "layer", source: "shapes")
+        let content = LayerSourceContent(polygons: polygons ?? [zone],
+                                         polylines: polylines ?? [path],
+                                         points: points ?? [spot])
+        return try XCTUnwrap(LayerMesh(key: layer.meshKey(sourceRevision: 0),
+                                       data: LayerMeshBuilder.build(layer: layer, content: content),
+                                       device: device))
     }
 
     private func draw(_ value: Float) -> LayerDrawUniform {
@@ -90,18 +92,17 @@ final class LayerDrawTests: XCTestCase {
         let full = try makeMesh(device: device)
         XCTAssertEqual(full.fillVertices?.label, "Layer fill vertices")
         XCTAssertEqual(full.fillIndices?.label, "Layer fill indices")
-        XCTAssertEqual(full.lineVertices?.label, "Layer line vertices")
-        XCTAssertEqual(full.lineIndices?.label, "Layer line indices")
+        XCTAssertEqual(full.lineSegments?.label, "Layer line segments")
         XCTAssertEqual(full.discs?.label, "Layer discs")
         XCTAssertTrue(device.buffers.allSatisfy { $0.storage == .shared })
 
         let pointsOnly = try makeMesh(device: device, polygons: [], polylines: [])
         XCTAssertNil(pointsOnly.fillVertices)
-        XCTAssertNil(pointsOnly.lineIndices)
+        XCTAssertNil(pointsOnly.lineSegments)
         XCTAssertNotNil(pointsOnly.discs)
     }
 
-    func testAFrameDrawsZonesThenLinesThenJoinsAndPointsForEveryPlacement() throws {
+    func testAFrameDrawsZonesThenLinesThenPointsForEveryPlacement() throws {
         let device = RecordingGPUDevice()
         let pipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 1)
         let mesh = try makeMesh(device: device)
@@ -128,10 +129,20 @@ final class LayerDrawTests: XCTestCase {
         let chunks = mesh.chunks
         let indexedDraws = commands.filter { if case .drawIndexed = $0 { return true } else { return false } }
         let fillChunks = chunks.filter { $0.fillIndexCount > 0 }.count
-        let lineChunks = chunks.filter { $0.lineIndexCount > 0 }.count
+        let lineChunks = chunks.filter { $0.lineCount > 0 }.count
         XCTAssertGreaterThan(fillChunks, 0)
         XCTAssertGreaterThan(lineChunks, 0)
         XCTAssertEqual(indexedDraws.count, 2 * (fillChunks + lineChunks), "Every chunk draws once per placement")
+        // A line chunk draws its segments as instances of the template's
+        // triangles, by the template's 16-bit indices.
+        let firstLine = try XCTUnwrap(chunks.first { $0.lineCount > 0 })
+        XCTAssertTrue(indexedDraws.contains {
+            guard case let .drawIndexed(_, indexCount, indexType, _, offset, instanceCount, baseVertex, baseInstance) = $0 else {
+                return false
+            }
+            return indexCount == LayerPipeline.lineTemplate.count && indexType == .uint16 && offset == 0
+                && instanceCount == firstLine.lineCount && baseVertex == 0 && baseInstance == firstLine.lineStart
+        })
         let instancedDraws = commands.filter { if case .draw = $0 { return true } else { return false } }
         let discRuns = chunks.filter { $0.joinCount > 0 }.count + chunks.filter { $0.pointCount > 0 }.count
         XCTAssertEqual(instancedDraws.count, 2 * discRuns)

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -89,12 +89,12 @@ final class ImmersiveMapFrameRenderedCallbackTests: XCTestCase {
     private func install(on view: ImmersiveMapHostView,
                          action: @escaping (ImmersiveMapRenderedFrame) -> Void) {
         view.update(settings: FixtureTiles.tilelessSettings(),
-                    avatarsController: nil,
+                    pinsController: nil,
                     cameraController: nil,
                     selectionController: nil,
-                    avatarTapAction: nil,
+                    pinTapAction: nil,
                     frameRenderedAction: action,
-                    markerContent: nil,
+                    annotationContent: nil,
                     cameraPosition: nil)
     }
 

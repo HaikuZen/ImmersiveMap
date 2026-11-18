@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: SurfaceLabel.metal fnv1a64=81f6ac0413d14e08
+// ported-from: SurfaceLabel.metal fnv1a64=96ec7b46b1ec434d
 // include: ../../../Render/Shaders/Shared/RenderUniforms.wgsl
 // include: ../../../Render/Shaders/Shared/GroundFog.wgsl
 // include: ../../../Globe/Shaders/GlobeUnroll.wgsl

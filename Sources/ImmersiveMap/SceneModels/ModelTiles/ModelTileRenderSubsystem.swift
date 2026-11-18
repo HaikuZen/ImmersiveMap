@@ -1,8 +1,9 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
 import PortableFoundation
+import ModelTileFormat
 import simd
 
 /// Draws the models of the model archive (`ImmersiveMapSettings.modelArchive`):
@@ -138,7 +139,8 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
                 riseSignature += heightScale
                 let depth = (1 - heightScale) * max(Float(mesh.boundsMaximum.z), 0) * placement.scale
                 let item = ModelTileDrawItem(mesh: mesh,
-                                             modelMatrix: Matrix.translationMatrix(x: 0, y: 0, z: -depth) * placement.modelMatrix,
+                                             modelMatrix: Matrix.translationMatrix(x: 0, y: 0, z: -depth) * placement.modelMatrix
+                                                 * mesh.positionMatrix,
                                              isRising: heightScale < 1)
                 let center = placement.origin + (mesh.boundsMinimum + mesh.boundsMaximum) * 0.5 * placement.scale
                     - SIMD3<Float>(0, 0, depth)

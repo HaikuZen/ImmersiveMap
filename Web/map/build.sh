@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2025-2026 ImmersiveMap contributors.
+# Copyright (c) 2025-2026 Artem Bobkin.
 # SPDX-License-Identifier: MIT
 #
 # Builds the map page into Web/map/build/: the ImmersiveMapWebMap module for

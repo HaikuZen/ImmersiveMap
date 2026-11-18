@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import simd
@@ -76,6 +76,18 @@ final class SimdKnownAnswerTests: XCTestCase {
         XCTAssertEqual(simd_mul(translationScale(), SIMD4<Float>(1, 1, 1, 1)), SIMD4<Float>(3, 6, 11, 1))
         // A vector on the left is a row.
         XCTAssertEqual(SIMD4<Float>(1, 1, 1, 1) * translationScale(), SIMD4<Float>(2, 4, 8, 7))
+    }
+
+    func testATwoByTwoDoubleMatrixInvertsAndTakesAVectorAsAColumn() {
+        let matrix = simd_double2x2(columns: (SIMD2<Double>(2, 1), SIMD2<Double>(1, 3)))
+        XCTAssertEqual(matrix.determinant, 5)
+        XCTAssertEqual(matrix * SIMD2<Double>(1, 2), SIMD2<Double>(4, 7))
+        let identity = SIMD2<Double>(3, -1)
+        let back = matrix.inverse * (matrix * identity)
+        XCTAssertEqual(back.x, identity.x, accuracy: 1e-12)
+        XCTAssertEqual(back.y, identity.y, accuracy: 1e-12)
+        XCTAssertEqual(matrix.inverse.columns.0.x, 0.6, accuracy: 1e-12)
+        XCTAssertEqual(matrix.inverse.columns.0.y, -0.2, accuracy: 1e-12)
     }
 
     func testAProductAppliesTheRightHandMatrixFirst() {

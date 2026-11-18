@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GroundFog.h fnv1a64=d572f4bf7ffcd84a
+// ported-from: GroundFog.h fnv1a64=1417adfb9e9a40af
 
 // The fog on the ground of the flat map (GroundFogSettings): thickest at
 // the ground, its density falling by a factor of e every `height` upward,

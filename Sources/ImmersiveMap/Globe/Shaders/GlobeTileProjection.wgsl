@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GlobeTileProjection.h fnv1a64=23eafb5ac058499f
+// ported-from: GlobeTileProjection.h fnv1a64=e59597b1205b09e6
 // include: ../../Render/Shaders/Shared/GeoMath.wgsl
 
 // The globe's projections of world and tile uvs. Only what a ported shader

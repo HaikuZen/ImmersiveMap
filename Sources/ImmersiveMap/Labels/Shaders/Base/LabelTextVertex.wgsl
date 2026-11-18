@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: LabelTextVertex.metal fnv1a64=dc5390279de44c72
+// ported-from: LabelTextVertex.metal fnv1a64=ead21cc7596eaceb
 // include: ../Shared/LabelTextCommon.wgsl
 
 // The screen labels' vertex stage: each glyph of a label hung off the

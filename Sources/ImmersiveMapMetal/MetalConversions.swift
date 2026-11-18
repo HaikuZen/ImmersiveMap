@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -139,6 +139,7 @@ extension GPUVertexFormat {
         case .char3Normalized: return .char3Normalized
         case .char4Normalized: return .char4Normalized
         case .ushort2Normalized: return .ushort2Normalized
+        case .ushort3Normalized: return .ushort3Normalized
         case .uchar4Normalized: return .uchar4Normalized
         }
     }

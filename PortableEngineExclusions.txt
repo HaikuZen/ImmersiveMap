@@ -1,43 +1,48 @@
 # The engine's files that build on Apple's platforms alone, one path a line,
 # relative to Sources/ImmersiveMap: the files that import an Apple framework
 # outside a `canImport` guard, the shader and resource folders, UI/, the
-# host of each Apple platform, and every file of Avatars/ but its selection
-# snapshot (plain values the render core carries): the avatars' public API
+# host of each Apple platform, and every file of Pins/: the pins' public API
 # takes Core Graphics images and draws its badges with Core Graphics, until
 # they have an image type of the engine's own. The portable package leaves them out and
 # compiles every other file of the engine. PortableEngineLayoutTests holds
 # this list to the sources' own imports, so a file that gains or loses an
 # Apple import changes it here, in the same change, where a review sees it.
-Avatars/AvatarMarker.swift
-Avatars/AvatarMarkerImageFactory.swift
-Avatars/AvatarMarkerImageLoader.swift
-Avatars/AvatarMarkerImageSource.swift
-Avatars/AvatarRenderSource.swift
-Avatars/AvatarRenderSubsystem.swift
-Avatars/AvatarTypes.swift
-Avatars/AvatarsRenderer.swift
-Avatars/Clustering/AvatarCollisionLayoutSolver.swift
-Avatars/Clustering/AvatarCollisionMath.swift
-Avatars/Clustering/AvatarScreenHashGrid.swift
-Avatars/Drawers/RendererAvatarDrawer.swift
-Avatars/LazyAvatarRenderResource.swift
-Avatars/Pipelines/AvatarBeamPipeline.swift
-Avatars/Pipelines/AvatarPipeline.swift
-Avatars/Presentation/AvatarPresentationStateStore.swift
-Avatars/Presentation/AvatarVisibilityFadeStateStore.swift
-Avatars/Resources/AvatarMarkerSDFResource.swift
-Avatars/Resources/avatar_marker_sdf.json
-Avatars/Resources/avatar_marker_sdf.png
-Avatars/Selection/AvatarSelectionProjector.swift
-Avatars/Shaders/AvatarBeam.metal
-Avatars/Shaders/AvatarCommon.h
-Avatars/Shaders/AvatarRender.metal
-Avatars/Textures/AvatarTextureAtlas.swift
 Globe/Shaders
 Horizon/Shaders
 Labels/POI/PoiSpriteAtlas.swift
 Labels/Shaders
+Layers/LayerMesh+Metal.swift
 Layers/Shaders
+Pins/Clustering/PinCollisionLayoutSolver.swift
+Pins/Clustering/PinCollisionMath.swift
+Pins/Clustering/PinScreenHashGrid.swift
+Pins/Drawers/RendererPinDrawer.swift
+Pins/ImmersiveMapPin.swift
+Pins/ImmersiveMapPinTapEvent.swift
+Pins/ImmersiveMapPinsController.swift
+Pins/LazyPinRenderResource.swift
+Pins/PinImageFactory.swift
+Pins/PinImageLoader.swift
+Pins/PinImageSource.swift
+Pins/PinRenderSource.swift
+Pins/PinRenderSubsystem.swift
+Pins/PinShape.swift
+Pins/PinTypes.swift
+Pins/PinsRenderer.swift
+Pins/Pipelines/PinBeamPipeline.swift
+Pins/Pipelines/PinPipeline.swift
+Pins/Presentation/PinPresentationStateStore.swift
+Pins/Presentation/PinVisibilityFadeStateStore.swift
+Pins/Resources/PinSDFResource.swift
+Pins/Resources/pin_sdf.json
+Pins/Resources/pin_sdf.png
+Pins/Selection/PinSelection.swift
+Pins/Selection/PinSelectionProjector.swift
+Pins/Shaders/PinBeam.metal
+Pins/Shaders/PinCommon.h
+Pins/Shaders/PinRender.metal
+Pins/Textures/PinShapeDistanceField.swift
+Pins/Textures/PinTextureAtlas.swift
 Render/Bootstrap/RendererBootstrap.swift
 Render/Bootstrap/SharedRenderResources.swift
 Render/Core/Context/FrameContext+Metal.swift
@@ -68,8 +73,8 @@ Tile/Relief/Lifts/GroundRelief+Metal.swift
 Tile/Relief/Shaders
 Tile/Relief/Store/GroundReliefTile+Metal.swift
 Tile/Shaders
-Tile/Store/MetalTileFactory+Metal.swift
 Tile/Store/MTLIOPreparedTileGeometryTransport.swift
+Tile/Store/MetalTileFactory+Metal.swift
 Tile/Trees/Resources
 Tile/Trees/TreeModelMesh+Metal.swift
 UI

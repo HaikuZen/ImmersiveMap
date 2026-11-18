@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import PortableFoundation
@@ -61,12 +61,12 @@ extension ImmersiveMapHostView {
         tapHandler.handleMapTap(at: point)
     }
 
-    func setAvatarSelectionSnapshotForTesting(_ snapshot: AvatarSelectionSnapshot) {
-        selectionHandler.updateAvatarSelectionSnapshot(snapshot)
+    func setPinSelectionSnapshotForTesting(_ snapshot: PinSelectionSnapshot) {
+        selectionHandler.updatePickData([snapshot])
     }
 
     func setSceneModelSelectionSnapshotForTesting(_ snapshot: SceneModelSelectionSnapshot) {
-        selectionHandler.updateSceneModelSelectionSnapshot(snapshot)
+        selectionHandler.updatePickData([snapshot])
     }
 
     var rendererForTesting: RenderFrameEngine? {

@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GlobeTransitionProjection.h fnv1a64=e1c899cd32c91076
+// ported-from: GlobeTransitionProjection.h fnv1a64=410bff0e1557dd71
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 // include: ../../Render/Shaders/Shared/GeoMath.wgsl
 

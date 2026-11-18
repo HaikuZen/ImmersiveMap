@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GeoMath.metal fnv1a64=e473013aa018450b
+// ported-from: GeoMath.metal fnv1a64=27806afda9673b62
 
 // The map's small geographic helpers. Only what a ported shader reads is
 // here so far.

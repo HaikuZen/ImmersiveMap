@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import PortableFoundation
@@ -6,7 +6,7 @@ import simd
 
 /// Deterministic animation math for scene models: move durations, quaternion
 /// orientation, and scalar easing. Kept inside SceneModels so the domain folder
-/// does not depend on Avatars. Great-circle interpolation itself lives in
+/// does not depend on Pins. Great-circle interpolation itself lives in
 /// `GeoGreatCircleMath`.
 enum SceneModelAnimationMath {
     static let minimumPositionDuration: TimeInterval = 0.14

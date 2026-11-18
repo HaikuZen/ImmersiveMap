@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: TextShader.metal fnv1a64=1b5047636c6fdd02
+// ported-from: TextShader.metal fnv1a64=7c2323606dbba7ad
 // include: ../../Labels/Shaders/Shared/LabelTextCommon.wgsl
 
 // The text of the labels: the glyphs drawn from the MTSDF atlas, the fill

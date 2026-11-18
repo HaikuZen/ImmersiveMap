@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 // The matrix types of the stand-in (see Vector.swift). Column-major, as
@@ -330,6 +330,41 @@ public struct simd_float3x3: Equatable, Sendable {
 
     @inlinable
     public static func * (lhs: Float, rhs: simd_float3x3) -> simd_float3x3 { rhs * lhs }
+}
+
+/// A 2x2 matrix of doubles, column-major as Apple's: what the layers' tap
+/// picking measures the screen with (`LayerPickMath`), and no more.
+public struct simd_double2x2: Equatable, Sendable {
+    public var columns: (SIMD2<Double>, SIMD2<Double>)
+
+    @inlinable
+    public init(columns: (SIMD2<Double>, SIMD2<Double>)) {
+        self.columns = columns
+    }
+
+    @inlinable
+    public var determinant: Double {
+        columns.0.x * columns.1.y - columns.1.x * columns.0.y
+    }
+
+    /// The inverse by cofactors. A singular matrix gives non-finite entries,
+    /// as Apple's does.
+    @inlinable
+    public var inverse: simd_double2x2 {
+        let scale = 1 / determinant
+        return simd_double2x2(columns: (SIMD2(columns.1.y, -columns.0.y) * scale,
+                                        SIMD2(-columns.1.x, columns.0.x) * scale))
+    }
+
+    @inlinable
+    public static func == (lhs: simd_double2x2, rhs: simd_double2x2) -> Bool {
+        lhs.columns.0 == rhs.columns.0 && lhs.columns.1 == rhs.columns.1
+    }
+
+    @inlinable
+    public static func * (lhs: simd_double2x2, rhs: SIMD2<Double>) -> SIMD2<Double> {
+        lhs.columns.0 * rhs.x + lhs.columns.1 * rhs.y
+    }
 }
 
 public typealias matrix_float4x4 = simd_float4x4

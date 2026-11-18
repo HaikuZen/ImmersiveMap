@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: Trees.metal fnv1a64=c2994002d02e6fd1
+// ported-from: Trees.metal fnv1a64=0cd47c886223cec8
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 // include: ../../Render/Shaders/Shared/GroundFog.wgsl
 // include: ../../Render/Shaders/Shared/GeoMath.wgsl

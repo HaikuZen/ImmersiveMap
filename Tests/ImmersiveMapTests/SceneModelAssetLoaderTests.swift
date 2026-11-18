@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -108,10 +108,9 @@ final class SceneModelMeshStoreTests: XCTestCase {
         func applyActivityState(_ state: RenderActivityState) {}
         func completeSceneModelPathAnimations(_: [SceneModelPathAnimationResult]) {}
 
-        func updateAvatarSelectionSnapshot(_ snapshot: AvatarSelectionSnapshot) {}
-        func updateSceneModelSelectionSnapshot(_ snapshot: SceneModelSelectionSnapshot) {}
+        func updateSelectionPickData(_ pickData: [any SelectionPickData]) {}
         func updateDebugOverlayHUDSnapshot(_ snapshot: DebugOverlayHUDSnapshot?) {}
-        func updateMarkerProjectionSnapshot(_ snapshot: MarkerProjectionSnapshot) {}
+        func updateAnnotationProjectionSnapshot(_ snapshot: AnnotationProjectionSnapshot) {}
     }
 
     private final class LoadCounter: @unchecked Sendable {

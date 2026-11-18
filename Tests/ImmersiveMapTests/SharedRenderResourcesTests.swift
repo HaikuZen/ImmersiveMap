@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import Metal
@@ -45,12 +45,12 @@ final class SharedRenderResourcesTests: XCTestCase {
         XCTAssertFalse(first.gpuCommandQueue === second.gpuCommandQueue)
     }
 
-    private final class StubAvatarSource: AvatarRenderSource {
-        var currentAvatarController: ImmersiveMapAvatarsController? { nil }
+    private final class StubPinSource: PinRenderSource {
+        var currentPinController: ImmersiveMapPinsController? { nil }
     }
 
-    private final class StubMarkerSource: MarkerRenderSource {
-        var currentMarkerProjectionInput: MarkerProjectionInput { .empty }
+    private final class StubAnnotationSource: AnnotationRenderSource {
+        var currentAnnotationProjectionInput: AnnotationProjectionInput { .empty }
     }
 
     private final class StubSceneModelSource: SceneModelRenderSource {
@@ -66,9 +66,9 @@ final class SharedRenderResourcesTests: XCTestCase {
         let shared = try SharedRenderResources.shared(sampleCount: settings.postProcessing.multisampleCount)
         return RenderPersistentContext(host: .metal(layer: CAMetalLayer(),
                                                     shared: shared,
-                                                    avatarSource: StubAvatarSource(),
+                                                    pinSource: StubPinSource(),
                                                     config: settings),
-                                       markerSource: StubMarkerSource(),
+                                       annotationSource: StubAnnotationSource(),
                                        sceneModelSource: StubSceneModelSource(),
                                        layerSource: FixedLayerRenderSource(),
                                        styleRuntime: MapStyleRuntime(settings: settings),

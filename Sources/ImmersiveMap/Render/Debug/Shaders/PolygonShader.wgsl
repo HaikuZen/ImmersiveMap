@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: PolygonShader.metal fnv1a64=2a98917a574a56f6
+// ported-from: PolygonShader.metal fnv1a64=4d733b64e50702b5
 // include: ../../Shaders/Shared/RenderUniforms.wgsl
 
 // The debug overlay's lines and plates (PolygonsPipeline): coloured

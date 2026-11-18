@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -36,11 +36,11 @@ final class ImmersiveMapDeferredRendererTests: XCTestCase {
 
         let view = makeHostView(settings: settings)
         view.update(settings: settings,
-                    avatarsController: nil,
+                    pinsController: nil,
                     cameraController: camera,
                     selectionController: nil,
-                    avatarTapAction: nil,
-                    markerContent: nil,
+                    pinTapAction: nil,
+                    annotationContent: nil,
                     cameraPosition: nil)
         XCTAssertNil(view.rendererForTesting, "Without the resources the view does not block on building them")
 

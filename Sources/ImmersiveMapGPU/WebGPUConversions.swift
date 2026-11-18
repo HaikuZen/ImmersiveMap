@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 // The interface's values as WebGPU names them, one property per type, the
@@ -28,6 +28,7 @@ extension GPUVertexFormat {
         case .char3Normalized: return "snorm8x4"
         case .char4Normalized: return "snorm8x4"
         case .ushort2Normalized: return "unorm16x2"
+        case .ushort3Normalized: return "unorm16x4"
         case .uchar4Normalized: return "unorm8x4"
         }
     }
@@ -40,7 +41,7 @@ extension GPUVertexFormat {
         case .uchar, .char: return 1
         case .ushort, .short, .char2Normalized: return 2
         case .float, .int, .char3Normalized, .char4Normalized, .ushort2Normalized, .uchar4Normalized: return 4
-        case .float2, .short3: return 8
+        case .float2, .short3, .ushort3Normalized: return 8
         case .float3: return 12
         case .float4: return 16
         }

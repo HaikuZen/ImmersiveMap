@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import PortableFoundation
@@ -64,12 +64,11 @@ enum GeoJSONObjectReaders {
 /// styles they are laid over. A reader that holds other objects hands each
 /// one back to `read(object:style:path:)`, which finds its reader.
 struct GeoJSONReadContext {
-    let base: ImmersiveMapGeoJSON.BaseStyles
     var shapes = ImmersiveMapGeoJSON.Shapes()
-
-    init(base: ImmersiveMapGeoJSON.BaseStyles) {
-        self.base = base
-    }
+    /// How many features were read, a feature's place in the document.
+    var featureCount = 0
+    /// The id the shapes of the feature being read take, nil outside one.
+    var featureID: UInt64?
 
     mutating func read(object: JSONValue, style: ImmersiveMapGeoJSON.SimpleStyle, path: String) throws {
         guard let dictionary = object.objectValue, let type = dictionary["type"]?.stringValue else {

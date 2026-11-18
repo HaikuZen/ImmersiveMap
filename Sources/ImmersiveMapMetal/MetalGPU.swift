@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -348,7 +348,7 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
     /// device. ASTC is on Apple's own GPUs, not on the Intel and AMD ones of
     /// older Macs.
     package var features: GPUDeviceFeatures {
-        var features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .pointSprites]
+        var features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .pointSprites, .unalignedVertexAttributes]
         if device.supportsFamily(.apple2) {
             features.insert(.astc)
         }

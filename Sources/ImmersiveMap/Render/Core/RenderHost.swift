@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -23,11 +23,14 @@ struct RenderHost {
     /// GPU memory, nil where they are copied from memory.
     let modelTileFileLoader: ModelTileMesh.FileLoader?
     let treeFileLoader: TreeModelMesh.FileLoader?
+    /// Loads a layer's mesh from its file on disk straight into its buffers
+    /// (`LayerMesh.FileLoader`), nil where the platform has no such path.
+    let layerFileLoader: LayerMesh.FileLoader?
     /// Reads a scene model's asset file into a mesh, throwing where the
     /// platform reads none.
     let loadSceneModelAsset: @Sendable (URL) throws -> SceneModelMesh
-    /// The subsystem the platform draws its own layer with (the avatars, on
-    /// Apple's platforms), placed in the avatars' slot of the graph, nil for
+    /// The subsystem the platform draws its own layer with (the pins, on
+    /// Apple's platforms), placed in the pins' slot of the graph, nil for
     /// none.
-    let makeAvatarSubsystem: (() -> any RenderSubsystem & RenderPassAvailabilityProvider)?
+    let makePinSubsystem: (() -> any RenderSubsystem & RenderPassAvailabilityProvider)?
 }

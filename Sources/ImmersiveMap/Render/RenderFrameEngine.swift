@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -99,7 +99,7 @@ final class RenderFrameEngine {
     /// from the view's layer (`init(layer:...)`, `RenderFrameEngine+Metal.swift`).
     @MainActor
     init(host: RenderHost,
-         markerSource: MarkerRenderSource,
+         annotationSource: AnnotationRenderSource,
          sceneModelSource: SceneModelRenderSource,
          layerSource: LayerRenderSource = FixedLayerRenderSource(),
          styleRuntime: MapStyleRuntime,
@@ -112,7 +112,7 @@ final class RenderFrameEngine {
          baseLabelTraceRecorder: BaseLabelTraceRecorder,
          clock: RenderFrameClock = RenderFrameWallClock()) {
         let persistentContext = RenderPersistentContext(host: host,
-                                                        markerSource: markerSource,
+                                                        annotationSource: annotationSource,
                                                         sceneModelSource: sceneModelSource,
                                                         layerSource: layerSource,
                                                         styleRuntime: styleRuntime,
@@ -283,10 +283,10 @@ final class RenderFrameEngine {
                                             value: persistentContext.groundRelief?.pendingTerrainTileCount ?? 0)
         let hasActiveLabelFadeAnimations = frameContext.sharedState.baseLabelState.hasActiveFadeAnimations
             || frameContext.sharedState.roadLabelState.hasActiveFadeAnimations
-        let hasActiveAvatarAnimations = frameContext.sharedState.avatarState.hasActiveAnimations
+        let hasActivePinAnimations = frameContext.sharedState.pinState.hasActiveAnimations
         let hasActiveSceneModelAnimations = frameContext.sharedState.sceneModelState.hasActiveAnimations
         eventSink.applyActivityState(RenderActivityState(labelFadeRenderingActive: hasActiveLabelFadeAnimations,
-                                                         avatarAnimationRenderingActive: hasActiveAvatarAnimations,
+                                                         pinAnimationRenderingActive: hasActivePinAnimations,
                                                          sceneModelAnimationRenderingActive: hasActiveSceneModelAnimations,
                                                          extrusionRiseRenderingActive: frameContext.sharedState.isExtrusionRising,
                                                          animatedZoomRenderingActive: animatedZoom.isSettling
@@ -297,11 +297,11 @@ final class RenderFrameEngine {
         if pathAnimationResults.isEmpty == false {
             eventSink.completeSceneModelPathAnimations(pathAnimationResults)
         }
-        // Synchronously and within the same frame: SwiftUI marker positions must
+        // Synchronously and within the same frame: SwiftUI annotation positions must
         // land in the same CA transaction as this frame's present. When didSchedule
         // == false the screen shows the old frame and there is nothing to publish.
-        if didSchedule, let markerProjectionSnapshot = frameContext.sharedState.markerState.snapshot {
-            eventSink.updateMarkerProjectionSnapshot(markerProjectionSnapshot)
+        if didSchedule, let annotationProjectionSnapshot = frameContext.sharedState.annotationState.snapshot {
+            eventSink.updateAnnotationProjectionSnapshot(annotationProjectionSnapshot)
         }
         publishDebugOverlayHUDSnapshot(frameContext: frameContext)
 
@@ -555,8 +555,7 @@ final class RenderFrameEngine {
             return false
         }
 
-        let avatarSelectionSnapshot = frameContext.sharedState.avatarState.selectionSnapshot
-        let sceneModelSelectionSnapshot = frameContext.sharedState.sceneModelState.selectionSnapshot
+        let selectionPickData = frameContext.sharedState.selectionPickData
         // The handler runs on a Metal thread, so it takes the engine's
         // thread-safe parts and never the engine itself.
         commandBuffer.addCompletedHandler(reporting: { [lastCompletedGPUFrameDuration, inFlightFramePool, eventSink] completion in
@@ -564,8 +563,7 @@ final class RenderFrameEngine {
                 lastCompletedGPUFrameDuration.withLock { $0 = gpuFrameDuration }
             }
             inFlightFramePool.release(slot: frameSlotIndex)
-            eventSink.updateAvatarSelectionSnapshot(avatarSelectionSnapshot)
-            eventSink.updateSceneModelSelectionSnapshot(sceneModelSelectionSnapshot)
+            eventSink.updateSelectionPickData(selectionPickData)
             onGPUComplete?(completion.succeeded)
         })
         if let present = target.present {

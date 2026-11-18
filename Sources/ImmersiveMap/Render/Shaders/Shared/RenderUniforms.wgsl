@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: RenderUniforms.h fnv1a64=2cc0d28bd7943bda
+// ported-from: RenderUniforms.h fnv1a64=a0e3cbf2be36c527
 
 // The uniforms the WGSL stages share: the twins of RenderUniforms.h and of
 // their Swift mirrors, with the same fields at the same offsets

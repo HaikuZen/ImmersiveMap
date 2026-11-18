@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: TileShading.h fnv1a64=5e443331539e54be
+// ported-from: TileShading.h fnv1a64=fdcfe986d743c171
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 
 // What the flat ground (Tile.wgsl) and the sphere's ground (TileSphere.wgsl)

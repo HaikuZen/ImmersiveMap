@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -11,19 +11,19 @@ extension RenderHost {
     /// stamped onto the layer with the view's own command queue
     /// (`RendererSetup.buildMetal`), the IO queue's file loaders, Model I/O
     /// for the scene models' assets, the POI icons drawn with the system's
-    /// symbols, and the avatars.
+    /// symbols, the layers' meshes loaded by the IO queue, and the pins.
     @MainActor
     static func metal(layer: CAMetalLayer,
                       shared: SharedRenderResources,
-                      avatarSource: AvatarRenderSource,
+                      pinSource: PinRenderSource,
                       config: ImmersiveMapSettings) -> RenderHost {
         let metal = RendererSetup.buildMetal(layer: layer, sharedResources: shared)
         // Metal's device is safe to use from any thread, the loads' queue
         // included.
         nonisolated(unsafe) let device = metal.device
-        let avatarsRenderer = AvatarsRenderer(metalDevice: metal.device,
-                                              sharedResources: shared.avatars,
-                                              config: config.avatars)
+        let pinsRenderer = PinsRenderer(metalDevice: metal.device,
+                                        sharedResources: shared.pins,
+                                        config: config.pins)
         let depthDisabledState = shared.depthDisabledState.metalState
         return RenderHost(resources: shared.core,
                           commandQueue: MetalCommandQueue(metal.commandQueue),
@@ -32,11 +32,12 @@ extension RenderHost {
                                                    compressionEnabled: config.tiles.cache.preparedDiskCompressionEnabled),
                           modelTileFileLoader: ModelTileMesh.metalFileLoader(device: metal.device),
                           treeFileLoader: TreeModelMesh.metalFileLoader(device: metal.device),
+                          layerFileLoader: LayerMesh.metalFileLoader(device: metal.device),
                           loadSceneModelAsset: { url in try SceneModelAssetLoader.load(url: url, device: device) },
-                          makeAvatarSubsystem: {
-                              AvatarRenderSubsystem(avatarsRenderer: avatarsRenderer,
-                                                    avatarSource: avatarSource,
-                                                    depthDisabledState: depthDisabledState)
+                          makePinSubsystem: {
+                              PinRenderSubsystem(pinsRenderer: pinsRenderer,
+                                                 pinSource: pinSource,
+                                                 depthDisabledState: depthDisabledState)
                           })
     }
 }

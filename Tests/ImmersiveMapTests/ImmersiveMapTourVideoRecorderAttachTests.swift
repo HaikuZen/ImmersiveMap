@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -14,9 +14,9 @@ final class ImmersiveMapTourVideoRecorderAttachTests: XCTestCase {
     private func makeContext() -> ImmersiveMapVideoExportAttachContext {
         ImmersiveMapVideoExportAttachContext(currentSettings: { FixtureTiles.tilelessSettings() },
                                              currentCameraPosition: { nil },
-                                             currentAvatarsController: { nil },
-                                             currentLayers: { [] },
-                                             currentMarkerContent: { nil })
+                                             currentPinsController: { nil },
+                                             currentLayersController: { nil },
+                                             currentAnnotationContent: { nil })
     }
 
     private func makeTemporaryURL() -> URL {

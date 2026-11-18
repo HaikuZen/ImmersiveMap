@@ -1,8 +1,8 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: RoadLabelTextVertex.metal fnv1a64=f1474951c82f453d
-// ported-from: RoadLabelCommon.h fnv1a64=c423a9ffb504623b
+// ported-from: RoadLabelTextVertex.metal fnv1a64=3c17ad57c5f6441a
+// ported-from: RoadLabelCommon.h fnv1a64=bc0c74845a9255a8
 // include: ../Shared/LabelTextCommon.wgsl
 
 // The road names' vertex stage: each glyph turned along its road at the

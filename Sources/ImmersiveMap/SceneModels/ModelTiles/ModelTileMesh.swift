@@ -1,8 +1,9 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
 import PortableFoundation
+import ModelTileFormat
 import simd
 
 enum ModelTileMeshError: Error, Equatable {
@@ -28,6 +29,10 @@ final class ModelTileMesh: @unchecked Sendable {
     /// The bounds of the whole tile, in tile space.
     let boundsMinimum: SIMD3<Float>
     let boundsMaximum: SIMD3<Float>
+    /// The vertices' stored positions into tile space
+    /// (`ModelTileContents.positionMatrix`): the first matrix a vertex of
+    /// the tile takes.
+    let positionMatrix: matrix_float4x4
     let vertexBuffer: any GPUBuffer
     let indexBuffer: any GPUBuffer
     /// The array of the tile's textures, one layer per source atlas.
@@ -125,7 +130,7 @@ final class ModelTileMesh: @unchecked Sendable {
         var replaced: [Int: Set<UInt64>] = [:]
         for model in contents.models {
             for entry in model.replacedBuildings {
-                if let featureID = schema.tileFeatureID(of: entry.element) {
+                if let featureID = schema.tileFeatureID(of: ImmersiveMapOSMElement(entry.element)) {
                     replaced[entry.mapTileZoom, default: []].insert(featureID)
                 }
             }
@@ -135,6 +140,7 @@ final class ModelTileMesh: @unchecked Sendable {
                   replacedBuildingIDs: replaced,
                   boundsMinimum: contents.boundsMinimum,
                   boundsMaximum: contents.boundsMaximum,
+                  positionMatrix: contents.positionMatrix,
                   vertexBuffer: vertexBuffer,
                   indexBuffer: indexBuffer,
                   texture: texture,
@@ -150,6 +156,7 @@ final class ModelTileMesh: @unchecked Sendable {
          replacedBuildingIDs: [Int: Set<UInt64>],
          boundsMinimum: SIMD3<Float>,
          boundsMaximum: SIMD3<Float>,
+         positionMatrix: matrix_float4x4,
          vertexBuffer: any GPUBuffer,
          indexBuffer: any GPUBuffer,
          texture: any GPUTexture,
@@ -159,6 +166,7 @@ final class ModelTileMesh: @unchecked Sendable {
         self.replacedBuildingIDs = replacedBuildingIDs
         self.boundsMinimum = boundsMinimum
         self.boundsMaximum = boundsMaximum
+        self.positionMatrix = positionMatrix
         self.vertexBuffer = vertexBuffer
         self.indexBuffer = indexBuffer
         self.texture = texture

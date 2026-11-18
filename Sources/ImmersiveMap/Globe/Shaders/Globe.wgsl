@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: Globe.metal fnv1a64=4f140b1f6d709aeb
+// ported-from: Globe.metal fnv1a64=dfe6fe4b0b901294
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 // include: GlobeLight.wgsl
 

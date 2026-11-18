@@ -1,9 +1,11 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
 import ImmersiveMapMetal
 import Metal
+import ModelTileFormat
+import ModelTileFormatTestSupport
 import XCTest
 
 /// The model tile store: a wanted tile loads and is answered on a later
@@ -24,10 +26,9 @@ final class ModelTileStoreTests: XCTestCase {
 
         func applyActivityState(_ state: RenderActivityState) {}
         func completeSceneModelPathAnimations(_: [SceneModelPathAnimationResult]) {}
-        func updateAvatarSelectionSnapshot(_ snapshot: AvatarSelectionSnapshot) {}
-        func updateSceneModelSelectionSnapshot(_ snapshot: SceneModelSelectionSnapshot) {}
+        func updateSelectionPickData(_ pickData: [any SelectionPickData]) {}
         func updateDebugOverlayHUDSnapshot(_ snapshot: DebugOverlayHUDSnapshot?) {}
-        func updateMarkerProjectionSnapshot(_ snapshot: MarkerProjectionSnapshot) {}
+        func updateAnnotationProjectionSnapshot(_ snapshot: AnnotationProjectionSnapshot) {}
     }
 
     private static let tileA = Tile(x: 9904, y: 5121, z: 14)

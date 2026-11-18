@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -14,7 +14,7 @@ extension RenderHost {
     /// the pixels of `PoiSpriteAtlasLayout.hostDescription`'s atlas, or no
     /// icons where it drew none, as Apple's symbols are drawn on Apple's
     /// platforms alone), the tiles, the model tiles and the trees copied
-    /// from memory, no scene model assets and no avatars. Without the
+    /// from memory, no scene model assets and no pins. Without the
     /// resources folder the text has no atlases and no label draws a glyph,
     /// which is logged, as is an atlas of the wrong size.
     static func portable(device: any GPUDevice,
@@ -38,8 +38,9 @@ extension RenderHost {
                           tileFileGeometry: nil,
                           modelTileFileLoader: nil,
                           treeFileLoader: nil,
+                          layerFileLoader: nil,
                           loadSceneModelAsset: { _ in throw SceneModelAssetsUnavailable() },
-                          makeAvatarSubsystem: nil)
+                          makePinSubsystem: nil)
     }
 
     /// A scene model's asset is read with Model I/O, on Apple's platforms

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -68,9 +68,6 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
         // theirs (`ModelTileRenderSubsystem`).
         frameContext.sharedState.sceneModelState.replacedBuildings = .none
         frameContext.sharedState.sceneModelState.hasDrawnModels = false
-        // Cleared up front so every early return below leaves an empty
-        // snapshot: a model that stops being drawn must stop being tappable.
-        frameContext.sharedState.sceneModelState.selectionSnapshot = .empty
         frameContext.sharedState.sceneModelState.pathAnimationResults =
             presentationStateStore.consumePathAnimationResults()
 
@@ -145,12 +142,13 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
         frameContext.sharedState.sceneModelState.hasShadowCasters = shadowItems.isEmpty == false
         frameContext.sharedState.sceneModelState.hasMovingShadowCasters = shadowItems.isEmpty == false
         frameContext.sharedState.sceneModelState.hasDrawnModels = items.isEmpty == false
-        frameContext.sharedState.sceneModelState.selectionSnapshot = SceneModelSelectionSnapshot(
+        // Hit volumes of the models this frame drew.
+        frameContext.sharedState.selectionPickData.append(SceneModelSelectionSnapshot(
             frameIndex: frameContext.frameIndex,
             drawSize: frameContext.drawSize,
             projectionView: frameContext.cameraMatrices.projectionView,
             cameraEye: frameContext.cameraEye,
-            entries: selectionEntries)
+            entries: selectionEntries))
     }
 
     func contributePassAvailability(settings _: ImmersiveMapSettings,

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -116,12 +116,12 @@ final class RenderPersistentContext {
     let layerMeshStore: LayerMeshStore
     let layerPipeline: LayerPipeline
 
-    // MARK: - Avatar and Debug Resources
+    // MARK: - Pin and Debug Resources
 
-    let markerSource: MarkerRenderSource
-    /// The host's own subsystem, drawn in the avatars' slot
-    /// (`RenderHost.makeAvatarSubsystem`).
-    let makeAvatarSubsystem: (() -> any RenderSubsystem & RenderPassAvailabilityProvider)?
+    let annotationSource: AnnotationRenderSource
+    /// The host's own subsystem, drawn in the pins' slot
+    /// (`RenderHost.makePinSubsystem`).
+    let makePinSubsystem: (() -> any RenderSubsystem & RenderPassAvailabilityProvider)?
     let debugOverlayRenderer: DebugOverlayRenderer
     let tileTraceRecorder: TileTraceRecorder
     let baseLabelTraceRecorder: BaseLabelTraceRecorder
@@ -131,7 +131,7 @@ final class RenderPersistentContext {
 
     @MainActor
     init(host: RenderHost,
-         markerSource: MarkerRenderSource,
+         annotationSource: AnnotationRenderSource,
          sceneModelSource: SceneModelRenderSource,
          layerSource: LayerRenderSource,
          styleRuntime: MapStyleRuntime,
@@ -235,11 +235,11 @@ final class RenderPersistentContext {
         self.treeModelStore.eventSink = eventSink
         self.layerSource = layerSource
         self.layerPipeline = shared.layerPipeline
-        self.layerMeshStore = LayerMeshStore(device: shared.device)
+        self.layerMeshStore = LayerMeshStore(device: shared.device, fileLoader: host.layerFileLoader)
         self.layerMeshStore.eventSink = eventSink
 
-        self.markerSource = markerSource
-        self.makeAvatarSubsystem = host.makeAvatarSubsystem
+        self.annotationSource = annotationSource
+        self.makePinSubsystem = host.makePinSubsystem
         self.debugOverlayRenderer = DebugOverlayRenderer(device: shared.device, settings: config.debug)
     }
 

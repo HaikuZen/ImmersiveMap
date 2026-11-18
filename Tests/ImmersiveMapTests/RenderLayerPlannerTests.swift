@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -9,7 +9,7 @@ final class RenderLayerPlannerTests: XCTestCase {
         let plan = RenderLayerPlanner.plan(
             availability: RenderPassAvailability(renderSurfaceMode: .flat,
                                                  labelsEnabled: true,
-                                                 avatarsEnabled: true,
+                                                 pinsEnabled: true,
                                                  debugOverlayEnabled: true,
                                                  starfieldEnabled: true)
         )
@@ -20,10 +20,11 @@ final class RenderLayerPlannerTests: XCTestCase {
             .buildingExtrusion,
             .sceneModels,
             .flatMapRoads,
+            .appLayers,
             .surfaceLabels,
             .horizon,
             .labels,
-            .avatars,
+            .pins,
             .debugOverlay
         ])
         XCTAssertTrue(plan.allSatisfy(\.enabled))
@@ -34,7 +35,7 @@ final class RenderLayerPlannerTests: XCTestCase {
         let plan = RenderLayerPlanner.plan(
             availability: RenderPassAvailability(renderSurfaceMode: .flat,
                                                  labelsEnabled: false,
-                                                 avatarsEnabled: false,
+                                                 pinsEnabled: false,
                                                  debugOverlayEnabled: false,
                                                  starfieldEnabled: true)
         )
@@ -45,16 +46,17 @@ final class RenderLayerPlannerTests: XCTestCase {
             .buildingExtrusion,
             .sceneModels,
             .flatMapRoads,
+            .appLayers,
             .surfaceLabels,
             .horizon,
             .labels,
-            .avatars,
+            .pins,
             .debugOverlay
         ])
         XCTAssertEqual(enabledLayers(in: plan),
-                       [.placementStencil, .flatMapSurface, .buildingExtrusion, .sceneModels, .flatMapRoads, .surfaceLabels, .horizon])
+                       [.placementStencil, .flatMapSurface, .buildingExtrusion, .sceneModels, .flatMapRoads, .appLayers, .surfaceLabels, .horizon])
         XCTAssertEqual(skipReason(for: .labels, in: plan), .noLabelContent)
-        XCTAssertEqual(skipReason(for: .avatars, in: plan), .noAvatarContent)
+        XCTAssertEqual(skipReason(for: .pins, in: plan), .noPinContent)
         XCTAssertEqual(skipReason(for: .debugOverlay, in: plan), .debugOverlayDisabled)
     }
 
@@ -62,7 +64,7 @@ final class RenderLayerPlannerTests: XCTestCase {
         let plan = RenderLayerPlanner.plan(
             availability: RenderPassAvailability(renderSurfaceMode: .spherical,
                                                  labelsEnabled: true,
-                                                 avatarsEnabled: true,
+                                                 pinsEnabled: true,
                                                  debugOverlayEnabled: true,
                                                  starfieldEnabled: true)
         )
@@ -71,12 +73,13 @@ final class RenderLayerPlannerTests: XCTestCase {
             .starfield,
             .placementStencil,
             .globeVectorSurface,
+            .appLayers,
             .surfaceLabels,
             .globeCap,
             .sceneModels,
             .horizon,
             .labels,
-            .avatars,
+            .pins,
             .debugOverlay
         ])
         XCTAssertTrue(plan.allSatisfy(\.enabled))
@@ -86,7 +89,7 @@ final class RenderLayerPlannerTests: XCTestCase {
         let plan = RenderLayerPlanner.plan(
             availability: RenderPassAvailability(renderSurfaceMode: .spherical,
                                                  labelsEnabled: false,
-                                                 avatarsEnabled: false,
+                                                 pinsEnabled: false,
                                                  debugOverlayEnabled: false,
                                                  starfieldEnabled: true)
         )
@@ -95,17 +98,18 @@ final class RenderLayerPlannerTests: XCTestCase {
             .starfield,
             .placementStencil,
             .globeVectorSurface,
+            .appLayers,
             .surfaceLabels,
             .globeCap,
             .sceneModels,
             .horizon,
             .labels,
-            .avatars,
+            .pins,
             .debugOverlay
         ])
-        XCTAssertEqual(enabledLayers(in: plan), [.starfield, .placementStencil, .globeVectorSurface, .surfaceLabels, .globeCap, .sceneModels, .horizon])
+        XCTAssertEqual(enabledLayers(in: plan), [.starfield, .placementStencil, .globeVectorSurface, .appLayers, .surfaceLabels, .globeCap, .sceneModels, .horizon])
         XCTAssertEqual(skipReason(for: .labels, in: plan), .noLabelContent)
-        XCTAssertEqual(skipReason(for: .avatars, in: plan), .noAvatarContent)
+        XCTAssertEqual(skipReason(for: .pins, in: plan), .noPinContent)
         XCTAssertEqual(skipReason(for: .debugOverlay, in: plan), .debugOverlayDisabled)
     }
 
@@ -115,7 +119,7 @@ final class RenderLayerPlannerTests: XCTestCase {
         let plan = RenderLayerPlanner.plan(
             availability: RenderPassAvailability(renderSurfaceMode: .spherical,
                                                  labelsEnabled: true,
-                                                 avatarsEnabled: true,
+                                                 pinsEnabled: true,
                                                  debugOverlayEnabled: true,
                                                  starfieldEnabled: false)
         )
@@ -123,12 +127,13 @@ final class RenderLayerPlannerTests: XCTestCase {
         XCTAssertEqual(enabledLayers(in: plan), [
             .placementStencil,
             .globeVectorSurface,
+            .appLayers,
             .surfaceLabels,
             .globeCap,
             .sceneModels,
             .horizon,
             .labels,
-            .avatars,
+            .pins,
             .debugOverlay
         ])
         XCTAssertEqual(skipReason(for: .starfield, in: plan), .transparentSpace)
@@ -143,7 +148,7 @@ final class RenderLayerPlannerTests: XCTestCase {
             let plan = RenderLayerPlanner.plan(
                 availability: RenderPassAvailability(renderSurfaceMode: mode,
                                                      labelsEnabled: true,
-                                                     avatarsEnabled: true,
+                                                     pinsEnabled: true,
                                                      debugOverlayEnabled: true,
                                                      starfieldEnabled: false)
             )
@@ -163,7 +168,7 @@ final class RenderLayerPlannerTests: XCTestCase {
             let plan = RenderLayerPlanner.plan(
                 availability: RenderPassAvailability(renderSurfaceMode: mode,
                                                      labelsEnabled: true,
-                                                     avatarsEnabled: false,
+                                                     pinsEnabled: false,
                                                      debugOverlayEnabled: false,
                                                      starfieldEnabled: true,
                                                      sceneModelsEnabled: false)

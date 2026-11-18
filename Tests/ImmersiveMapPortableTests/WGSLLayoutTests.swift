@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import Foundation
@@ -382,12 +382,11 @@ final class WGSLLayoutTests: XCTestCase {
             MemoryLayout<LayerFillVertex>.offset(of: \.position),
             MemoryLayout<LayerFillVertex>.offset(of: \.color),
         ])
-        try assertLayout("LayerLineVertex", in: layers, matches: LayerLineVertex.self, offsets: [
-            MemoryLayout<LayerLineVertex>.offset(of: \.start),
-            MemoryLayout<LayerLineVertex>.offset(of: \.end),
-            MemoryLayout<LayerLineVertex>.offset(of: \.corner),
-            MemoryLayout<LayerLineVertex>.offset(of: \.widthPoints),
-            MemoryLayout<LayerLineVertex>.offset(of: \.color),
+        try assertLayout("LayerLineSegment", in: layers, matches: LayerLineSegment.self, offsets: [
+            MemoryLayout<LayerLineSegment>.offset(of: \.start),
+            MemoryLayout<LayerLineSegment>.offset(of: \.end),
+            MemoryLayout<LayerLineSegment>.offset(of: \.widthPoints),
+            MemoryLayout<LayerLineSegment>.offset(of: \.color),
         ])
         try assertLayout("LayerPointInstance", in: layers, matches: LayerPointInstance.self, offsets: [
             MemoryLayout<LayerPointInstance>.offset(of: \.position),

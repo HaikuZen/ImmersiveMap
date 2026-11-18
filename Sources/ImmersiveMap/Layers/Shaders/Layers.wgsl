@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: Layers.metal fnv1a64=c5704a9579f6601e
+// ported-from: Layers.metal fnv1a64=98e3bb7345c1763c
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 // include: ../../Render/Shaders/Shared/GroundFog.wgsl
 // include: ../../Globe/Shaders/GlobeUnroll.wgsl
@@ -11,9 +11,10 @@
 
 // The layers of the app's data (ImmersiveMapLayer): zones, lines and points
 // lying on the ground, each vertex projected the ground's own way on the
-// surface the frame draws. A zone is its triangles, a line a quad per
-// segment widened on screen, a point a disc with a ring. Layers.metal
-// explains them.
+// surface the frame draws. A zone is its triangles, a line an instance
+// per segment, a shape of the screen with round ends, solid and drawn
+// without blending, a point a disc with a ring. Layers.metal explains
+// them.
 //
 // The vertices are read from a storage buffer by the vertex or instance
 // index. Their colours are Metal's uchar4, four bytes red first, which WGSL
@@ -39,14 +40,27 @@ struct LayerFillVertex {
     color: u32,
 }
 
-/// Mirrors LayerLineVertex in LayerMeshBuilder.swift.
-struct LayerLineVertex {
+/// Mirrors LayerLineSegment in LayerMeshBuilder.swift. The colour's
+/// fourth byte is not an alpha, a line is always solid: it states which
+/// ends are round, 1 for the start and 2 for the end.
+struct LayerLineSegment {
     start: vec2f,
     end: vec2f,
-    corner: vec2f,
     widthPoints: f32,
     color: u32,
 }
+
+/// The corners of a segment's shape, the same for every segment
+/// (`LayerPipeline.lineTemplateIndices` joins them into triangles): which
+/// end of the segment the corner is at, then how far it stands from that
+/// end along the segment (outward is positive) and across it, in half
+/// widths. Each end is half an octagon, standing for a half disc.
+const kLayerLineCorners = array<vec3f, 10>(
+    vec3f(0.0, 0.0, -1.0), vec3f(0.0, 0.0, 1.0),
+    vec3f(0.0, 0.70710678, -0.70710678), vec3f(0.0, 0.70710678, 0.70710678), vec3f(0.0, 1.0, 0.0),
+    vec3f(1.0, 0.0, -1.0), vec3f(1.0, 0.0, 1.0),
+    vec3f(1.0, 0.70710678, -0.70710678), vec3f(1.0, 0.70710678, 0.70710678), vec3f(1.0, 1.0, 0.0)
+);
 
 /// Mirrors LayerPointInstance in LayerMeshBuilder.swift.
 struct LayerPointInstance {
@@ -73,7 +87,7 @@ struct LayerDraw {
 }
 
 @group(0) @binding(0) var<storage, read> fillVertices: array<LayerFillVertex>;
-@group(0) @binding(0) var<storage, read> lineVertices: array<LayerLineVertex>;
+@group(0) @binding(0) var<storage, read> lineSegments: array<LayerLineSegment>;
 @group(0) @binding(0) var<storage, read> pointInstances: array<LayerPointInstance>;
 @group(0) @binding(1) var<uniform> camera: Camera;
 @group(0) @binding(2) var<uniform> draw: LayerDraw;
@@ -181,19 +195,16 @@ struct LayerLineOut {
     @location(1) sphereNormal: vec3f,
     @location(2) color: vec4f,
     @location(3) clipDistance: f32,
-    /// The signed distance from the centreline across the quad, in pixels.
-    @location(4) edgePx: f32,
-    /// The line's half width in pixels.
-    @location(5) @interpolate(flat) halfWidthPx: f32,
 }
 
 @vertex
-fn layerLineVertex(@builtin(vertex_index) vertexID: u32) -> LayerLineOut {
-    let vertexIn = lineVertices[vertexID];
-    let start = layerProject(vertexIn.start);
-    let end = layerProject(vertexIn.end);
+fn layerLineVertex(@builtin(vertex_index) vertexID: u32,
+                   @builtin(instance_index) instanceID: u32) -> LayerLineOut {
+    let segment = lineSegments[instanceID];
+    let start = layerProject(segment.start);
+    let end = layerProject(segment.end);
     // An end behind the camera is pulled to just before it along the
-    // segment, so the quad's direction on screen stays the segment's.
+    // segment, so the shape's direction on screen stays the segment's.
     var startClip = start.position;
     var endClip = end.position;
     if (startClip.w < kLayerNearW && endClip.w > kLayerNearW) {
@@ -213,40 +224,46 @@ fn layerLineVertex(@builtin(vertex_index) vertexID: u32) -> LayerLineOut {
     }
     let normal = vec2f(-direction.y, direction.x);
 
-    let halfWidthPx = vertexIn.widthPoints * draw.pixelsPerPoint * 0.5;
-    // A pixel of margin for the edge's antialiasing.
-    let extentPx = halfWidthPx + 1.0;
-    let atEnd = vertexIn.corner.x > 0.5;
+    let corner = kLayerLineCorners[vertexID % 10u];
+    let atEnd = corner.x > 0.5;
+    let rounding = (segment.color >> 24u) & 0xFFu;
+    let isRound = (rounding & select(1u, 2u, atEnd)) != 0u;
+    // A round end reaches past the segment's end by the line's half
+    // width, and two segments that meet with round ends overlap in a disc,
+    // which is their join. A flat end stops at the segment's end: its
+    // corners fall onto the end's edge and its triangles are empty.
+    let outwardPx = select(0.0, corner.y, isRound);
+    let halfWidthPx = segment.widthPoints * draw.pixelsPerPoint * 0.5;
+    let offsetPx = (normal * corner.z + direction * select(-outwardPx, outwardPx, atEnd)) * halfWidthPx;
     var at = start;
     var position = startClip;
     if (atEnd) {
         at = end;
         position = endClip;
     }
-    position = vec4f(position.xy + normal * (vertexIn.corner.y * extentPx) / halfViewport * position.w, position.zw);
+    position = vec4f(position.xy + offsetPx / halfViewport * position.w, position.zw);
 
     var out: LayerLineOut;
     out.position = position;
     out.clipDistance = select(at.clipDistance, -1.0, startClip.w < kLayerNearW && endClip.w < kLayerNearW);
     out.worldPosition = at.worldPosition;
     out.sphereNormal = at.sphereNormal;
-    out.color = unpack4x8unorm(vertexIn.color);
-    out.edgePx = vertexIn.corner.y * extentPx;
-    out.halfWidthPx = halfWidthPx;
+    out.color = vec4f(unpack4x8unorm(segment.color).rgb, 1.0);
     return out;
 }
 
+/// A line's fragment is whole: the shape is its geometry, with no edge to
+/// soften, and the pass does not blend (`LayerPipeline`). Only where
+/// Metal's hardware clip would cut it (the clip distance) is it discarded.
 @fragment
 fn layerLineFragment(in: LayerLineOut) -> @location(0) vec4f {
     if (in.clipDistance < 0.0) {
         discard;
     }
-    var color = in.color;
-    color.a *= saturate(in.halfWidthPx + 0.5 - abs(in.edgePx));
-    return layerShade(color, in.worldPosition, in.sphereNormal);
+    return layerShade(in.color, in.worldPosition, in.sphereNormal);
 }
 
-// MARK: - Points and joins
+// MARK: - Points
 
 struct LayerPointOut {
     @builtin(position) position: vec4f,
@@ -295,10 +312,10 @@ fn layerPointFragment(in: LayerPointOut) -> @location(0) vec4f {
     // The disc, then the ring outside it, each with a pixel of antialiasing
     // at its edge.
     let inside = saturate(in.radiusPx + 0.5 - distance);
+    // Outside the ring the coverage is zero, and so is the alpha: the pass
+    // blends and writes neither depth nor stencil (`LayerPipeline`), so a
+    // corner of the quad changes nothing without a discard.
     let covered = saturate(in.radiusPx + in.strokeWidthPx + 0.5 - distance);
-    if (covered <= 0.0) {
-        discard;
-    }
     var color = in.color;
     if (in.strokeWidthPx > 0.0) {
         color = mix(in.strokeColor, in.color, inside);

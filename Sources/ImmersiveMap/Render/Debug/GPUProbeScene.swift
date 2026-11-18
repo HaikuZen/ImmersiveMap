@@ -1,7 +1,8 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
+import ModelTileFormat
 import PortableFoundation
 import simd
 
@@ -201,7 +202,9 @@ package final class GPUProbeScene {
     }
 
     /// A model tile of the whole world: one tower in the tile's units, in
-    /// the baker's vertex (`ModelTileContents`), four corners a face wound
+    /// the baker's vertex (`ModelTileContents`, version 6: a position is a
+    /// place in the tile's bounding box, 0 to 65535 across it, and the
+    /// draw takes it into tile space by `positionMatrix`), four corners a face wound
     /// counterclockwise seen from outside, the walls on the texture's first
     /// layer and the roof and floor on its second. The texture is RGBA, a
     /// format every backend samples, where an archive's is ASTC, which
@@ -226,13 +229,16 @@ package final class GPUProbeScene {
             let layer: UInt8 = face.normal.z == 0 ? 0 : 1
             for (a, b) in [(Float(-1), Float(-1)), (1, -1), (1, 1), (-1, 1)] {
                 let position = center + (face.normal + face.u * a + face.v * b) * half
-                withUnsafeBytes(of: position.x) { vertices += $0 }
-                withUnsafeBytes(of: position.y) { vertices += $0 }
-                withUnsafeBytes(of: position.z) { vertices += $0 }
+                // The box is the tower's: a corner is 0 or 65535 on each axis.
+                let stored = ((position - low) / (high - low) * Float(65535)).rounded(.toNearestOrAwayFromZero)
+                for value in [stored.x, stored.y, stored.z] {
+                    withUnsafeBytes(of: UInt16(value).littleEndian) { vertices += $0 }
+                }
+                withUnsafeBytes(of: (a < 0 ? UInt16.min : UInt16.max).littleEndian) { vertices += $0 }
+                withUnsafeBytes(of: (b < 0 ? UInt16.max : UInt16.min).littleEndian) { vertices += $0 }
                 vertices += [face.normal.x, face.normal.y, face.normal.z].map { UInt8(bitPattern: Int8($0 * 127)) }
                 vertices.append(layer)
-                withUnsafeBytes(of: a < 0 ? UInt16.min : UInt16.max) { vertices += $0 }
-                withUnsafeBytes(of: b < 0 ? UInt16.max : UInt16.min) { vertices += $0 }
+                vertices += [0, 0]
             }
             indices += [first, first + 1, first + 2, first, first + 2, first + 3]
         }
@@ -258,6 +264,11 @@ package final class GPUProbeScene {
                              replacedBuildingIDs: [:],
                              boundsMinimum: low,
                              boundsMaximum: high,
+                             // `ModelTileContents.positionMatrix` of these bounds.
+                             positionMatrix: matrix_float4x4(columns: (SIMD4<Float>(high.x - low.x, 0, 0, 0),
+                                                                       SIMD4<Float>(0, high.y - low.y, 0, 0),
+                                                                       SIMD4<Float>(0, 0, high.z - low.z, 0),
+                                                                       SIMD4<Float>(low.x, low.y, low.z, 1))),
                              vertexBuffer: vertexBuffer,
                              indexBuffer: indexBuffer,
                              texture: texture,
@@ -276,7 +287,8 @@ package final class GPUProbeScene {
     }
 
     /// A layer of the app's over the ground: a zone, a path across it and a
-    /// point, by the public layer types and the mesh builder.
+    /// point, a source's shapes drawn by a layer, by the public layer types
+    /// and the mesh builder.
     private static func layer(device: any GPUDevice) -> LayerMesh? {
         let zone = ImmersiveMapPolygon(exterior: [GeoCoordinate(latitude: -40, longitude: -100),
                                                   GeoCoordinate(latitude: -40, longitude: -40),
@@ -286,8 +298,11 @@ package final class GPUProbeScene {
                                                       GeoCoordinate(latitude: 0, longitude: 80),
                                                       GeoCoordinate(latitude: 50, longitude: 120)])
         let point = ImmersiveMapPoint(coordinate: GeoCoordinate(latitude: 50, longitude: -70))
-        let layer = ImmersiveMapLayer(id: "probe", polygons: [zone], polylines: [path], points: [point])
-        return LayerMesh(key: layer.meshKey, data: LayerMeshBuilder.build(layer: layer), device: device)
+        let layer = ImmersiveMapLayer(source: "probe")
+        let content = LayerSourceContent(polygons: [zone], polylines: [path], points: [point])
+        return LayerMesh(key: layer.meshKey(sourceRevision: 0),
+                         data: LayerMeshBuilder.build(layer: layer, content: content),
+                         device: device)
     }
 
     /// A label painted on the ground below the building: one glyph quad of

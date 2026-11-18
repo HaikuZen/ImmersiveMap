@@ -1,15 +1,18 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: ModelTile.metal fnv1a64=797b1f3868e737e2
+// ported-from: ModelTile.metal fnv1a64=e04d9c39e1b39fc7
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 // include: ../../Render/Shaders/Shared/GroundFog.wgsl
 
 // The models of a model tile (ModelTilePipeline): every model of the tile
 // in one vertex buffer and one index buffer, in the tile's own space, with
-// one texture array, so a tile draws in one call under one matrix.
-// ModelTile.metal explains the space, the depth bias and the clipped
-// variant.
+// one texture array, so a tile draws in one call under one matrix. A
+// vertex keeps its position as a place in the tile's bounding box, and the
+// model matrix takes it from there: the box's size and minimum into tile
+// space (`ModelTileContents.positionMatrix`), then the tile's translation
+// and scale. ModelTile.metal explains the space, the depth bias and the
+// clipped variant.
 
 /// The clipped variant of the fragment stage: the fragments below the
 /// ground, the plane Z = 0, are dropped.
@@ -17,15 +20,23 @@
 
 /// The vertex of a model tile, as the baker wrote it (ModelTileContents).
 struct VertexIn {
+    /// Unsigned normalized shorts: 0...1 across the tile's bounding box on
+    /// each axis, read as four (WebGPU has no three-short format), the
+    /// fourth the texture coordinate's first short, left unread.
     @location(0) position: vec3f,
-    /// Signed normalized bytes, read as four (WebGPU has no three-byte
-    /// format): the fourth is the layer's byte, left unread.
-    @location(1) normal: vec3f,
+    /// Signed normalized bytes at byte 10, where WebGPU reads no attribute:
+    /// x and y are the last two bytes of the aligned word from byte 8, z the
+    /// first of the word from byte 12 (`ModelTilePipeline`), and the other
+    /// bytes (the texture coordinate's, the layer's) are left unread.
+    @location(1) normalLow: vec4f,
+    @location(4) normalHigh: vec4f,
     /// The layer of the tile's texture array.
     @location(2) layer: u32,
-    /// Unsigned normalized shorts, V down: the origin is the top left of
-    /// the image.
-    @location(3) uv: vec2f,
+    /// Unsigned normalized shorts at byte 6, V down (the origin is the top
+    /// left of the image), where WebGPU reads no two-short attribute: they
+    /// are the middle two of the four shorts from byte 4
+    /// (`ModelTilePipeline`), between the position's last and the normal.
+    @location(3) uvWord: vec4f,
 }
 
 struct VertexOut {
@@ -57,9 +68,10 @@ fn modelTileVertexShader(vertexIn: VertexIn) -> VertexOut {
     var out: VertexOut;
     out.position = camera.matrix * vec4f(drawnPosition, 1.0);
     out.worldPosition = worldPosition.xyz;
-    // A translation and a uniform scale leave a direction as it is.
-    out.worldNormal = normalize(vertexIn.normal);
-    out.uv = vertexIn.uv;
+    // The normal is in tile space already, apart from the position's box,
+    // and a translation and a uniform scale leave a direction as it is.
+    out.worldNormal = normalize(vec3f(vertexIn.normalLow.zw, vertexIn.normalHigh.x));
+    out.uv = vertexIn.uvWord.yz;
     out.layer = vertexIn.layer;
     return out;
 }

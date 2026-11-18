@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: PoiSprite.metal fnv1a64=8f5a329cf792738f
+// ported-from: PoiSprite.metal fnv1a64=c0e96d6250af3a0e
 // include: ../Shared/LabelTextCommon.wgsl
 
 // The POI icons: an icon from the sprite atlas over a round plate, placed

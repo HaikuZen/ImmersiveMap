@@ -1,10 +1,10 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import PortableFoundation
 
 /// The engine's resource bundle, `ImmersiveMap_ImmersiveMap.bundle`: the
-/// shader library (`default.metallib`), the text atlases, the avatar marker,
+/// shader library (`default.metallib`), the text atlases, the pin,
 /// the overview archive and the tree model. Every read of an engine resource
 /// goes through `bundle()`, never through `Bundle.module` directly.
 ///

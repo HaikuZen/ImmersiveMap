@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -8,22 +8,22 @@ final class RenderPassGraph {
     static func isWorldLayer(_ layer: RenderLayer) -> Bool {
         switch layer {
         case .starfield, .globeVectorSurface, .globeCap,
-             .placementStencil, .flatMapSurface, .flatMapRoads, .surfaceLabels, .buildingExtrusion, .sceneModels,
-             .horizon:
+             .placementStencil, .flatMapSurface, .flatMapRoads, .appLayers, .surfaceLabels, .buildingExtrusion,
+             .sceneModels, .horizon:
             return true
         case .shadowCasters, .farShadowCasters, .groundShadowMask, .postProcessing,
-             .labels, .avatars, .debugOverlay:
+             .labels, .pins, .debugOverlay:
             return false
         }
     }
 
     static func isOverlayLayer(_ layer: RenderLayer) -> Bool {
         switch layer {
-        case .labels, .avatars, .debugOverlay:
+        case .labels, .pins, .debugOverlay:
             return true
         case .shadowCasters, .farShadowCasters, .groundShadowMask, .starfield,
-             .globeVectorSurface, .globeCap, .placementStencil, .flatMapSurface, .flatMapRoads, .surfaceLabels,
-             .buildingExtrusion, .sceneModels, .horizon, .postProcessing:
+             .globeVectorSurface, .globeCap, .placementStencil, .flatMapSurface, .flatMapRoads, .appLayers,
+             .surfaceLabels, .buildingExtrusion, .sceneModels, .horizon, .postProcessing:
             return false
         }
     }

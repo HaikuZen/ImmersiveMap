@@ -95,8 +95,11 @@ var targets: [Target] = [
     // the Hilbert tile id and the gzip step, pure functions over bytes)
     // and the HTTP range client that reads an archive with them. Its own
     // module for the same reason as `Earcut`: a tool that knows nothing
-    // of the engine, reached at `package` access. The test support target
-    // is the independent archive writer both test targets share.
+    // of the engine, reached at `package` access. Its writer alone
+    // (`PMTilesWriter`) is public and the module a product, for the
+    // baker of a model archive, which is another package. The test
+    // support target is the independent archive writer both test
+    // targets share.
     .target(
         name: "PMTiles",
         dependencies: ["PortableFoundation"]
@@ -112,6 +115,24 @@ var targets: [Target] = [
     .target(
         name: "TileFlattening",
         dependencies: ["PortableFoundation"]
+    ),
+    // The model tile as bytes: the decoder the engine reads a tile with
+    // and the writer a baker makes one with, on `PortableFoundation` and
+    // simd alone (Foundation itself on Apple's platforms, which
+    // `PortableFoundation` re-exports). A product, so its API is public:
+    // the baker is another package. The test support target is the
+    // independent writer of fixture tiles both test targets share.
+    .target(
+        name: "ModelTileFormat",
+        dependencies: portable ? ["PortableFoundation", "simd"] : ["PortableFoundation"]
+    ),
+    .target(
+        name: "ModelTileFormatTestSupport",
+        dependencies: portable ? ["PortableFoundation", "simd"] : ["PortableFoundation"]
+    ),
+    .testTarget(
+        name: "ModelTileFormatTests",
+        dependencies: ["ModelTileFormat", "ModelTileFormatTestSupport"]
     ),
     .testTarget(
         name: "EarcutTests",
@@ -213,7 +234,7 @@ if portable {
     targets += [
         .target(
             name: "ImmersiveMap",
-            dependencies: ["Earcut", "ImmersiveMapGPU", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening", "simd", "os"],
+            dependencies: ["Earcut", "ImmersiveMapGPU", "ModelTileFormat", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening", "simd", "os"],
             exclude: portableEngineExclusions()
         )
     ]
@@ -264,14 +285,14 @@ if portable {
         ),
         .target(
             name: "ImmersiveMap",
-            dependencies: ["Earcut", "ImmersiveMapGPU", "ImmersiveMapMetal", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening"],
+            dependencies: ["Earcut", "ImmersiveMapGPU", "ImmersiveMapMetal", "ModelTileFormat", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening"],
             // The shaders and their headers: not resources, so no build
             // system makes a library of its own from them. `MetalLibraryPlugin`
             // compiles every .metal file of the target into the one
             // default.metallib of the resource bundle, under Xcode and under
             // `swift build` alike. A new shader folder goes here.
             exclude: [
-                "Avatars/Shaders",
+                "Pins/Shaders",
                 "Globe/Shaders",
                 "Horizon/Shaders",
                 "Labels/Shaders",
@@ -287,8 +308,8 @@ if portable {
                 "Tile/Shaders",
             ],
             resources: [
-                .process("Avatars/Resources/avatar_marker_sdf.json"),
-                .process("Avatars/Resources/avatar_marker_sdf.png"),
+                .process("Pins/Resources/pin_sdf.json"),
+                .process("Pins/Resources/pin_sdf.png"),
                 .process("Text/Resources"),
                 // The overview of the globe laid into the tiles of zooms 0 to 5
                 // (`OverviewTileSource`): copied whole, a PMTiles archive.
@@ -317,7 +338,8 @@ if portable {
         ),
         .testTarget(
             name: "ImmersiveMapTests",
-            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapMetal", "Mvt", "MvtTestSupport", "PMTilesTestSupport"]
+            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapMetal", "Mvt", "MvtTestSupport", "PMTilesTestSupport",
+                           "ModelTileFormat", "ModelTileFormatTestSupport"]
         )
     ]
 }
@@ -339,6 +361,21 @@ let package = Package(
         .library(
             name: "ImmersiveMapDebug",
             targets: ["ImmersiveMapDebug"]
+        ),
+        // The model tile's format, read and written. The engine links it,
+        // and so does the baker of a model archive, which lives in the
+        // project the models are made in: the layout, its version and its
+        // reference are in one place for both.
+        .library(
+            name: "ModelTileFormat",
+            targets: ["ModelTileFormat"]
+        ),
+        // The PMTiles module, for its writer (`PMTilesWriter`), the one
+        // public thing in it: the same baker writes its archive with it,
+        // on the header, the tile id and the limits the reader goes by.
+        .library(
+            name: "PMTiles",
+            targets: ["PMTiles"]
         )
     ],
     targets: targets,

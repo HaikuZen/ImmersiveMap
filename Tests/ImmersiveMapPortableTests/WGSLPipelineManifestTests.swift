@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import Foundation
@@ -83,13 +83,15 @@ final class WGSLPipelineManifestTests: XCTestCase {
         _ = PlacementStencilPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = HorizonPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = SceneModelPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
-        _ = ModelTilePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         _ = FXAAPipeline(device: device, pixelFormat: .bgra8Unorm)
         _ = PolygonsPipeline(device: device, pixelFormat: .bgra8Unorm)
         _ = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
-        // The starfield as WebGPU draws it, on a device without point sprites.
+        // The starfield as WebGPU draws it, on a device without point
+        // sprites, and the model tiles as it reads their vertex, on one
+        // without unaligned attributes.
         let webGPU = RecordingGPUDevice(features: [.depthClamp])
         _ = StarfieldPipeline(device: webGPU, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        _ = ModelTilePipeline(device: webGPU, pixelFormat: .bgra8Unorm, sampleCount: 4)
         return device.pipelines + webGPU.pipelines
     }
 

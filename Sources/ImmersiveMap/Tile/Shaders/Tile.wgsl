@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: Tile.metal fnv1a64=4d3d0f2fec4e86d9
+// ported-from: Tile.metal fnv1a64=edbc80cbd412ede8
 // include: TileShading.wgsl
 // include: ../Relief/Shaders/GroundRelief.wgsl
 // include: ../../Render/Shaders/Shared/GroundFog.wgsl

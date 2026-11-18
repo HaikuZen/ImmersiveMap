@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -10,9 +10,9 @@ import QuartzCore
 /// The map for a host that is no Apple view (the browser program,
 /// `ImmersiveMapWebMap`): the frame engine over the platform's GPU device
 /// (`RenderHost.portable`), with no scene models, no layers of the app's and
-/// no avatars, the camera moves a pointer and a wheel make, and markers the
+/// no pins, the camera moves a pointer and a wheel make, and markers the
 /// host draws itself at the positions each frame projects them to
-/// (`markerPositions`), as the Apple views place theirs.
+/// (`markerPositions`), as the Apple views place their annotations.
 ///
 /// Rendering is on demand, as on Apple's platforms: the host asks
 /// `needsFrame` once a display frame and calls `render` only when it is
@@ -78,7 +78,7 @@ package final class PortableMapRenderer {
         presentation = MapPresentationStateController(settings: settings)
         engine = RenderFrameEngine(host: .portable(device: device, commandQueue: commandQueue,
                                                    sampleCount: sampleCount, poiAtlas: poiAtlas),
-                                   markerSource: markers,
+                                   annotationSource: markers,
                                    sceneModelSource: sceneModels,
                                    styleRuntime: MapStyleRuntime(settings: settings),
                                    settings: settings,
@@ -132,9 +132,9 @@ package final class PortableMapRenderer {
     }
 
     /// The snapshot's pixels (bottom left origin, y up) as points from the
-    /// top left corner, as `MarkerOverlayLayoutMath.pointFromPixel` places
-    /// the Apple views' markers.
-    private static func positions(of snapshot: MarkerProjectionSnapshot, pixelsPerPoint: Double) -> [PortableMarkerPosition] {
+    /// top left corner, as `AnnotationOverlayLayoutMath.pointFromPixel`
+    /// places the Apple views' annotations.
+    private static func positions(of snapshot: AnnotationProjectionSnapshot, pixelsPerPoint: Double) -> [PortableMarkerPosition] {
         guard pixelsPerPoint > 0 else { return [] }
         let height = Double(snapshot.drawSize.height)
         return snapshot.entries.map { entry in
@@ -406,11 +406,12 @@ package struct PortableFrameDemand {
     }
 }
 
-/// The markers the host placed, by its ids, as the engine projects them.
-private final class PortableMarkers: MarkerRenderSource {
+/// The markers the host placed, by its ids, as the engine projects the
+/// Apple views' annotations.
+private final class PortableMarkers: AnnotationRenderSource {
     private var order: [UInt64] = []
     private var bases: [UInt64: GeoProjectionBasis] = [:]
-    private(set) var currentMarkerProjectionInput: MarkerProjectionInput = .empty
+    private(set) var currentAnnotationProjectionInput: AnnotationProjectionInput = .empty
 
     func set(id: UInt64, coordinate: GeoCoordinate) {
         if bases.updateValue(GeoProjectionBasis(coordinate: coordinate), forKey: id) == nil {
@@ -427,8 +428,8 @@ private final class PortableMarkers: MarkerRenderSource {
     }
 
     private func rebuild() {
-        currentMarkerProjectionInput = MarkerProjectionInput(entries: order.compactMap { id in
-            bases[id].map { MarkerProjectionEntry(id: id, basis: $0) }
+        currentAnnotationProjectionInput = AnnotationProjectionInput(entries: order.compactMap { id in
+            bases[id].map { AnnotationProjectionEntry(id: id, basis: $0) }
         })
     }
 }
@@ -446,7 +447,7 @@ private final class PortableEventSink: RenderFrameEventSink, @unchecked Sendable
     private let lock = NSLock()
     private var isRequested = false
     private var isAnimating = false
-    private var markerSnapshot: MarkerProjectionSnapshot?
+    private var markerSnapshot: AnnotationProjectionSnapshot?
 
     var needsFrame: Bool {
         lock.lock()
@@ -461,7 +462,7 @@ private final class PortableEventSink: RenderFrameEventSink, @unchecked Sendable
         return isRequested
     }
 
-    func takeMarkerSnapshot() -> MarkerProjectionSnapshot? {
+    func takeMarkerSnapshot() -> AnnotationProjectionSnapshot? {
         lock.lock()
         defer { lock.unlock() }
         defer { markerSnapshot = nil }
@@ -476,7 +477,7 @@ private final class PortableEventSink: RenderFrameEventSink, @unchecked Sendable
 
     func applyActivityState(_ state: RenderActivityState) {
         let animating = state.labelFadeRenderingActive
-            || state.avatarAnimationRenderingActive
+            || state.pinAnimationRenderingActive
             || state.sceneModelAnimationRenderingActive
             || state.extrusionRiseRenderingActive
             || state.animatedZoomRenderingActive
@@ -485,14 +486,13 @@ private final class PortableEventSink: RenderFrameEventSink, @unchecked Sendable
         lock.unlock()
     }
 
-    func updateMarkerProjectionSnapshot(_ snapshot: MarkerProjectionSnapshot) {
+    func updateAnnotationProjectionSnapshot(_ snapshot: AnnotationProjectionSnapshot) {
         lock.lock()
         markerSnapshot = snapshot
         lock.unlock()
     }
 
-    func updateAvatarSelectionSnapshot(_ snapshot: AvatarSelectionSnapshot) {}
-    func updateSceneModelSelectionSnapshot(_ snapshot: SceneModelSelectionSnapshot) {}
+    func updateSelectionPickData(_ pickData: [any SelectionPickData]) {}
     func completeSceneModelPathAnimations(_ results: [SceneModelPathAnimationResult]) {}
     func updateDebugOverlayHUDSnapshot(_ snapshot: DebugOverlayHUDSnapshot?) {}
 }

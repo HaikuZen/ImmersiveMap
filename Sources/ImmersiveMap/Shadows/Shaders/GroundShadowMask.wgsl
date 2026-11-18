@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GroundShadowMask.metal fnv1a64=929980d2e70cdf64
+// ported-from: GroundShadowMask.metal fnv1a64=fd9eb3665ec2dae5
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 
 // The ground shadow mask: the shadow factor of the flat ground plane

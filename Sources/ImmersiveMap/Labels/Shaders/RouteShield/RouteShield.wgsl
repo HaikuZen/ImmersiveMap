@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: RouteShield.metal fnv1a64=c031b85085491e50
+// ported-from: RouteShield.metal fnv1a64=83657e2562607025
 // include: ../Shared/LabelTextCommon.wgsl
 
 // The plate behind a route number, drawn from its distance field. The quad

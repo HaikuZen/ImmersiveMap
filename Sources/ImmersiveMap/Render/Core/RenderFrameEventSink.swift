@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 package enum RenderInvalidationReason {
@@ -12,7 +12,7 @@ package enum RenderInvalidationReason {
 
 struct RenderActivityState {
     let labelFadeRenderingActive: Bool
-    let avatarAnimationRenderingActive: Bool
+    let pinAnimationRenderingActive: Bool
     let sceneModelAnimationRenderingActive: Bool
     /// The buildings or the models rising out of the ground
     /// (`ExtrusionRise`).
@@ -26,8 +26,10 @@ struct RenderActivityState {
 protocol RenderFrameEventSink: AnyObject, Sendable {
     func invalidate(_ reason: RenderInvalidationReason)
     func applyActivityState(_ state: RenderActivityState)
-    func updateAvatarSelectionSnapshot(_ snapshot: AvatarSelectionSnapshot)
-    func updateSceneModelSelectionSnapshot(_ snapshot: SceneModelSelectionSnapshot)
+    /// What a frame that reached the screen drew that a tap can land on,
+    /// one entry from each feature that drew something selectable. Called
+    /// from the command buffer's completion handler, off the main thread.
+    func updateSelectionPickData(_ pickData: [any SelectionPickData])
     /// Path animations that ended on the last frame, with where they left the
     /// model.
     func completeSceneModelPathAnimations(_ results: [SceneModelPathAnimationResult])
@@ -42,14 +44,14 @@ protocol RenderFrameEventSink: AnyObject, Sendable {
     /// What the panel shows, for the frame to build only that. A sink with
     /// no HUD answers everything.
     func debugOverlayHUDContentRequest() -> DebugOverlayHUDContentRequest
-    /// Unlike `updateAvatarSelectionSnapshot` (completion handler, off-main),
+    /// Unlike `updateSelectionPickData` (completion handler, off-main),
     /// this is called synchronously from the render loop on the main thread so
     /// that marker positions apply in the same CA transaction as the frame.
-    func updateMarkerProjectionSnapshot(_ snapshot: MarkerProjectionSnapshot)
-    /// The engine is being discarded while the process lives on: late
-    /// deliveries from its in-flight frames are dropped from here on, so they
-    /// never resurrect state a successor has just reset. Called on the main
-    /// thread. A sink that delivers nothing late ignores it.
+    func updateAnnotationProjectionSnapshot(_ snapshot: AnnotationProjectionSnapshot)
+    /// The engine feeding this sink is being discarded: what a frame still
+    /// in flight on the GPU delivers from here on is dropped, so it cannot
+    /// bring back state a successor has just reset. Called on the main
+    /// thread. A sink that hands nothing on later ignores it.
     func invalidateDelivery()
 }
 

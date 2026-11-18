@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import Foundation
@@ -41,24 +41,24 @@ struct PortableEngineLayoutTests {
     }
 
     /// The folders left out whole, whatever their files import: `UI`, the
-    /// host of each Apple platform, and `Avatars`, whose public API takes
+    /// host of each Apple platform, and `Pins`, whose public API takes
     /// Core Graphics images and draws its badges with Core Graphics, until
-    /// the avatars have an image type of the engine's own.
-    static let appleOnlyFolders: Set<String> = ["UI", "Avatars"]
+    /// the pins have an image type of the engine's own.
+    static let appleOnlyFolders: Set<String> = ["UI", "Pins"]
     /// The files of those folders that build everywhere all the same, plain
     /// values the portable engine carries.
-    static let portableInAppleOnlyFolders: Set<String> = ["Avatars/Selection/AvatarSelectionSnapshot.swift"]
+    static let portableInAppleOnlyFolders: Set<String> = []
 
     /// What the rule in PortableEngineExclusions.txt names today.
     static func expectedExclusions() throws -> Set<String> {
-        var paths = appleOnlyFolders.subtracting(["Avatars"])
+        var paths = appleOnlyFolders.subtracting(["Pins"])
         let base = engineDirectory.path + "/"
         let enumerator = try #require(FileManager.default.enumerator(atPath: engineDirectory.path))
         while let relative = enumerator.nextObject() as? String {
             if relative == "UI" || relative.hasPrefix("UI/") {
                 continue
             }
-            if relative.hasPrefix("Avatars/") {
+            if relative.hasPrefix("Pins/") {
                 var isDirectory: ObjCBool = false
                 FileManager.default.fileExists(atPath: base + relative, isDirectory: &isDirectory)
                 if isDirectory.boolValue == false, Self.portableInAppleOnlyFolders.contains(relative) == false {

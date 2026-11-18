@@ -1,8 +1,8 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: LabelTextCommon.h fnv1a64=2155bf195f10447f
-// ported-from: LabelRuntimeMeta.h fnv1a64=533968a7a099d396
+// ported-from: LabelTextCommon.h fnv1a64=1c8b7c30f195efc4
+// ported-from: LabelRuntimeMeta.h fnv1a64=7a582d73d3f2bbf5
 
 // What the label shaders share: the label vertex, the screen points the
 // labels hang off, the per-label state written every frame, the vertex

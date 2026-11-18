@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: StarfieldStars.metal fnv1a64=6f75de6cd4b1c44d
+// ported-from: StarfieldStars.metal fnv1a64=f7394c001441bd58
 // include: ../../Render/Shaders/Shared/RenderUniforms.wgsl
 
 // The stars around the globe, blended additively over space. Metal draws

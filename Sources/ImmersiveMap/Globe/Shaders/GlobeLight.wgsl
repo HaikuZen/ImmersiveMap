@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GlobeLight.h fnv1a64=ea0e9ee1ef9e0edd
+// ported-from: GlobeLight.h fnv1a64=bedc4dcb6d7b6538
 
 // The sun on the globe (GlobeLightSettings): the surface shaded by the
 // sphere's normal against the scene light, the night side drawn toward the

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -30,10 +30,10 @@ enum RenderGraphFactory {
                                                             depthDisabledState: context.depthDisabledState,
                                                             fallbackDepthTexture: context.sceneDepthFallbackTexture,
                                                             hidesBehindBuildingsFromZoom: settings.labels.road.hidesBehindBuildingsFromZoom)
-        // The host's own layer (the avatars, on Apple's platforms), if it
-        // has one.
-        let avatarSubsystem = context.makeAvatarSubsystem?()
-        let markerSubsystem = MarkerRenderSubsystem(markerSource: context.markerSource)
+        // The host's own layer (the pins, on Apple's platforms), if it has
+        // one.
+        let pinSubsystem = context.makePinSubsystem?()
+        let annotationSubsystem = AnnotationRenderSubsystem(annotationSource: context.annotationSource)
         let sceneModelSubsystem = SceneModelRenderSubsystem(sceneModelSource: context.sceneModelSource,
                                                             meshStore: context.sceneModelMeshStore,
                                                             pipeline: context.sceneModelPipeline,
@@ -152,8 +152,8 @@ enum RenderGraphFactory {
             baseLabelSubsystem,
             baseLabelDrawSubsystem,
             roadLabelDrawSubsystem,
-        ] + (avatarSubsystem.map { [$0] } ?? []) + [
-            markerSubsystem,
+        ] + (pinSubsystem.map { [$0] } ?? []) + [
+            annotationSubsystem,
             groundShadowMaskSubsystem,
             // Before the ground of either surface: the planner's decision
             // in the stencil, the placements' marks
@@ -173,9 +173,8 @@ enum RenderGraphFactory {
             reliefShadowCasterSubsystem,
             starfieldSubsystem,
             globeVectorSurfaceSubsystem,
-            // The layers of the app's data over the ground of either
-            // surface: after the flat map's roads and the trees' shadows,
-            // after the globe's ground, before the labels painted on both.
+            // The layers of the app's data, in a layer of their own
+            // (`RenderLayer.appLayers`).
             layerSubsystem,
             surfaceLabelSubsystem,
             globeCapSubsystem,
@@ -186,9 +185,10 @@ enum RenderGraphFactory {
         let availabilityProviders: [any RenderPassAvailabilityProvider] = [
             baseLabelDrawSubsystem,
             roadLabelDrawSubsystem,
-        ] + (avatarSubsystem.map { [$0] } ?? []) + [
+        ] + (pinSubsystem.map { [$0] } ?? []) + [
             sceneModelSubsystem,
             modelTileSubsystem,
+            layerSubsystem,
             starfieldSubsystem,
             debugSubsystem
         ]

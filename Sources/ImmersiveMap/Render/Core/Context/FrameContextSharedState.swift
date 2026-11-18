@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 //
@@ -58,12 +58,10 @@ struct RoadLabelState {
     var hasActiveFadeAnimations: Bool
 }
 
-struct AvatarState {
-    static let empty = AvatarState(hasActiveAnimations: false,
-                                   selectionSnapshot: .empty)
+struct PinState {
+    static let empty = PinState(hasActiveAnimations: false)
 
     var hasActiveAnimations: Bool
-    var selectionSnapshot: AvatarSelectionSnapshot
 }
 
 /// One model tile that casts into the frame's shadow map: the loaded tile
@@ -119,7 +117,6 @@ struct SceneModelFrameState {
     static let empty = SceneModelFrameState(hasActiveAnimations: false,
                                             hasShadowCasters: false,
                                             hasDrawnModels: false,
-                                            selectionSnapshot: .empty,
                                             pathAnimationResults: [])
 
     var hasActiveAnimations: Bool
@@ -141,21 +138,18 @@ struct SceneModelFrameState {
     var replacedBuildings = ReplacedBuildings.none
     /// At least one model draws in the world pass this frame.
     var hasDrawnModels: Bool
-    /// Hit volumes of the models this frame drew, published after the frame
-    /// reaches the screen so taps are tested against what is visible.
-    var selectionSnapshot: SceneModelSelectionSnapshot
     /// Path animations that ended on this frame, with the transform they left
     /// the model at; the engine forwards them so the controller's descriptor
     /// stays truthful and the app's completion fires exactly once.
     var pathAnimationResults: [SceneModelPathAnimationResult]
 }
 
-struct MarkerFrameState {
-    static let empty = MarkerFrameState(snapshot: nil)
+struct AnnotationFrameState {
+    static let empty = AnnotationFrameState(snapshot: nil)
 
     /// nil: no markers, nothing to publish. Empty snapshot: markers exist,
     /// but all are hidden, and the UI must hide the views.
-    var snapshot: MarkerProjectionSnapshot?
+    var snapshot: AnnotationProjectionSnapshot?
 }
 
 final class FrameContextSharedState {
@@ -164,9 +158,14 @@ final class FrameContextSharedState {
     var baseLabelState: BaseLabelState = .empty
     var baseLabelDebugBoxesState: BaseLabelDebugBoxesState = .empty
     var roadLabelState: RoadLabelState = .empty
-    var avatarState: AvatarState = .empty
+    var pinState: PinState = .empty
     var sceneModelState: SceneModelFrameState = .empty
-    var markerState: MarkerFrameState = .empty
+    var annotationState: AnnotationFrameState = .empty
+    /// What the frame drew that a tap can land on, one entry from each
+    /// feature that drew something selectable (`SelectionPickData`). The
+    /// engine hands it on once the frame reaches the screen, so taps are
+    /// tested against what is visible.
+    var selectionPickData: [any SelectionPickData] = []
     /// The model tiles (`ModelTileStore.tileZoom`) still on their way this
     /// frame, set in `update` by `ModelTileRenderSubsystem`: the buildings
     /// under them wait, so the ones a model stands in for are left out

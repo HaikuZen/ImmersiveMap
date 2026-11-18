@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -9,7 +9,7 @@ import Metal
 /// the Metal device and its shader library, the engine's resources made
 /// with them through the GPU interface (`RenderResources`, whose members
 /// are read here as if they were this type's own), and what only Apple's
-/// platforms make (the avatars' resources, the POI icons' atlas).
+/// platforms make (the pins' resources, the POI icons' atlas).
 ///
 /// A new `ImmersiveMapView` used to rebuild all of this from scratch: the
 /// shader library load, ~26 pipeline states, the MSDF text atlases (two raw
@@ -54,7 +54,7 @@ final class SharedRenderResources {
 
     // MARK: - Apple's own
 
-    let avatars: AvatarsRenderer.SharedResources
+    let pins: PinsRenderer.SharedResources
     let poiSpriteAtlas: PoiSpriteAtlas
 
     /// `core`'s members, read as this type's own (`shared.tilePipeline`).
@@ -176,11 +176,11 @@ final class SharedRenderResources {
         let gpuDevice: MetalDevice
         let renderSampleCount: Int
         let core: RenderResources
-        let avatars: AvatarsRenderer.SharedResources
+        let pins: PinsRenderer.SharedResources
     }
 
     private nonisolated static func build(device: MTLDevice, renderSampleCount: Int) throws -> Built {
-        // The bundle first: the text atlases and the avatar marker are read
+        // The bundle first: the text atlases and the pin are read
         // from it whichever library the shaders come from.
         let resourceBundle = try ImmersiveMapResourceBundle.bundle()
         let library = try RendererSetup.makeLibrary(metalDevice: device, bundle: resourceBundle)
@@ -192,20 +192,20 @@ final class SharedRenderResources {
             fatalError("The GPU interface has no name for the color format \(pixelFormat.rawValue)")
         }
         // The engine's resources (whose pipelines compile on every core) and
-        // the avatars' side by side; each job writes its own variable, and
+        // the pins' side by side; each job writes its own variable, and
         // `concurrentPerform` returns once both finished.
         var core: RenderResources?
-        var avatars: AvatarsRenderer.SharedResources?
+        var pins: PinsRenderer.SharedResources?
         nonisolated(unsafe) let jobs: [() -> Void] = [
             { core = RenderResources(device: gpuDevice,
                                      colorFormat: colorFormat,
                                      sampleCount: renderSampleCount,
                                      resource: { resourceBundle.url(forResource: $0, withExtension: $1) }) },
-            { avatars = AvatarsRenderer.SharedResources.make(metalDevice: device,
-                                                             pixelFormat: pixelFormat,
-                                                             library: library,
-                                                             resourceBundle: resourceBundle,
-                                                             sampleCount: 1) },
+            { pins = PinsRenderer.SharedResources.make(metalDevice: device,
+                                                          pixelFormat: pixelFormat,
+                                                          library: library,
+                                                          resourceBundle: resourceBundle,
+                                                          sampleCount: 1) },
         ]
         DispatchQueue.concurrentPerform(iterations: jobs.count) { jobs[$0]() }
         return Built(device: device,
@@ -213,7 +213,7 @@ final class SharedRenderResources {
                      gpuDevice: gpuDevice,
                      renderSampleCount: renderSampleCount,
                      core: core!,
-                     avatars: avatars!)
+                     pins: pins!)
     }
 
     private init(built: Built) {
@@ -222,7 +222,7 @@ final class SharedRenderResources {
         self.gpuDevice = built.gpuDevice
         self.renderSampleCount = built.renderSampleCount
         self.core = built.core
-        self.avatars = built.avatars
+        self.pins = built.pins
         // SF Symbol rasterization goes through UIImage/NSImage and stays on
         // the main thread rather than joining the background build.
         self.poiSpriteAtlas = PoiSpriteAtlas(device: built.gpuDevice)

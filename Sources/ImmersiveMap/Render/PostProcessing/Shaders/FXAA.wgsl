@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: FXAA.metal fnv1a64=e6f003c73f8bae36
+// ported-from: FXAA.metal fnv1a64=abdb8859d460719f
 
 // The FXAA pass (FXAAPipeline): one triangle over the frame, smoothing the
 // edges of the frame drawn before it. FXAA.metal explains the early out,

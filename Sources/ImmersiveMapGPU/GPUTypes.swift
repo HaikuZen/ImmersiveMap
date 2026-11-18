@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 // The values the engine describes its GPU work with, apart from any API:
@@ -184,6 +184,8 @@ package enum GPUVertexFormat: Hashable, Sendable {
     /// WebGPU's `snorm8x4`.
     case char4Normalized
     case ushort2Normalized
+    /// WebGPU's `unorm16x4`, read as its four-component kin.
+    case ushort3Normalized
     case uchar4Normalized
 }
 
@@ -359,4 +361,11 @@ package struct GPUDeviceFeatures: OptionSet, Hashable, Sendable {
     /// later pass to read: Metal's depth resolve, on Apple3 and Mac2 GPUs.
     /// WebGPU resolves colour alone.
     package static let depthResolve = GPUDeviceFeatures(rawValue: 1 << 4)
+    /// A vertex attribute at any byte offset, Metal's. WebGPU asks an
+    /// attribute's offset to be a multiple of its format's size, up to four
+    /// bytes: a feature whose vertex places one otherwise reads it from the
+    /// aligned bytes around it where the device lacks this
+    /// (`ModelTilePipeline`, the normal and the texture coordinate of a
+    /// model tile at bytes 10 and 6).
+    package static let unalignedVertexAttributes = GPUDeviceFeatures(rawValue: 1 << 5)
 }

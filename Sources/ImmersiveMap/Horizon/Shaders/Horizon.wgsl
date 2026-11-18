@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: Horizon.metal fnv1a64=4031514c680818d8
+// ported-from: Horizon.metal fnv1a64=13b08e08e94a1923
 
 // The horizon layer: the air around the surface's visible edge, resolved per
 // pixel from the view ray, drawn twice by the depth buffer (the sky side

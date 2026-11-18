@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -223,7 +223,7 @@ final class ZoomAnchorMathTests: XCTestCase {
     }
 
     /// Spherical position of a globe point: the `GlobeProjectionConstants` formulas
-    /// from AvatarSelectionProjector at transition 0.
+    /// from PinSelectionProjector at transition 0.
     private func sphereWorldPosition(latitudeRadians: Double,
                                      longitudeRadians: Double,
                                      globeRenderState: GlobeRenderState) -> SIMD3<Float> {

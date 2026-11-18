@@ -1,7 +1,8 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
+import ModelTileFormat
 
 /// The pipelines the models of the model tiles draw with (ModelTile.metal):
 /// the opaque world-pass pipeline, its variant that drops the fragments
@@ -21,13 +22,35 @@ final class ModelTilePipeline {
          sampleCount: Int = 1) {
         // The vertex of a model tile, as the baker wrote it.
         var layout = GPUVertexLayout()
-        layout.attributes[0] = GPUVertexAttribute(format: .float3, offset: 0, bufferIndex: 0)
-        layout.attributes[1] = GPUVertexAttribute(format: .char3Normalized,
-                                                  offset: ModelTileContents.normalOffset, bufferIndex: 0)
+        // A place in the tile's bounding box: the tile's draw puts it into
+        // tile space (`ModelTileContents.positionMatrix`).
+        layout.attributes[0] = GPUVertexAttribute(format: .ushort3Normalized, offset: 0, bufferIndex: 0)
+        if device.features.contains(.unalignedVertexAttributes) {
+            layout.attributes[1] = GPUVertexAttribute(format: .char3Normalized,
+                                                      offset: ModelTileContents.normalOffset, bufferIndex: 0)
+        } else {
+            // The normal at byte 10 is where WebGPU reads no attribute (an
+            // offset a multiple of four for a four-byte format): its bytes
+            // are read in the aligned words around them, x and y the last
+            // two of bytes 8 to 11 and z the first of bytes 12 to 15
+            // (`ModelTile.wgsl`).
+            layout.attributes[1] = GPUVertexAttribute(format: .char4Normalized,
+                                                      offset: ModelTileContents.normalOffset - 2, bufferIndex: 0)
+            layout.attributes[4] = GPUVertexAttribute(format: .char4Normalized,
+                                                      offset: ModelTileContents.normalOffset + 2, bufferIndex: 0)
+        }
         layout.attributes[2] = GPUVertexAttribute(format: .uchar,
                                                   offset: ModelTileContents.layerOffset, bufferIndex: 0)
-        layout.attributes[3] = GPUVertexAttribute(format: .ushort2Normalized,
-                                                  offset: ModelTileContents.textureCoordinateOffset, bufferIndex: 0)
+        if device.features.contains(.unalignedVertexAttributes) {
+            layout.attributes[3] = GPUVertexAttribute(format: .ushort2Normalized,
+                                                      offset: ModelTileContents.textureCoordinateOffset, bufferIndex: 0)
+        } else {
+            // The texture coordinate at byte 6 likewise: the middle two of
+            // the four shorts from byte 4 (`ushort3Normalized`, which WebGPU
+            // reads as four).
+            layout.attributes[3] = GPUVertexAttribute(format: .ushort3Normalized,
+                                                      offset: ModelTileContents.textureCoordinateOffset - 2, bufferIndex: 0)
+        }
         layout.strides[0] = ModelTileContents.vertexStride
 
         func main(clipsBelowGround: Bool) -> GPURenderPipelineDescriptor {

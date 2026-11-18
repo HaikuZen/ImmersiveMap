@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GlobeUnroll.h fnv1a64=eafa21078a72d586
+// ported-from: GlobeUnroll.h fnv1a64=59f20e60d7e9f3a7
 
 // The sphere-to-plane unroll: the surface lives on a sphere of radius
 // 1 / curvature tangent to the view centre, and every point travels a

@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -71,7 +71,7 @@ final class TransparentSpaceSettingsTests: XCTestCase {
 
     /// Alpha must accumulate on a transparent destination: `.sourceAlpha` on the
     /// alpha channel squares the coverage, which shows up as washed-out labels,
-    /// avatars and routes over the app's own background.
+    /// pins and routes over the app's own background.
     func testNoPipelineSquaresAlphaCoverage() throws {
         let sourceRoot = packageRootURL().appendingPathComponent("Sources/ImmersiveMap")
         let enumerator = try XCTUnwrap(FileManager.default.enumerator(at: sourceRoot,

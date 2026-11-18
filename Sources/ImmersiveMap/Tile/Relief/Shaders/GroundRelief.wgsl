@@ -1,7 +1,7 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-// ported-from: GroundRelief.h fnv1a64=6bc9669b150318cd
+// ported-from: GroundRelief.h fnv1a64=39224bc145a9ef10
 
 // The ground relief as the vertex stages read it (GroundReliefStore): the
 // ground rises by one bilinear sample of its terrain, scaled by the frame's

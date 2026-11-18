@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
@@ -23,12 +23,15 @@ final class SceneModelOffscreenRenderTests: XCTestCase {
         func invalidate(_ reason: RenderInvalidationReason) {}
         func applyActivityState(_ state: RenderActivityState) {}
         func completeSceneModelPathAnimations(_: [SceneModelPathAnimationResult]) {}
-        func updateAvatarSelectionSnapshot(_ snapshot: AvatarSelectionSnapshot) {}
         func updateDebugOverlayHUDSnapshot(_ snapshot: DebugOverlayHUDSnapshot?) {}
-        func updateMarkerProjectionSnapshot(_ snapshot: MarkerProjectionSnapshot) {}
+        func updateAnnotationProjectionSnapshot(_ snapshot: AnnotationProjectionSnapshot) {}
 
-        func updateSceneModelSelectionSnapshot(_ snapshot: SceneModelSelectionSnapshot) {
-            lock.withLock { latestSceneModelSnapshot = snapshot }
+        func updateSelectionPickData(_ pickData: [any SelectionPickData]) {
+            // A frame that drew no model hands none on, and the last one
+            // drawn stays.
+            for case let snapshot as SceneModelSelectionSnapshot in pickData {
+                lock.withLock { latestSceneModelSnapshot = snapshot }
+            }
         }
     }
 

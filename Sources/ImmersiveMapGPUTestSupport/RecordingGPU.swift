@@ -1,4 +1,4 @@
-// Copyright (c) 2025-2026 ImmersiveMap contributors.
+// Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
 import ImmersiveMapGPU
@@ -303,7 +303,7 @@ package final class RecordingGPUDevice: GPUDevice, @unchecked Sendable {
     package var textures: [RecordingTexture] { lock.withLock { _ in textureLog } }
     package var pipelines: [GPURenderPipelineDescriptor] { lock.withLock { _ in pipelineLog } }
 
-    package init(features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .astc, .pointSprites],
+    package init(features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .astc, .pointSprites, .unalignedVertexAttributes],
                  shaderFunctions: Set<String>? = nil) {
         self.features = features
         self.shaderFunctions = shaderFunctions
