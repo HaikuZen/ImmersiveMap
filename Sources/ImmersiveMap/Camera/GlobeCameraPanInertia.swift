@@ -37,7 +37,7 @@ final class GlobeCameraPanInertia {
     }
 
     private var configuration: Configuration
-    private var isActive: Bool = false
+    private(set) var isActive: Bool = false
     private var velocity: CGPoint = .zero
     private var lastTickTime: CFTimeInterval?
 

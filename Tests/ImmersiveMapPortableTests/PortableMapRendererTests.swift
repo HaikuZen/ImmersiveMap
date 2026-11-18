@@ -138,4 +138,62 @@ struct PortableMapRendererTests {
         #expect(map.markerPositions.contains { $0.id == 7 } == false)
         #expect(map.needsFrame(width: 64, height: 48, pixelsPerPoint: 2))
     }
+
+    /// A clock the test moves by hand.
+    private final class TestClock {
+        var now: Double = 100
+    }
+
+    /// A fast release on the globe glides on, the camera moving with each
+    /// step of the clock and no input, and slows to a stop.
+    @Test func aFastReleaseOnTheGlobeGlidesAndStops() throws {
+        let clock = TestClock()
+        let map = try PortableMapRenderer(device: RecordingGPUDevice(), settings: Self.offlineSettings(), clock: { clock.now })
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: 2)
+        map.pan(deltaX: 30, deltaY: 0)
+        map.endPan(velocityX: 2000, velocityY: 0)
+        #expect(map.isGliding)
+        #expect(map.needsFrame(width: 64, height: 48, pixelsPerPoint: 2))
+
+        let released = map.cameraPosition.longitudeDegrees
+        clock.now += 0.016
+        map.advanceGlide()
+        #expect(map.cameraPosition.longitudeDegrees != released)
+
+        // The half-life and the stop velocity end it within a few seconds.
+        var steps = 0
+        while map.isGliding, steps < 200 {
+            clock.now += 0.05
+            map.advanceGlide()
+            steps += 1
+        }
+        #expect(map.isGliding == false)
+        let stopped = map.cameraPosition.longitudeDegrees
+        clock.now += 0.05
+        map.advanceGlide()
+        #expect(map.cameraPosition.longitudeDegrees == stopped)
+    }
+
+    @Test func aSlowReleaseDoesNotGlide() throws {
+        let clock = TestClock()
+        let map = try PortableMapRenderer(device: RecordingGPUDevice(), settings: Self.offlineSettings(), clock: { clock.now })
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: 2)
+        map.pan(deltaX: 5, deltaY: 0)
+        map.endPan(velocityX: 100, velocityY: 0)
+        #expect(map.isGliding == false)
+    }
+
+    @Test func aDragOrAZoomStopsAGlide() throws {
+        let clock = TestClock()
+        let map = try PortableMapRenderer(device: RecordingGPUDevice(), settings: Self.offlineSettings(), clock: { clock.now })
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: 2)
+        map.endPan(velocityX: 2000, velocityY: 0)
+        #expect(map.isGliding)
+        map.pan(deltaX: 1, deltaY: 0)
+        #expect(map.isGliding == false)
+        map.endPan(velocityX: 2000, velocityY: 0)
+        #expect(map.isGliding)
+        map.zoom(delta: 0.5)
+        #expect(map.isGliding == false)
+    }
 }

@@ -105,7 +105,11 @@ try {
             }
             if (places.some((place) => place.id === 2)) errors.push('map: a marker beyond the horizon was placed');
         }
-        if (frame === 30) map.pan(40, 10, true);
+        if (frame === 30) {
+            // A fast release: the globe glides on through the next frames.
+            map.pan(40, 10);
+            map.endPan(1500, 300);
+        }
         if (frame === 50) map.zoom(1);
         if (frame === 60) map.orbit(0.3, 0.4);
         if (frame === 70) map.removeMarker(1);

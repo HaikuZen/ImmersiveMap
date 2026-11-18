@@ -3,6 +3,9 @@
 
 import ImmersiveMapGPU
 import PortableFoundation
+#if canImport(QuartzCore)
+import QuartzCore
+#endif
 
 /// The map for a host that is no Apple view (the browser program,
 /// `ImmersiveMapWebMap`): the frame engine over the platform's GPU device
@@ -16,7 +19,8 @@ import PortableFoundation
 /// true, and stops asking for display frames while it stays false. A frame
 /// is needed after a camera move, a marker change or a new drawing size,
 /// when the engine asks for one (a tile arrived, a retry is due) and while
-/// one of its animations runs (a label fade, a rise, a zoom settling).
+/// one of its animations runs (a label fade, a rise, a zoom settling) or
+/// the globe glides on after a drag (`endPan(velocityX:velocityY:)`).
 @MainActor
 package final class PortableMapRenderer {
     /// The device made no command queue.
@@ -37,6 +41,11 @@ package final class PortableMapRenderer {
     /// drawing size.
     private var demand = PortableFrameDemand()
     private var drawnSize: (width: Int, height: Int, pixelsPerPoint: Double)?
+    /// The globe's glide after a drag, as the Apple views' pan inertia, from
+    /// the camera settings' `globePanInertia` values.
+    private let inertia: GlobeCameraPanInertia
+    /// The time the glide advances by, in seconds.
+    private let clock: () -> CFTimeInterval
 
     /// Where the markers were on the last frame drawn, in points from the
     /// drawing's top left corner. A marker beyond the globe's horizon or
@@ -44,8 +53,11 @@ package final class PortableMapRenderer {
     package private(set) var markerPositions: [PortableMarkerPosition] = []
 
     /// The world pass's sample count is the settings', 1 or 4: the two
-    /// counts every WebGPU device renders with.
-    package init(device: any GPUDevice, settings: ImmersiveMapSettings) throws {
+    /// counts every WebGPU device renders with. The clock is the media
+    /// clock unless a test drives its own.
+    package init(device: any GPUDevice,
+                 settings: ImmersiveMapSettings,
+                 clock: @escaping () -> CFTimeInterval = { CACurrentMediaTime() }) throws {
         guard let commandQueue = device.makeCommandQueue() else {
             throw Unavailable()
         }
@@ -53,6 +65,13 @@ package final class PortableMapRenderer {
         var settings = settings
         settings.postProcessing.multisampleCount = sampleCount
         self.settings = settings
+        self.clock = clock
+        let cameraSettings = settings.camera
+        inertia = GlobeCameraPanInertia(configuration: .init(isEnabled: cameraSettings.globePanInertiaEnabled,
+                                                             halfLife: cameraSettings.globePanInertiaHalfLife,
+                                                             activationVelocity: cameraSettings.globePanInertiaActivationVelocity,
+                                                             stopVelocity: cameraSettings.globePanInertiaStopVelocity,
+                                                             maximumInitialVelocity: cameraSettings.globePanInertiaMaxInitialVelocity))
         camera = FrameCameraStateResolver(settings: settings)
         presentation = MapPresentationStateController(settings: settings)
         engine = RenderFrameEngine(host: .portable(device: device, commandQueue: commandQueue, sampleCount: sampleCount),
@@ -71,7 +90,7 @@ package final class PortableMapRenderer {
     /// the last one drawn, or an animation runs.
     package func needsFrame(width: Int, height: Int, pixelsPerPoint: Double) -> Bool {
         if let drawnSize, drawnSize == (width, height, pixelsPerPoint) {
-            return demand.isRequested || eventSink.needsFrame
+            return demand.isRequested || isGliding || eventSink.needsFrame
         }
         return true
     }
@@ -82,6 +101,7 @@ package final class PortableMapRenderer {
     /// still needed.
     @discardableResult
     package func render(into texture: any GPUTexture, width: Int, height: Int, pixelsPerPoint: Double) -> Bool {
+        advanceGlide()
         // Taken before the frame, so a request made while it is drawn (a
         // tile landing) asks for the next one.
         let requestedHere = demand.take()
@@ -138,28 +158,66 @@ package final class PortableMapRenderer {
         camera.currentCameraPosition()
     }
 
+    /// Whether the globe still glides after a drag.
+    package var isGliding: Bool {
+        inertia.isActive
+    }
+
     /// Moves the map by a drag of the points, as the Apple views' pan does
-    /// (`CameraSettings.gesturePanTranslationScale`).
+    /// (`CameraSettings.gesturePanTranslationScale`). Stops a glide.
     package func pan(deltaX: Double, deltaY: Double) {
+        inertia.cancel()
+        applyPan(deltaX: deltaX, deltaY: deltaY)
+    }
+
+    /// The drag ended, the pointer moving at the velocity, in points a
+    /// second: on the globe, a release fast enough
+    /// (`globePanInertiaActivationVelocity`) lets the map glide on and slow
+    /// to a stop, as the Apple views do. The next drag is its own.
+    package func endPan(velocityX: Double = 0, velocityY: Double = 0) {
+        camera.endPanCamera()
+        guard presentation.isSphericalSurfaceActive(cameraState: camera.currentCameraState()) else {
+            inertia.cancel()
+            return
+        }
+        if inertia.start(initialVelocity: CGPoint(x: velocityX, y: velocityY), currentTime: clock()) {
+            demand.request()
+        }
+    }
+
+    /// Moves the glide on to now, which `render` does before each frame: the
+    /// camera pans by what it covered since the last step, until it slows to
+    /// a stop or the map is no longer a globe.
+    package func advanceGlide() {
+        guard inertia.isActive else { return }
+        guard presentation.isSphericalSurfaceActive(cameraState: camera.currentCameraState()) else {
+            inertia.cancel()
+            return
+        }
+        let step = inertia.advance(currentTime: clock())
+        if step.translation != .zero {
+            applyPan(deltaX: Double(step.translation.x), deltaY: Double(step.translation.y))
+        }
+    }
+
+    private func applyPan(deltaX: Double, deltaY: Double) {
         let scale = settings.camera.gesturePanTranslationScale
         let transition = presentation.resolve(cameraState: camera.currentCameraState()).presentationState.transition
         camera.panCamera(deltaX: deltaX * scale, deltaY: deltaY * scale, transition: transition)
         demand.request()
     }
 
-    /// The drag ended: the next one is its own.
-    package func endPan() {
-        camera.endPanCamera()
-    }
-
-    /// Zooms by the levels, positive in.
+    /// Zooms by the levels, positive in. Stops a glide, as every move of
+    /// the camera's below does.
     package func zoom(delta: Double) {
+        inertia.cancel()
         camera.zoomCamera(delta: delta)
         applyConstraints()
     }
 
     /// Turns the camera about the map's centre, in radians.
     package func rotate(yaw: Double) {
+        inertia.cancel()
         camera.rotateCameraYaw(delta: Float(yaw))
         applyConstraints()
     }
@@ -167,12 +225,14 @@ package final class PortableMapRenderer {
     /// Tilts the camera by the radians, held between flat and the zoom's
     /// steepest pitch.
     package func tilt(by delta: Double) {
+        inertia.cancel()
         camera.setCameraPitch(camera.currentCameraState().pitch + Float(delta))
         applyConstraints()
     }
 
     /// Puts the camera over the point at the zoom, looking straight down.
     package func setCamera(latitudeDegrees: Double, longitudeDegrees: Double, zoom: Double) {
+        inertia.cancel()
         camera.setCameraPosition(ImmersiveMapCameraPosition(latitudeDegrees: latitudeDegrees,
                                                             longitudeDegrees: longitudeDegrees,
                                                             zoom: zoom))

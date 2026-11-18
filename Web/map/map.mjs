@@ -48,7 +48,9 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   ready and draws a frame only when one is needed. It returns
 ///   `{ needsFrame, drew }`: whether to ask for another animation frame, and
 ///   whether this one drew, after which `markers()` has their new places.
-/// - The camera's moves: `pan(dx, dy, ended)` in points, `zoom(levels)`,
+/// - The camera's moves: `pan(dx, dy)` in points, `endPan(vx, vy)` when the
+///   drag ends with the pointer's velocity in points a second (a fast
+///   release on the globe glides on), `zoom(levels)`,
 ///   `orbit(yaw, pitch)` in radians, `look(lat, lon, zoom)`, and `camera()`,
 ///   where it is: `{ latitude, longitude, zoom, bearing, pitch }`, the
 ///   bearing and the pitch in radians.
@@ -158,7 +160,8 @@ export async function startMap({
             const result = exports.immersivemap_map_frame(width, height, pixelsPerPoint);
             return { needsFrame: (result & 1) !== 0, drew: (result & 2) !== 0 };
         },
-        pan: changing((dx, dy, ended = false) => exports.immersivemap_map_pan(dx, dy, ended ? 1 : 0)),
+        pan: changing((dx, dy) => exports.immersivemap_map_pan(dx, dy)),
+        endPan: changing((vx = 0, vy = 0) => exports.immersivemap_map_end_pan(vx, vy)),
         zoom: changing((levels) => exports.immersivemap_map_zoom(levels)),
         orbit: changing((yaw, pitch) => exports.immersivemap_map_orbit(yaw, pitch)),
         look: changing((latitude, longitude, zoom) => exports.immersivemap_map_look(latitude, longitude, zoom)),

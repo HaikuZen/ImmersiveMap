@@ -23,6 +23,11 @@ const input = {
     /// across the whole height tilts it a quarter of one.
     orbitYawPerWidth: Math.PI,
     orbitPitchPerHeight: Math.PI * 0.5,
+    /// A drag's velocity at release is measured over its last moves within
+    /// this many milliseconds, and is none when the pointer has not moved
+    /// for `releaseStillTime` (it stopped before lifting).
+    releaseVelocityWindow: 100,
+    releaseStillTime: 50,
 };
 
 /// A key only `create` holds, so the constructor is not called directly.
@@ -136,9 +141,10 @@ export class ImmersiveMap {
         this.#map?.look(latitude, longitude, zoom ?? this.camera?.zoom ?? 2);
     }
 
-    /// Moves the map as a drag of the points does.
+    /// Moves the map as a drag of the points does, with no glide after.
     panBy(dx, dy) {
-        this.#map?.pan(dx, dy, true);
+        this.#map?.pan(dx, dy);
+        this.#map?.endPan(0, 0);
     }
 
     /// Zooms by the levels, positive in.
@@ -261,17 +267,31 @@ export class ImmersiveMap {
     // MARK: - Input
 
     /// One pointer drags the map, or turns and tilts it with the secondary
-    /// button or Shift. Two pointers (a pinch) zoom and drag it. The wheel
-    /// zooms. All in points (CSS pixels).
+    /// button or Shift, and a fast release of a drag lets the globe glide on.
+    /// Two pointers (a pinch) zoom and drag it. The wheel zooms. All in points
+    /// (CSS pixels).
     #listen() {
         const canvas = this.#canvas;
         const signal = this.#listeners.signal;
         const pointers = new Map();
         let orbiting = false;
         let panning = false;
-        const endPan = () => {
-            if (panning) this.#map?.pan(0, 0, true);
+        // The one-finger drag's recent moves, `{ time, x, y }`, for its
+        // velocity at release.
+        let moves = [];
+        const endPan = (vx = 0, vy = 0) => {
+            if (panning) this.#map?.endPan(vx, vy);
             panning = false;
+            moves = [];
+        };
+        /// The drag's velocity at the time, in points a second.
+        const releaseVelocity = (time) => {
+            const last = moves.at(-1);
+            if (!last || time - last.time > input.releaseStillTime) return [0, 0];
+            const first = moves.find((move) => last.time - move.time <= input.releaseVelocityWindow);
+            const seconds = (last.time - first.time) / 1000;
+            if (seconds <= 0) return [0, 0];
+            return [(last.x - first.x) / seconds, (last.y - first.y) / seconds];
         };
         const pinch = () => {
             const [a, b] = [...pointers.values()];
@@ -306,6 +326,8 @@ export class ImmersiveMap {
                 } else {
                     panning = true;
                     this.#map.pan(dx, dy);
+                    moves.push({ time: event.timeStamp, x: event.clientX, y: event.clientY });
+                    while (moves.length > 1 && event.timeStamp - moves[0].time > input.releaseVelocityWindow) moves.shift();
                 }
             } else if (pointers.size === 2 && lastPinch) {
                 const now = pinch();
@@ -316,8 +338,10 @@ export class ImmersiveMap {
             }
         }, { signal });
         const lift = (event) => {
+            const wasDragging = pointers.size === 1 && !orbiting;
             if (!pointers.delete(event.pointerId)) return;
-            endPan();
+            // Only a one-finger drag glides on, not the end of a pinch.
+            endPan(...(wasDragging && event.type === 'pointerup' ? releaseVelocity(event.timeStamp) : [0, 0]));
             lastPinch = null;
             // The finger left on the screen after a pinch starts a drag of
             // its own.

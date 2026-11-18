@@ -40,7 +40,11 @@ export interface ImmersiveMapOptions {
     multisample?: boolean;
     /** Where the camera starts, looking straight down. */
     camera?: Coordinate & { zoom?: number };
-    /** Whether the pointer, the wheel and touch move the camera. True by default. */
+    /**
+     * Whether the pointer, the wheel and touch move the camera. True by
+     * default. A fast release of a drag lets the globe glide on, by the
+     * engine's pan inertia settings.
+     */
     interactive?: boolean;
     /** How often a still map runs the module's due work, in milliseconds. 250 by default. */
     idleTickInterval?: number;
@@ -88,7 +92,7 @@ export declare class ImmersiveMap {
 
     /** Puts the camera over the point at the zoom (the current one if left out), looking straight down. */
     lookAt(position: Coordinate & { zoom?: number }): void;
-    /** Moves the map as a drag of the points does. */
+    /** Moves the map as a drag of the points does, with no glide after. */
     panBy(dx: number, dy: number): void;
     /** Zooms by the levels, positive in. */
     zoomBy(levels: number): void;

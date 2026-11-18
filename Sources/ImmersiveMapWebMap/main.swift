@@ -138,16 +138,20 @@ func mapMarkers() -> UnsafeMutableRawPointer? {
     return UnsafeMutableRawPointer(buffer.baseAddress)
 }
 
-/// A drag of the points, `ended` 1 when the pointer is up.
+/// A drag of the points. Stops a glide.
 @_expose(wasm, "immersivemap_map_pan")
 @_cdecl("immersivemap_map_pan")
-func mapPan(_ deltaX: Double, _ deltaY: Double, _ ended: Int32) {
-    MainActor.assumeIsolated {
-        map?.pan(deltaX: deltaX, deltaY: deltaY)
-        if ended != 0 {
-            map?.endPan()
-        }
-    }
+func mapPan(_ deltaX: Double, _ deltaY: Double) {
+    MainActor.assumeIsolated { map?.pan(deltaX: deltaX, deltaY: deltaY) }
+}
+
+/// The drag ended, the pointer moving at the velocity in points a second:
+/// on the globe, a fast release glides on
+/// (`PortableMapRenderer.endPan(velocityX:velocityY:)`).
+@_expose(wasm, "immersivemap_map_end_pan")
+@_cdecl("immersivemap_map_end_pan")
+func mapEndPan(_ velocityX: Double, _ velocityY: Double) {
+    MainActor.assumeIsolated { map?.endPan(velocityX: velocityX, velocityY: velocityY) }
 }
 
 /// Zooms by the levels, positive in.
