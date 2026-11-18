@@ -26,8 +26,8 @@
 // with the page's fetch, drawn only when something changed. Drag to move,
 // the wheel or a pinch to zoom, a right drag or a Shift drag to turn and
 // tilt. `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA
-// off, `?markers=0` leaves out the sample markers. Built and served by
-// build.sh.
+// off, `?markers=0` leaves out the sample markers, `?tilecache=0` reads
+// every range from the network. Built and served by build.sh.
 import { ImmersiveMap } from './ImmersiveMap.mjs';
 
 const status = document.getElementById('status');
@@ -56,6 +56,7 @@ try {
     map = await ImmersiveMap.create(document.getElementById('map'), {
         archive: query.get('archive') ?? '',
         multisample: query.get('msaa') !== '0',
+        tileCache: query.get('tilecache') !== '0',
         onError: (message) => { errors.push(message); show(); },
         onWarning: (message) => { notes.push(message); show(); },
         onDownloadFailure: show,

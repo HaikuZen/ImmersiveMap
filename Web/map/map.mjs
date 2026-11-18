@@ -43,6 +43,8 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   last one (a camera move, a marker, a request answered), so a page that
 ///   stopped asking for animation frames asks again.
 /// - downloadFailed: called with `downloads` after each failed request.
+/// - rangeCache: an `ArchiveRangeCache` (rangeCache.mjs) the archives'
+///   requests go through, none by default.
 /// Returns:
 /// - `frame(width, height, pixelsPerPoint)`, which runs what the module has
 ///   ready and draws a frame only when one is needed. It returns
@@ -58,7 +60,8 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   integer from 0 to 2^32 - 1), `removeMarker(id)`, and `markers()`, the
 ///   places on the last frame drawn, `{ id, x, y, alpha }` in points from the
 ///   canvas's top left corner, a marker beyond the horizon left out.
-/// - `downloads`: the requests answered, the ones that failed (`fetch`
+/// - `downloads`: the requests answered, from the cache or the network
+///   (`cached` of them from the cache), the ones that failed (`fetch`
 ///   threw, as it does when the archive's host refuses the page's origin, or
 ///   an HTTP error) and the first failure's text, for the page to show, as
 ///   the engine only logs them.
@@ -66,7 +69,7 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 export async function startMap({
     device, module, shaders, resources, canvasTexture,
     archiveURL = '', multisample = true, fetch: fetchFunction = globalThis.fetch,
-    warn = console.warn, print, wake = () => {}, downloadFailed = () => {},
+    warn = console.warn, print, wake = () => {}, downloadFailed = () => {}, rangeCache = null,
 }) {
     const files = new Map([...resources].map(([name, bytes]) => [`${resourceFolder.slice(1)}/${name}`, bytes]));
     const wasi = new WASIShim({
@@ -86,7 +89,7 @@ export async function startMap({
         const pointer = instance.exports.immersivemap_fetch_buffer(id, kind, bytes.length);
         if (pointer !== 0) new Uint8Array(memory(), pointer, bytes.length).set(bytes);
     };
-    const downloads = { answered: 0, failed: 0, firstFailure: null };
+    const downloads = { answered: 0, cached: 0, failed: 0, firstFailure: null };
     const noteFailure = (text) => {
         downloads.failed += 1;
         downloads.firstFailure ??= text;
@@ -124,8 +127,13 @@ export async function startMap({
                     .map((line) => [line.slice(0, line.indexOf(':')).trim(), line.slice(line.indexOf(':') + 1).trim()]);
                 // Answered on a later turn of the event loop, never inside
                 // the module's call.
-                fetchRange({ url, headers, start, end }, fetchFunction)
-                    .then((response) => answer(id, response), (error) => fail(id, error));
+                const request = { url, headers, start, end };
+                const network = (range) => fetchRange(range, fetchFunction);
+                (rangeCache ? rangeCache.fetch(request, network) : network(request))
+                    .then((response) => {
+                        downloads.cached = rangeCache?.counts.hits ?? 0;
+                        answer(id, response);
+                    }, (error) => fail(id, error));
             },
         },
     });

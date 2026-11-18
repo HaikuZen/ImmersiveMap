@@ -18,6 +18,7 @@
     "map/ImmersiveMap.mjs",
     "map/ImmersiveMap.d.ts",
     "map/map.mjs",
+    "map/rangeCache.mjs",
     "map/build/"
   ],
   "sideEffects": false

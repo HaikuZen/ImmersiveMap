@@ -5,13 +5,16 @@
 // element with a canvas the engine draws into (the ImmersiveMapWebMap
 // module through the page's WebGPU device, map.mjs), takes the pointer, the
 // wheel and two-finger touch as camera moves, draws only when something
-// changed, and keeps the page's marker elements over the points they mark.
+// changed, keeps the page's marker elements over the points they mark, and
+// keeps the archives' ranges it read in the browser's storage for the next
+// load (rangeCache.mjs).
 // The types are in ImmersiveMap.d.ts. The module, the shader bundle and the
 // resources are what Web/map/build.sh writes, found in `build/` beside this
 // file unless `assets` names another folder.
 
 import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
 import { startMap, fetchResources } from './map.mjs';
+import { ArchiveRangeCache, openBrowserStore } from './rangeCache.mjs';
 
 /// How a drag and the wheel move the camera.
 const input = {
@@ -93,7 +96,7 @@ export class ImmersiveMap {
         container.append(this.#canvas, this.#markerLayer);
     }
 
-    async #start({ assets, archive = '', multisample = true, camera }) {
+    async #start({ assets, archive = '', multisample = true, camera, tileCache = true }) {
         const base = new URL(String(assets ?? new URL('./build/', import.meta.url)), document.baseURI);
         if (!base.pathname.endsWith('/')) base.pathname += '/';
         const context = this.#canvas.getContext('webgpu');
@@ -108,6 +111,13 @@ export class ImmersiveMap {
             WebAssembly.compileStreaming(fetch(new URL('ImmersiveMapWebMap.wasm', base))),
             fetchResources(new URL('resources', base).href),
         ]);
+        // The archives' ranges kept in the browser's storage, where it has
+        // storage the page can write.
+        const store = tileCache === false ? null : await openBrowserStore();
+        const rangeCache = store && new ArchiveRangeCache(store, {
+            maxBytes: tileCache?.maxBytes,
+            warn: (message) => this.#options.onWarning(message),
+        });
         this.#map = await startMap({
             device: this.#device,
             module,
@@ -119,6 +129,7 @@ export class ImmersiveMap {
             warn: (message) => this.#options.onWarning(message),
             wake: () => this.#wake(),
             downloadFailed: (downloads) => this.#options.onDownloadFailure({ ...downloads }),
+            rangeCache,
         });
         if (camera) this.lookAt(camera);
         if (this.#options.interactive) this.#listen();
@@ -206,9 +217,11 @@ export class ImmersiveMap {
 
     // MARK: - State
 
-    /// The tile archive's requests: `{ answered, failed, firstFailure }`.
+    /// The tile archive's requests: `{ answered, cached, failed,
+    /// firstFailure }`, `cached` the ones answered from the browser's
+    /// storage.
     get downloads() {
-        return this.#map ? { ...this.#map.downloads } : { answered: 0, failed: 0, firstFailure: null };
+        return this.#map ? { ...this.#map.downloads } : { answered: 0, cached: 0, failed: 0, firstFailure: null };
     }
 
     /// Stops drawing, lets go of the input and the GPU device, and takes the

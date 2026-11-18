@@ -18,7 +18,10 @@ export interface CameraPosition extends Coordinate {
 
 /** The tile archive's requests so far. */
 export interface Downloads {
+    /** From the browser's storage or the network. */
     answered: number;
+    /** Answered from the browser's storage (the tile cache). */
+    cached: number;
     /** `fetch` threw (as it does when the archive's host refuses the page's origin) or an HTTP error came back. */
     failed: number;
     /** The first failure's text, null while there is none. */
@@ -36,6 +39,15 @@ export interface ImmersiveMapOptions {
      * must allow the page's origin (CORS), or serve it from the page's site.
      */
     archive?: string;
+    /**
+     * Keeps the archives' ranges in the browser's storage (OPFS), so a page
+     * loaded again reads them from there. On by default where the browser
+     * lets the page write it, at most 256 MB unless `maxBytes` says, the
+     * oldest dropped past it. An archive replaced on its host (a new ETag,
+     * or a new Last-Modified where the ETag is not exposed) is read anew.
+     * False turns it off.
+     */
+    tileCache?: boolean | { maxBytes?: number };
     /** MSAA 4x. True by default. */
     multisample?: boolean;
     /** Where the camera starts, looking straight down. */
