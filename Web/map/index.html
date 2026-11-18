@@ -7,184 +7,71 @@
 <title>ImmersiveMap in a browser</title>
 <style>
   html, body { margin: 0; height: 100%; background: #05080f; color: #cdd6e4; font: 13px/1.4 system-ui, sans-serif; }
-  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
-  canvas:active { cursor: grabbing; }
+  #map { position: fixed; inset: 0; cursor: grab; }
+  #map:active { cursor: grabbing; }
   #status { position: fixed; left: 12px; bottom: 12px; right: 12px; white-space: pre-wrap; pointer-events: none; }
   #status.error { color: #ff8a80; }
-  /* The markers lie over the canvas and let the pointer through to it. */
-  #markers { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
-  .marker { position: absolute; left: 0; top: 0; display: none; align-items: center; gap: 4px;
-            text-shadow: 0 1px 2px #000; white-space: nowrap; will-change: transform; }
-  .marker::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #ffcc4d;
-                    box-shadow: 0 0 0 2px #05080f; }
+  /* A sample marker: the dot is the element, centred on the city, its name beside it. */
+  .marker { width: 8px; height: 8px; border-radius: 50%; background: #ffcc4d; box-shadow: 0 0 0 2px #05080f; }
+  .marker span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+                 text-shadow: 0 1px 2px #000; white-space: nowrap; }
 </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
-<div id="markers"></div>
+<div id="map"></div>
 <div id="status">Loading…</div>
 <script type="module">
-// The engine in a browser: the map drawn by the Swift module through the
-// page's WebGPU host, its tiles read with the page's fetch. Drag to move,
-// the wheel to zoom, a right drag or a shift drag to turn and tilt.
-// `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA off,
-// `?markers=0` leaves out the sample markers. Built and served by build.sh.
-//
-// Frames are drawn on demand: the page asks for animation frames while the
-// map says it needs them, and stops when it is still. Then a slow tick asks
-// again a few times a second, so the module's timers (a download's retry)
-// still run, and any input, request answered or resize asks at once.
-import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
-import { startMap, fetchResources } from './map.mjs';
+// The engine in a browser, through the page's module (ImmersiveMap.mjs):
+// the map drawn by the Swift module with the page's WebGPU, its tiles read
+// with the page's fetch, drawn only when something changed. Drag to move,
+// the wheel or a pinch to zoom, a right drag or a Shift drag to turn and
+// tilt. `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA
+// off, `?markers=0` leaves out the sample markers. Built and served by
+// build.sh.
+import { ImmersiveMap } from './ImmersiveMap.mjs';
 
 const status = document.getElementById('status');
 const say = (text, isError = false) => { status.textContent = text; status.className = isError ? 'error' : ''; };
+const query = new URLSearchParams(location.search);
+const errors = [];
+const notes = [];
+
+// The engine only logs a failed download, so a host that refuses the
+// page's origin (CORS) would leave an empty globe and no word.
+const downloadStatus = ({ answered, failed, firstFailure }) => failed === 0 ? '' :
+    `${failed} of ${answered + failed} tile archive requests failed, the first with: ${firstFailure}\n`
+    + 'If the archive is on another site, its host must allow this page\'s origin (CORS), '
+    + 'or serve the archive from this site and open the page with ?archive=/<file>.pmtiles.';
+let map = null;
+const show = () => {
+    if (errors.length > 0) {
+        say(`WebGPU error:\n${errors.slice(-3).join('\n')}`, true);
+    } else {
+        say([map ? downloadStatus(map.downloads) : '', ...notes.slice(-3)].filter(Boolean).join('\n'));
+    }
+};
 
 try {
-    if (!navigator.gpu) throw new Error('This browser has no WebGPU.');
-    const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) throw new Error('No WebGPU adapter.');
-    const device = await adapter.requestDevice({ requiredFeatures: chooseFeatures(adapter) });
-    const errors = [];
-    device.addEventListener('uncapturederror', (event) => {
-        errors.push(event.error.message);
-        say(`WebGPU error:\n${errors.slice(-3).join('\n')}`, true);
-    });
-    const canvas = document.getElementById('canvas');
-    const context = canvas.getContext('webgpu');
-    // The engine's pipelines draw bgra8unorm, which every canvas takes.
-    context.configure({ device, format: 'bgra8unorm', alphaMode: 'opaque' });
-
     say('Loading the module, the shaders and the resources…');
-    const [shaders, module, resources] = await Promise.all([
-        fetch('build/shaders.json').then((response) => response.json()),
-        WebAssembly.compileStreaming(fetch('build/ImmersiveMapWebMap.wasm')),
-        fetchResources('build/resources'),
-    ]);
-    const query = new URLSearchParams(location.search);
-    const notes = [];
-    // How often a still map runs the module's due work, in milliseconds.
-    const idleTickInterval = 250;
-    let frameAsked = false;
-    let idleTick = null;
-    const wake = () => {
-        if (idleTick !== null) {
-            clearTimeout(idleTick);
-            idleTick = null;
-        }
-        if (!frameAsked) {
-            frameAsked = true;
-            requestAnimationFrame(frame);
-        }
-    };
-    const map = await startMap({
-        device, module, shaders, resources,
-        canvasTexture: () => context.getCurrentTexture(),
-        archiveURL: query.get('archive') ?? '',
+    map = await ImmersiveMap.create(document.getElementById('map'), {
+        archive: query.get('archive') ?? '',
         multisample: query.get('msaa') !== '0',
-        warn: (message) => notes.push(message),
-        wake,
+        onError: (message) => { errors.push(message); show(); },
+        onWarning: (message) => { notes.push(message); show(); },
+        onDownloadFailure: show,
     });
-    new ResizeObserver(wake).observe(canvas);
-
-    // Markers: an element of the page each, moved to where each frame
-    // drawn puts its point, centred on it, faded at the globe's horizon and
-    // hidden beyond it.
-    const markerLayer = document.getElementById('markers');
-    const markerElements = new Map();
-    const addMarker = (id, latitude, longitude, name) => {
-        const element = document.createElement('div');
-        element.className = 'marker';
-        element.textContent = name;
-        markerLayer.append(element);
-        markerElements.set(id, element);
-        map.setMarker(id, latitude, longitude);
-    };
-    const placeMarkers = () => {
-        const shown = new Set();
-        for (const { id, x, y, alpha } of map.markers()) {
-            const element = markerElements.get(id);
-            if (!element) continue;
-            shown.add(id);
-            element.style.display = 'flex';
-            element.style.opacity = alpha;
-            // Centred on the dot, the name to its right.
-            element.style.transform = `translate(${x - 4}px, ${y}px) translateY(-50%)`;
-        }
-        for (const [id, element] of markerElements) {
-            if (!shown.has(id)) element.style.display = 'none';
-        }
-    };
+    show();
     if (query.get('markers') !== '0') {
-        [[55.7558, 37.6173, 'Moscow'], [48.8566, 2.3522, 'Paris'], [41.9028, 12.4964, 'Rome'],
-         [35.6762, 139.6503, 'Tokyo'], [-33.8688, 151.2093, 'Sydney'], [40.7128, -74.006, 'New York']]
-            .forEach(([latitude, longitude, name], index) => addMarker(index + 1, latitude, longitude, name));
-    }
-
-    // Input, in points (CSS pixels).
-    let drag = null;
-    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-    canvas.addEventListener('pointerdown', (event) => {
-        canvas.setPointerCapture(event.pointerId);
-        drag = { x: event.clientX, y: event.clientY, orbit: event.button === 2 || event.shiftKey };
-    });
-    canvas.addEventListener('pointermove', (event) => {
-        if (!drag) return;
-        const dx = event.clientX - drag.x;
-        const dy = event.clientY - drag.y;
-        drag.x = event.clientX;
-        drag.y = event.clientY;
-        if (drag.orbit) {
-            map.orbit((dx / canvas.clientWidth) * Math.PI, (dy / canvas.clientHeight) * Math.PI * 0.5);
-        } else {
-            map.pan(dx, dy);
-        }
-    });
-    const endDrag = () => {
-        if (drag && !drag.orbit) map.pan(0, 0, true);
-        drag = null;
-    };
-    canvas.addEventListener('pointerup', endDrag);
-    canvas.addEventListener('pointercancel', endDrag);
-    canvas.addEventListener('wheel', (event) => {
-        event.preventDefault();
-        // A wheel notch (100 pixels) is a fifth of a level.
-        const pixels = event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY;
-        map.zoom(-pixels / 500);
-    }, { passive: false });
-
-    // The engine only logs a failed download, so a host that refuses
-    // the page's origin (CORS) would leave an empty globe and no word.
-    const downloadStatus = () => {
-        const { answered, failed, firstFailure } = map.downloads;
-        if (failed === 0) return '';
-        return `${failed} of ${answered + failed} tile archive requests failed, the first with: ${firstFailure}\n`
-            + 'If the archive is on another site, its host must allow this page\'s origin (CORS), '
-            + 'or serve the archive from this site and open the page with ?archive=/<file>.pmtiles.';
-    };
-
-    function frame() {
-        const scale = window.devicePixelRatio || 1;
-        const width = Math.max(1, Math.round(canvas.clientWidth * scale));
-        const height = Math.max(1, Math.round(canvas.clientHeight * scale));
-        if (canvas.width !== width || canvas.height !== height) {
-            canvas.width = width;
-            canvas.height = height;
-        }
-        frameAsked = false;
-        const { needsFrame, drew } = map.frame(width, height, scale);
-        if (drew) placeMarkers();
-        if (errors.length === 0) say([downloadStatus(), ...notes.slice(-3)].filter(Boolean).join('\n'));
-        if (needsFrame) {
-            wake();
-        } else if (idleTick === null) {
-            idleTick = setTimeout(() => {
-                idleTick = null;
-                wake();
-            }, idleTickInterval);
+        for (const [latitude, longitude, name] of [
+            [55.7558, 37.6173, 'Moscow'], [48.8566, 2.3522, 'Paris'], [41.9028, 12.4964, 'Rome'],
+            [35.6762, 139.6503, 'Tokyo'], [-33.8688, 151.2093, 'Sydney'], [40.7128, -74.006, 'New York'],
+        ]) {
+            const element = document.createElement('div');
+            element.className = 'marker';
+            element.append(Object.assign(document.createElement('span'), { textContent: name }));
+            map.addMarker({ latitude, longitude, element });
         }
     }
-    wake();
 } catch (error) {
     // Chrome's stack starts with the message, Firefox's leaves it out.
     const stack = error.stack ?? '';

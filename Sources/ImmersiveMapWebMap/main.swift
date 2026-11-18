@@ -25,6 +25,9 @@ import ImmersiveMapWebGPUBrowser
 import PMTiles
 import PortableFoundation
 
+// A reactor never runs this file's top-level code, so its globals stay
+// zero: only an optional object reference, whose zero is nil, belongs
+// here. Any other state is in PageMemory.swift.
 nonisolated(unsafe) private var device: WebGPUDevice?
 nonisolated(unsafe) private var map: PortableMapRenderer?
 
@@ -123,23 +126,17 @@ func mapRemoveMarker(_ id: UInt32) {
 func mapMarkers() -> UnsafeMutableRawPointer? {
     let positions = MainActor.assumeIsolated { map?.markerPositions ?? [] }
     let count = 1 + positions.count * 4
-    if markerBuffer.count < count {
-        markerBuffer.deallocate()
-        markerBuffer = .allocate(capacity: max(count, 64))
-    }
-    markerBuffer[0] = Double(positions.count)
+    let buffer = PageMemory.markers(count: count)
+    buffer[0] = Double(positions.count)
     for (index, position) in positions.enumerated() {
         let base = 1 + index * 4
-        markerBuffer[base] = Double(position.id)
-        markerBuffer[base + 1] = position.x
-        markerBuffer[base + 2] = position.y
-        markerBuffer[base + 3] = position.alpha
+        buffer[base] = Double(position.id)
+        buffer[base + 1] = position.x
+        buffer[base + 2] = position.y
+        buffer[base + 3] = position.alpha
     }
-    return UnsafeMutableRawPointer(markerBuffer.baseAddress)
+    return UnsafeMutableRawPointer(buffer.baseAddress)
 }
-
-/// The memory `immersivemap_map_markers` hands the page, grown as needed.
-nonisolated(unsafe) private var markerBuffer = UnsafeMutableBufferPointer<Double>.allocate(capacity: 64)
 
 /// A drag of the points, `ended` 1 when the pointer is up.
 @_expose(wasm, "immersivemap_map_pan")
@@ -177,6 +174,23 @@ func mapLook(_ latitude: Double, _ longitude: Double, _ zoom: Double) {
     MainActor.assumeIsolated {
         map?.setCamera(latitudeDegrees: latitude, longitudeDegrees: longitude, zoom: zoom)
     }
+}
+
+/// Where the camera is, as five doubles: latitude and longitude in
+/// degrees, the zoom, and the bearing and the pitch in radians. The memory
+/// is the module's and holds until the next call.
+@_expose(wasm, "immersivemap_map_camera")
+@_cdecl("immersivemap_map_camera")
+func mapCamera() -> UnsafeMutableRawPointer? {
+    let position = MainActor.assumeIsolated { map?.cameraPosition }
+    guard let position else { return nil }
+    let buffer = PageMemory.camera
+    buffer[0] = position.latitudeDegrees
+    buffer[1] = position.longitudeDegrees
+    buffer[2] = position.zoom
+    buffer[3] = Double(position.bearing)
+    buffer[4] = Double(position.pitch)
+    return UnsafeMutableRawPointer(buffer.baseAddress)
 }
 
 /// The page's `fetch` wants room for the answer of a request

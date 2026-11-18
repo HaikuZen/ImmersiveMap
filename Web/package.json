@@ -1,0 +1,24 @@
+{
+  "name": "immersivemap",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The ImmersiveMap engine in a browser: the Swift engine compiled to WebAssembly, drawing through WebGPU. Build it with map/build.sh before packing.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./map/ImmersiveMap.d.ts",
+      "default": "./map/ImmersiveMap.mjs"
+    }
+  },
+  "types": "./map/ImmersiveMap.d.ts",
+  "files": [
+    "ImmersiveMapWebGPU.js",
+    "WASIShim.js",
+    "map/ImmersiveMap.mjs",
+    "map/ImmersiveMap.d.ts",
+    "map/map.mjs",
+    "map/build/"
+  ],
+  "sideEffects": false
+}

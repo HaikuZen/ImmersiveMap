@@ -8,8 +8,9 @@
 // from the file, so the tiles travel the whole path from `fetch` to the
 // GPU. `node map.mjs [module.wasm]` here, after `npm ci`. Fails on any
 // WebGPU validation error, a trap in the module, no request reaching the
-// archive, a first frame not drawn, or a marker at the camera's centre not
-// placed at the canvas's centre. Looks at no pixel: the page is judged in a
+// archive, a camera not read back where it was put, a first frame not
+// drawn, or a marker at the camera's centre not placed at the canvas's
+// centre. Looks at no pixel: the page is judged in a
 // browser.
 
 import { create, globals } from 'webgpu';
@@ -81,6 +82,10 @@ try {
         print: (stream, line) => output.push(`${stream === 2 ? 'stderr' : 'stdout'}: ${line}`),
     });
     map.look(45.46, 9.19, 5);
+    const camera = map.camera();
+    if (!camera || Math.abs(camera.latitude - 45.46) > 1e-6 || Math.abs(camera.longitude - 9.19) > 1e-6 || Math.abs(camera.zoom - 5) > 1e-6) {
+        errors.push(`map: the camera reads back as ${JSON.stringify(camera)}, not where it was put`);
+    }
     // A marker where the camera looks, and one on the far side of the globe.
     map.setMarker(1, 45.46, 9.19);
     map.setMarker(2, -45.46, -170.81);

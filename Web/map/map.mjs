@@ -42,13 +42,16 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 /// - wake: called when the map may need a frame it did not ask for at the
 ///   last one (a camera move, a marker, a request answered), so a page that
 ///   stopped asking for animation frames asks again.
+/// - downloadFailed: called with `downloads` after each failed request.
 /// Returns:
 /// - `frame(width, height, pixelsPerPoint)`, which runs what the module has
 ///   ready and draws a frame only when one is needed. It returns
 ///   `{ needsFrame, drew }`: whether to ask for another animation frame, and
 ///   whether this one drew, after which `markers()` has their new places.
 /// - The camera's moves: `pan(dx, dy, ended)` in points, `zoom(levels)`,
-///   `orbit(yaw, pitch)` in radians, `look(lat, lon, zoom)`.
+///   `orbit(yaw, pitch)` in radians, `look(lat, lon, zoom)`, and `camera()`,
+///   where it is: `{ latitude, longitude, zoom, bearing, pitch }`, the
+///   bearing and the pitch in radians.
 /// - The markers: `setMarker(id, lat, lon)` with an id of the page's (an
 ///   integer from 0 to 2^32 - 1), `removeMarker(id)`, and `markers()`, the
 ///   places on the last frame drawn, `{ id, x, y, alpha }` in points from the
@@ -61,7 +64,7 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 export async function startMap({
     device, module, shaders, resources, canvasTexture,
     archiveURL = '', multisample = true, fetch: fetchFunction = globalThis.fetch,
-    warn = console.warn, print, wake = () => {},
+    warn = console.warn, print, wake = () => {}, downloadFailed = () => {},
 }) {
     const files = new Map([...resources].map(([name, bytes]) => [`${resourceFolder.slice(1)}/${name}`, bytes]));
     const wasi = new WASIShim({
@@ -85,6 +88,7 @@ export async function startMap({
     const noteFailure = (text) => {
         downloads.failed += 1;
         downloads.firstFailure ??= text;
+        downloadFailed(downloads);
     };
     const answer = (id, { status, headers, body }) => {
         downloads.answered += 1;
@@ -160,6 +164,12 @@ export async function startMap({
         look: changing((latitude, longitude, zoom) => exports.immersivemap_map_look(latitude, longitude, zoom)),
         setMarker: changing((id, latitude, longitude) => exports.immersivemap_map_set_marker(id, latitude, longitude)),
         removeMarker: changing((id) => exports.immersivemap_map_remove_marker(id)),
+        camera() {
+            const pointer = exports.immersivemap_map_camera();
+            if (pointer === 0) return null;
+            const [latitude, longitude, zoom, bearing, pitch] = new Float64Array(memory(), pointer, 5);
+            return { latitude, longitude, zoom, bearing, pitch };
+        },
         markers() {
             const pointer = exports.immersivemap_map_markers();
             const count = new Float64Array(memory(), pointer, 1)[0];
