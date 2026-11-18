@@ -29,6 +29,22 @@ enum PageMemory {
         return buffer
     }()
 
+    /// `immersivemap_map_attribution`'s length and JSON, grown as needed.
+    nonisolated(unsafe) static var attribution = UnsafeMutableRawBufferPointer.allocate(byteCount: 256, alignment: 4)
+
+    /// The text as its length (4 bytes, little endian) and its UTF-8, in
+    /// the attribution's buffer.
+    static func attribution(_ text: String) -> UnsafeMutableRawBufferPointer {
+        let bytes = Array(text.utf8)
+        if attribution.count < 4 + bytes.count {
+            attribution.deallocate()
+            attribution = .allocate(byteCount: max(4 + bytes.count, attribution.count * 2), alignment: 4)
+        }
+        attribution.storeBytes(of: UInt32(bytes.count).littleEndian, as: UInt32.self)
+        attribution.baseAddress!.advanced(by: 4).copyMemory(from: bytes, byteCount: bytes.count)
+        return attribution
+    }
+
     /// The markers' buffer, with room for `count` doubles at least.
     static func markers(count: Int) -> UnsafeMutableBufferPointer<Double> {
         if markers.count < count {

@@ -7,7 +7,8 @@
 // wheel and two-finger touch as camera moves, draws only when something
 // changed, keeps the page's marker elements over the points they mark, and
 // keeps the archives' ranges it read in the browser's storage for the next
-// load (rangeCache.mjs).
+// load (rangeCache.mjs), and credits the map's data in a badge in the
+// corner, as the Apple views do.
 // The types are in ImmersiveMap.d.ts. The module, the shader bundle and the
 // resources are what Web/map/build.sh writes, found in `build/` beside this
 // file unless `assets` names another folder.
@@ -59,6 +60,8 @@ export class ImmersiveMap {
     #device;
     #canvas;
     #markerLayer;
+    #badge = null;
+    #shownCredits = null;
     #map = null;
     #options;
     #markers = new Map();
@@ -79,6 +82,7 @@ export class ImmersiveMap {
             onError: (message) => console.error(message),
             onWarning: (message) => console.warn(message),
             onDownloadFailure: () => {},
+            attribution: true,
             ...options,
         };
         device.addEventListener('uncapturederror', (event) => this.#options.onError(`WebGPU: ${event.error.message}`));
@@ -95,6 +99,21 @@ export class ImmersiveMap {
         this.#markerLayer = document.createElement('div');
         Object.assign(this.#markerLayer.style, { position: 'absolute', inset: '0', overflow: 'hidden', pointerEvents: 'none' });
         container.append(this.#canvas, this.#markerLayer);
+        if (this.#options.attribution === false) {
+            console.warn('ImmersiveMap: the attribution badge is hidden, but map data licenses (ODbL for '
+                + 'OpenStreetMap data) require visible attribution near the map. Show the credits elsewhere on the page.');
+        } else {
+            this.#badge = document.createElement('div');
+            // The Apple badge's look: one line, semibold, white in a dark
+            // halo, no plate, in the bottom trailing corner.
+            Object.assign(this.#badge.style, {
+                position: 'absolute', insetInlineEnd: '0', bottom: '0', padding: '7px 10px',
+                font: '600 12px/1.2 system-ui, -apple-system, sans-serif', color: '#fff',
+                textShadow: '0 0 3.5px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.95)',
+                whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
+            });
+            container.append(this.#badge);
+        }
     }
 
     async #start({ assets, archive = '', multisample = true, camera, tileCache = true }) {
@@ -219,6 +238,27 @@ export class ImmersiveMap {
         }
     }
 
+    /// The credits on screen at the camera's zoom, joined as the Apple
+    /// badge joins them, the line a link where the attribution has one.
+    /// Rewritten only when they change.
+    #showAttribution() {
+        if (!this.#badge) return;
+        const { credits, link } = this.#map.attribution();
+        const line = credits.join(' \u00b7 ');
+        if (line === this.#shownCredits) return;
+        this.#shownCredits = line;
+        this.#badge.replaceChildren();
+        if (link) {
+            const anchor = Object.assign(document.createElement('a'), {
+                href: link, target: '_blank', rel: 'noopener', textContent: line,
+            });
+            Object.assign(anchor.style, { color: 'inherit', textDecoration: 'none', pointerEvents: 'auto' });
+            this.#badge.append(anchor);
+        } else {
+            this.#badge.textContent = line;
+        }
+    }
+
     // MARK: - State
 
     /// The tile archive's requests: `{ answered, cached, failed,
@@ -239,6 +279,7 @@ export class ImmersiveMap {
         this.#resizeObserver?.disconnect();
         this.#canvas.remove();
         this.#markerLayer.remove();
+        this.#badge?.remove();
         this.#markers.clear();
         this.#map = null;
         this.#device.destroy();
@@ -270,7 +311,10 @@ export class ImmersiveMap {
             this.#canvas.height = height;
         }
         const { needsFrame, drew } = this.#map.frame(width, height, scale);
-        if (drew) this.#placeMarkers();
+        if (drew) {
+            this.#placeMarkers();
+            this.#showAttribution();
+        }
         if (needsFrame) {
             this.#wake();
         } else if (this.#idleTick === null) {

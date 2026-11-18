@@ -11,8 +11,9 @@
 // archive, a camera not read back where it was put, a first frame not
 // drawn, a marker at the camera's centre not placed at the canvas's
 // centre, the tile cache (in memory here) not answering a second load or
-// keeping ranges of an archive replaced, or a POI icon of the engine's
-// with no path in poiIcons.mjs (or one there the engine has not). Looks at no pixel: the page is judged in a
+// keeping ranges of an archive replaced, a POI icon of the engine's with
+// no path in poiIcons.mjs (or one there the engine has not), or no
+// OpenStreetMap credit in the attribution. Looks at no pixel: the page is judged in a
 // browser.
 
 import { create, globals } from 'webgpu';
@@ -115,6 +116,12 @@ try {
     const camera = map.camera();
     if (!camera || Math.abs(camera.latitude - 45.46) > 1e-6 || Math.abs(camera.longitude - 9.19) > 1e-6 || Math.abs(camera.zoom - 5) > 1e-6) {
         errors.push(`map: the camera reads back as ${JSON.stringify(camera)}, not where it was put`);
+    }
+    // The badge's credits where the camera looks: the engine's first, the
+    // tiles' (OpenStreetMap, as no override is set) among them.
+    const { credits, link } = map.attribution();
+    if (credits[0] !== 'Powered by ImmersiveMap' || !credits.includes('© OpenStreetMap') || !link) {
+        errors.push(`map: the attribution reads ${JSON.stringify({ credits, link })}`);
     }
     // A marker where the camera looks, and one on the far side of the globe.
     map.setMarker(1, 45.46, 9.19);

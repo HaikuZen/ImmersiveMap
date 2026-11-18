@@ -60,6 +60,15 @@ export interface ImmersiveMapOptions {
     interactive?: boolean;
     /** How often a still map runs the module's due work, in milliseconds. 250 by default. */
     idleTickInterval?: number;
+    /**
+     * The badge crediting the map's data in the bottom trailing corner, as
+     * the Apple views show it: the tile source's credit, the engine's, and
+     * the biomes' and the terrain's at the zooms they are on screen, a click
+     * opening the source's license page. True by default. The licenses of
+     * the data (ODbL for OpenStreetMap) require visible attribution near
+     * the map: hide it only where the page credits the data itself.
+     */
+    attribution?: boolean;
     /** A WebGPU error or the device lost. `console.error` by default. */
     onError?: (message: string) => void;
     /** A warning of the WebGPU host. `console.warn` by default. */

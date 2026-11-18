@@ -59,6 +59,9 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   `orbit(yaw, pitch)` in radians, `look(lat, lon, zoom)`, and `camera()`,
 ///   where it is: `{ latitude, longitude, zoom, bearing, pitch }`, the
 ///   bearing and the pitch in radians.
+/// - `attribution()`: the credits the map's data asks for at the camera's
+///   zoom, `{ credits, link }`, the words in order and where a click on
+///   them leads (null for nowhere).
 /// - The markers: `setMarker(id, lat, lon)` with an id of the page's (an
 ///   integer from 0 to 2^32 - 1), `removeMarker(id)`, and `markers()`, the
 ///   places on the last frame drawn, `{ id, x, y, alpha }` in points from the
@@ -195,6 +198,12 @@ export async function startMap({
         look: changing((latitude, longitude, zoom) => exports.immersivemap_map_look(latitude, longitude, zoom)),
         setMarker: changing((id, latitude, longitude) => exports.immersivemap_map_set_marker(id, latitude, longitude)),
         removeMarker: changing((id) => exports.immersivemap_map_remove_marker(id)),
+        attribution() {
+            const pointer = exports.immersivemap_map_attribution();
+            if (pointer === 0) return { credits: [], link: null };
+            const length = new DataView(memory(), pointer, 4).getUint32(0, true);
+            return JSON.parse(text(pointer + 4, length));
+        },
         camera() {
             const pointer = exports.immersivemap_map_camera();
             if (pointer === 0) return null;

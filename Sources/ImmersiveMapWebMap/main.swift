@@ -205,6 +205,18 @@ func mapCamera() -> UnsafeMutableRawPointer? {
     return UnsafeMutableRawPointer(buffer.baseAddress)
 }
 
+/// The credits the map's data asks for at the camera's zoom
+/// (`PortableMapRenderer.attribution`): the length of its JSON as 4 bytes,
+/// little endian, then the JSON in UTF-8. The memory is the module's and
+/// holds until the next call. Null before the map is made.
+@_expose(wasm, "immersivemap_map_attribution")
+@_cdecl("immersivemap_map_attribution")
+func mapAttribution() -> UnsafeMutableRawPointer? {
+    let json = MainActor.assumeIsolated { map?.attribution.json }
+    guard let json else { return nil }
+    return UnsafeMutableRawPointer(PageMemory.attribution(json).baseAddress)
+}
+
 /// The POI icons' atlas the page draws for `immersivemap_map_start`
 /// (`PortableMapRenderer.poiAtlasLayoutDescription`): the length of its
 /// JSON as 4 bytes, little endian, then the JSON in UTF-8. The memory is

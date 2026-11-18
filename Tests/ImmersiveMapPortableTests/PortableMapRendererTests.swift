@@ -233,4 +233,29 @@ struct PortableMapRendererTests {
         _ = try PortableMapRenderer(device: wrong, settings: Self.offlineSettings(), poiAtlas: [UInt8](repeating: 255, count: 16))
         #expect(wrong.textures.contains { $0.width == side && $0.height == side } == false)
     }
+
+    /// The badge's credits are the settings' resolved attribution at the
+    /// camera's zoom: the biomes' only up to the zoom they are drawn to.
+    @Test func theAttributionFollowsTheCamerasZoom() throws {
+        let settings = Self.offlineSettings()
+        let map = try PortableMapRenderer(device: RecordingGPUDevice(), settings: settings)
+        let biomesEnd = settings.tiles.overview.creditMaximumZoom
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: max(0, biomesEnd - 2))
+        let near = map.attribution
+        #expect(near.credits == settings.resolvedAttribution.credits(atZoom: map.cameraPosition.zoom).map(\.text))
+        #expect(near.credits.first == ImmersiveMapAttribution.engineCredit.text)
+        #expect(near.credits.contains(OverviewTileSource.creditText))
+        #expect(near.linkURL == settings.resolvedAttribution.linkURL?.absoluteString)
+
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: biomesEnd + 2)
+        #expect(map.attribution.credits.contains(OverviewTileSource.creditText) == false)
+        #expect(map.attribution.credits.contains(ImmersiveMapTilesService.attribution.credits[0].text))
+    }
+
+    @Test func theAttributionsJSONEscapesItsText() throws {
+        let attribution = PortableAttribution(credits: ["© \"Quoted\" \\ data", "line\nbreak"], linkURL: nil)
+        let json = try #require(JSONSerialization.jsonObject(with: Data(attribution.json.utf8)) as? [String: Any])
+        #expect(json["credits"] as? [String] == attribution.credits)
+        #expect(json["link"] is NSNull)
+    }
 }

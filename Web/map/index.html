@@ -9,7 +9,8 @@
   html, body { margin: 0; height: 100%; background: #05080f; color: #cdd6e4; font: 13px/1.4 system-ui, sans-serif; }
   #map { position: fixed; inset: 0; cursor: grab; }
   #map:active { cursor: grabbing; }
-  #status { position: fixed; left: 12px; bottom: 12px; right: 12px; white-space: pre-wrap; pointer-events: none; }
+  /* Clear of the attribution badge in the bottom right corner. */
+  #status { position: fixed; left: 12px; bottom: 12px; max-width: 60%; white-space: pre-wrap; pointer-events: none; }
   #status.error { color: #ff8a80; }
   /* A sample marker: the dot is the element, centred on the city, its name beside it. */
   .marker { width: 8px; height: 8px; border-radius: 50%; background: #ffcc4d; box-shadow: 0 0 0 2px #05080f; }

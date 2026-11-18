@@ -145,6 +145,18 @@ package final class PortableMapRenderer {
         }
     }
 
+    // MARK: - Attribution
+
+    /// What the map's data asks to be credited for at the camera's zoom, as
+    /// the Apple views' badge shows it: the settings' resolved attribution
+    /// (the tile source's credit, the engine's, the biomes' up to their
+    /// zoom, the relief's while it stands) with the credits on screen.
+    package var attribution: PortableAttribution {
+        let resolved = settings.resolvedAttribution
+        return PortableAttribution(credits: resolved.credits(atZoom: camera.currentCameraPosition().zoom).map(\.text),
+                                   linkURL: resolved.linkURL?.absoluteString)
+    }
+
     // MARK: - Markers
 
     /// Places the marker of the host's id at the point, or moves it there.
@@ -253,6 +265,39 @@ package final class PortableMapRenderer {
     private func applyConstraints() {
         camera.applyConstraints(presentation.cameraConstraints(cameraState: camera.currentCameraState()))
         demand.request()
+    }
+}
+
+/// The credits a host shows on its badge, in order, and where a click on
+/// it leads.
+package struct PortableAttribution: Equatable, Sendable {
+    package let credits: [String]
+    package let linkURL: String?
+
+    /// As JSON: `{"credits": [...], "link": "..." or null}`.
+    package var json: String {
+        let credits = credits.map(Self.quoted).joined(separator: ",")
+        return "{\"credits\":[\(credits)],\"link\":\(linkURL.map(Self.quoted) ?? "null")}"
+    }
+
+    /// The text as a JSON string: quotes, backslashes and control
+    /// characters escaped.
+    private static func quoted(_ text: String) -> String {
+        var quoted = "\""
+        for scalar in text.unicodeScalars {
+            switch scalar {
+            case "\"": quoted += "\\\""
+            case "\\": quoted += "\\\\"
+            case "\n": quoted += "\\n"
+            case "\r": quoted += "\\r"
+            case "\t": quoted += "\\t"
+            case _ where scalar.value < 0x20:
+                let hex = String(scalar.value, radix: 16)
+                quoted += "\\u" + String(repeating: "0", count: 4 - hex.count) + hex
+            default: quoted.unicodeScalars.append(scalar)
+            }
+        }
+        return quoted + "\""
     }
 }
 
