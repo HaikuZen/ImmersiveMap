@@ -45,7 +45,20 @@ export interface CallTimings {
 export interface Timings {
     frames: CallTimings;
     answers: CallTimings;
+    /** The handling of the tiles the workers prepared (their materialize). */
+    tiles: CallTimings;
     submissions: CallTimings;
+}
+
+/** The tile workers and what became of the tiles they prepared. */
+export interface TileWorkerCounts {
+    workers: number;
+    /** Prepared by a worker and drawn. */
+    accepted: number;
+    /** Prepared but not read or not materialized: parsed on the page's thread after all. */
+    refused: number;
+    /** Not prepared (a worker failed): parsed on the page's thread after all. */
+    failed: number;
 }
 
 export interface ImmersiveMapOptions {
@@ -68,6 +81,13 @@ export interface ImmersiveMapOptions {
      * False turns it off.
      */
     tileCache?: boolean | { maxBytes?: number };
+    /**
+     * How many Web Workers parse the tiles off the page's thread, each a copy
+     * of the module (about its size in memory). One fewer than the cores, at
+     * most four, by default. 0 parses on the page's thread, which stalls it
+     * for a hundred milliseconds and more a tile.
+     */
+    tileWorkers?: number;
     /** MSAA 4x. True by default. */
     multisample?: boolean;
     /** Where the camera starts, looking straight down. */
@@ -149,6 +169,8 @@ export declare class ImmersiveMap {
     readonly downloads: Downloads;
     /** How long the module's calls have held the page's thread, null once destroyed. */
     readonly timings: Timings | null;
+    /** The tile workers' counts, null once destroyed. */
+    readonly tileWorkers: TileWorkerCounts | null;
 
     /** Puts the camera over the point at the zoom (the current one if left out), looking straight down. */
     lookAt(position: Coordinate & { zoom?: number }): void;

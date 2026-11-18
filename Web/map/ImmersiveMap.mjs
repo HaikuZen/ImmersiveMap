@@ -7,8 +7,9 @@
 // wheel and two-finger touch as camera moves, draws only when something
 // changed, keeps the page's marker elements over the points they mark, and
 // keeps the archives' ranges it read in the browser's storage for the next
-// load (rangeCache.mjs), and credits the map's data in a badge in the
-// corner, as the Apple views do.
+// load (rangeCache.mjs), credits the map's data in a badge in the corner,
+// as the Apple views do, and parses the tiles in Web Workers off the page's
+// thread (tileWorker.mjs).
 // The types are in ImmersiveMap.d.ts. The module, the shader bundle and the
 // resources are what Web/map/build.sh writes, found in `build/` beside this
 // file unless `assets` names another folder.
@@ -94,6 +95,7 @@ export class ImmersiveMap {
     #frameRequest = null;
     #idleTick = null;
     #listeners = new AbortController();
+    #workers = [];
     #resizeObserver = null;
     #destroyed = false;
 
@@ -141,7 +143,7 @@ export class ImmersiveMap {
         }
     }
 
-    async #start({ assets, archive = '', multisample = true, camera, tileCache = true }) {
+    async #start({ assets, archive = '', multisample = true, camera, tileCache = true, tileWorkers }) {
         const base = new URL(String(assets ?? new URL('./build/', import.meta.url)), document.baseURI);
         if (!base.pathname.endsWith('/')) base.pathname += '/';
         const context = this.#canvas.getContext('webgpu');
@@ -163,6 +165,12 @@ export class ImmersiveMap {
             maxBytes: tileCache?.maxBytes,
             warn: (message) => this.#options.onWarning(message),
         });
+        // The tile workers: one fewer than the cores, at most four, as each
+        // holds a copy of the module.
+        const workerCount = Math.max(0, Math.floor(tileWorkers
+            ?? Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1))));
+        this.#workers = Array.from({ length: workerCount },
+                                   () => new Worker(new URL('./tileWorker.mjs', import.meta.url), { type: 'module' }));
         this.#map = await startMap({
             device: this.#device,
             module,
@@ -175,6 +183,10 @@ export class ImmersiveMap {
             wake: () => this.#wake(),
             downloadFailed: (downloads) => this.#options.onDownloadFailure({ ...downloads }),
             rangeCache,
+            tileWorkers: this.#workers.map((worker) => ({
+                send: (message, transfer) => worker.postMessage(message, transfer),
+                listen: (handler) => { worker.onmessage = (event) => handler(event.data); },
+            })),
             // Maki's icons (poiIcons.mjs), where Apple's platforms draw SF
             // Symbols.
             drawPoiIcons: drawPoiAtlas,
@@ -302,6 +314,13 @@ export class ImmersiveMap {
         return this.#map ? structuredClone(this.#map.timings) : null;
     }
 
+    /// The workers that parse the tiles and what became of the tiles they
+    /// prepared: `{ workers, accepted, refused, failed }`. A refused or
+    /// failed tile was parsed on the page's thread after all.
+    get tileWorkers() {
+        return this.#map?.tileWorkers() ?? null;
+    }
+
     /// Stops drawing, lets go of the input and the GPU device, and takes the
     /// canvas and the markers out of the element.
     destroy() {
@@ -310,6 +329,8 @@ export class ImmersiveMap {
         if (this.#frameRequest !== null) cancelAnimationFrame(this.#frameRequest);
         if (this.#idleTick !== null) clearTimeout(this.#idleTick);
         this.#listeners.abort();
+        for (const worker of this.#workers) worker.terminate();
+        this.#workers = [];
         this.#resizeObserver?.disconnect();
         this.#canvas.remove();
         this.#markerLayer.remove();

@@ -713,6 +713,32 @@ final class ImmersiveMapNeedsTile: @unchecked Sendable {
             if Task.isCancelled {
                 return
             }
+            // A host that parses off this thread (a web page's workers,
+            // `OffThreadTilePreparation`) hands back an entry materialized as
+            // a disk hit is. Nothing is saved: such a host keeps no prepared
+            // cache. An entry that does not come or does not materialize
+            // falls through to the parse below.
+            if let prepared = await loadPipeline.prepareOffThread(tile: tile, data: data) {
+                if Task.isCancelled {
+                    return
+                }
+                let outcome = await materializeDiskImage(prepared.image,
+                                                         expectedTile: tile,
+                                                         generation: generation)
+                if outcome == .materialized {
+                    OffThreadTilePreparation.note(.accepted)
+                    _ = markLoadSucceeded(tile: tile,
+                                          generation: generation,
+                                          source: "off_thread")
+                    return
+                }
+                if Task.isCancelled {
+                    return
+                }
+                // Not cancelled, so the entry itself failed: the loader
+                // parses the bytes after all.
+                OffThreadTilePreparation.note(.refused)
+            }
 
             guard let preparedFromNetwork = await prepareTile(data: data,
                                                               tile: tile,

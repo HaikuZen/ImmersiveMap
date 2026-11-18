@@ -58,17 +58,12 @@ func mapFree(_ pointer: UnsafeMutableRawPointer?) {
 func mapStart(_ features: UInt32, _ multisample: Int32,
               _ archive: UnsafePointer<UInt8>?, _ archiveLength: Int32,
               _ poiAtlas: UnsafePointer<UInt8>?, _ poiAtlasLength: Int32,
-              _ attribution: UnsafePointer<UInt8>?, _ attributionLength: Int32) -> Int32 {
+              _ attribution: UnsafePointer<UInt8>?, _ attributionLength: Int32,
+              _ tileWorkers: Int32) -> Int32 {
     PMTilesArchiveClient.hostFetcherMaker = { url, headers in BrowserFetch.fetcher(archiveURL: url, requestHeaders: headers) }
-    var settings = ImmersiveMapSettings.default.msaa(isEnabled: multisample != 0)
-    // A page has no disk the prepared tiles could be kept on.
-    settings.tiles.cache.preparedTileCacheEnabled = false
-    // The model tiles' textures are ASTC, which most desktop GPUs lack.
-    settings.modelArchive.archiveURL = nil
-    if let archive, archiveLength > 0,
-       let url = URL(string: String(decoding: UnsafeBufferPointer(start: archive, count: Int(archiveLength)), as: UTF8.self)) {
-        settings = settings.tileArchive(url)
-    }
+    // The page's workers parse the tiles (BrowserTileWorkers.swift).
+    OffThreadTilePreparation.prepare = tileWorkers != 0 ? BrowserTileWorkers.prepare : nil
+    var settings = pageSettings(multisample: multisample, archive: archive, archiveLength: archiveLength)
     if let attribution, attributionLength > 0 {
         do {
             let options = try PortableAttributionOptions(json: Data(UnsafeBufferPointer(start: attribution,
@@ -94,6 +89,23 @@ func mapStart(_ features: UInt32, _ multisample: Int32,
             return 0
         }
     }
+}
+
+/// The map's settings on a page: the engine's defaults, MSAA as asked, no
+/// prepared-tile disk cache (a page has no disk), no model archive (its
+/// textures are ASTC, which most desktop GPUs lack), and the archive at the
+/// URL, UTF-8 at `archive`, the engine's own when empty. The map's and a
+/// tile worker's alike, so the worker parses under the map's identity: the
+/// attribution, which `immersivemap_map_start` adds, is not part of it.
+private func pageSettings(multisample: Int32, archive: UnsafePointer<UInt8>?, archiveLength: Int32) -> ImmersiveMapSettings {
+    var settings = ImmersiveMapSettings.default.msaa(isEnabled: multisample != 0)
+    settings.tiles.cache.preparedTileCacheEnabled = false
+    settings.modelArchive.archiveURL = nil
+    if let archive, archiveLength > 0,
+       let url = URL(string: String(decoding: UnsafeBufferPointer(start: archive, count: Int(archiveLength)), as: UTF8.self)) {
+        settings = settings.tileArchive(url)
+    }
+    return settings
 }
 
 /// After running the tasks that are ready, draws a frame into the canvas
@@ -238,6 +250,68 @@ func mapAttribution() -> UnsafeMutableRawPointer? {
 @_cdecl("immersivemap_poi_atlas_layout")
 func poiAtlasLayout() -> UnsafeMutableRawPointer? {
     UnsafeMutableRawPointer(PageMemory.poiAtlasLayout.baseAddress)
+}
+
+/// A tile worker wants room for the entry of a tile it prepared
+/// (BrowserTileWorkers.swift).
+@_expose(wasm, "immersivemap_tiles_buffer")
+@_cdecl("immersivemap_tiles_buffer")
+func tilesBuffer(_ id: UInt32, _ length: Int32) -> UnsafeMutableRawPointer? {
+    BrowserTileWorkers.buffer(id: id, length: Int(length))
+}
+
+/// A tile worker answered, `prepared` 0 when it could not prepare the tile,
+/// and the tasks it wakes run now.
+@_expose(wasm, "immersivemap_tiles_finish")
+@_cdecl("immersivemap_tiles_finish")
+func tilesFinish(_ id: UInt32, _ prepared: Int32) {
+    BrowserTileWorkers.finish(id: id, prepared: prepared != 0)
+    runReadyTasks()
+}
+
+/// What became of the tiles handed to the workers
+/// (`OffThreadTilePreparation.counts`), as three doubles: accepted,
+/// refused and failed. The memory is the module's and holds until the next
+/// call.
+@_expose(wasm, "immersivemap_tiles_counts")
+@_cdecl("immersivemap_tiles_counts")
+func tilesCounts() -> UnsafeMutableRawPointer? {
+    let counts = OffThreadTilePreparation.counts
+    let buffer = PageMemory.tileCounts
+    buffer[0] = Double(counts.accepted)
+    buffer[1] = Double(counts.refused)
+    buffer[2] = Double(counts.failed)
+    return UnsafeMutableRawPointer(buffer.baseAddress)
+}
+
+// MARK: - A tile worker
+
+/// Starts this module as a tile worker, not a map: it parses the tiles of
+/// the map started with the same `multisample` and archive
+/// (`pageSettings`), with the font metrics from the resources folder.
+/// Returns 1.
+@_expose(wasm, "immersivemap_worker_start")
+@_cdecl("immersivemap_worker_start")
+func workerStart(_ multisample: Int32, _ archive: UnsafePointer<UInt8>?, _ archiveLength: Int32) -> Int32 {
+    let settings = pageSettings(multisample: multisample, archive: archive, archiveLength: archiveLength)
+    PageMemory.preparer = PortableTilePreparer(settings: settings)
+    return 1
+}
+
+/// The tile at `x`, `y`, `z`, from its `length` bytes at `data`, parsed and
+/// encoded as a prepared-tile entry (`PortableTilePreparer.prepare`): the
+/// entry's length as 4 bytes, little endian, then the entry. Null when the
+/// tile does not parse or the worker is not started. The memory is the
+/// module's and holds until the next call.
+@_expose(wasm, "immersivemap_worker_prepare")
+@_cdecl("immersivemap_worker_prepare")
+func workerPrepare(_ x: Int32, _ y: Int32, _ z: Int32, _ data: UnsafePointer<UInt8>?, _ length: Int32) -> UnsafeMutableRawPointer? {
+    guard let preparer = PageMemory.preparer, let data, length >= 0,
+          let entry = preparer.prepare(x: Int(x), y: Int(y), z: Int(z),
+                                       data: Data(UnsafeBufferPointer(start: data, count: Int(length)))) else {
+        return nil
+    }
+    return UnsafeMutableRawPointer(PageMemory.workerEntry(entry).baseAddress)
 }
 
 /// The page's `fetch` wants room for the answer of a request

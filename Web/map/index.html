@@ -30,7 +30,8 @@
 // off, `?markers=0` leaves out the sample markers, `?tilecache=0` reads
 // every range from the network, `?credit=<text>` credits another archive's
 // data in place of OpenStreetMap (`&creditlink=<url>` its license page),
-// `?stats=1` shows how long the module holds the page's thread.
+// `?stats=1` shows how long the module holds the page's thread,
+// `?workers=<n>` sets how many workers parse the tiles (0 for none).
 // Built and served by build.sh.
 import { ImmersiveMap } from './ImmersiveMap.mjs';
 
@@ -55,8 +56,10 @@ const statsLine = () => {
     if (!timings) return '';
     const describe = (name, { calls, total, longest, overBudget }) =>
         `${name}: ${calls} calls, longest ${longest.toFixed(1)} ms, total ${total.toFixed(0)} ms, ${overBudget} over 16.7 ms`;
+    const { workers, accepted, refused, failed } = map.tileWorkers;
     return [describe('frames', timings.frames), describe('answers', timings.answers),
-            describe('WebGPU submissions', timings.submissions)].join('\n');
+            describe('worker tiles', timings.tiles), describe('WebGPU submissions', timings.submissions),
+            `${workers} tile workers: ${accepted} tiles drawn, ${refused} refused, ${failed} failed`].join('\n');
 };
 const show = () => {
     if (errors.length > 0) {
@@ -73,6 +76,7 @@ try {
         archive: query.get('archive') ?? '',
         multisample: query.get('msaa') !== '0',
         tileCache: query.get('tilecache') !== '0',
+        tileWorkers: query.has('workers') ? Number(query.get('workers')) : undefined,
         attribution: query.has('credit')
             ? { credits: [{ text: query.get('credit') }], link: query.get('creditlink') }
             : true,

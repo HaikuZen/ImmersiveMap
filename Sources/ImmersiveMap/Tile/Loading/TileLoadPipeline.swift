@@ -45,9 +45,22 @@ protocol TileLoadPipeline {
                             sourceETag: String?) async
     func removePreparedFromDisk(tile: Tile)
     func prepare(tile: Tile, data: Data) async -> PreparedTileLoadResult?
+    /// The tile prepared away from the loader's thread
+    /// (`OffThreadTilePreparation`), as an entry the loader materializes
+    /// like a disk hit: nil when the host prepares none, or the entry did not
+    /// come or does not read, and the loader then parses the bytes itself.
+    func prepareOffThread(tile: Tile, data: Data) async -> PreparedTileDiskCacheHit?
     func materialize(preparedTile: PreparedTileCPU,
                      plan: TileArenaImagePlan?) async -> PreparedTileMaterializeOutcome
     /// Materializes a disk-cached arena image (blob copy or MTLIO load plus
     /// span-table reconstruction) instead of a parsed tile.
     func materialize(image: PreparedTileArenaImage) async -> PreparedTileMaterializeOutcome
+}
+
+extension TileLoadPipeline {
+    /// No preparation off the loader's thread: a pipeline that has none
+    /// (the tests' controlled ones) parses every tile itself.
+    func prepareOffThread(tile: Tile, data: Data) async -> PreparedTileDiskCacheHit? {
+        nil
+    }
 }

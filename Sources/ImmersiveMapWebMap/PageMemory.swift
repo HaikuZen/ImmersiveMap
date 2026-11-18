@@ -11,6 +11,7 @@
 
 #if arch(wasm32)
 import ImmersiveMap
+import PortableFoundation
 
 /// One thread: plain state.
 enum PageMemory {
@@ -43,6 +44,29 @@ enum PageMemory {
         attribution.storeBytes(of: UInt32(bytes.count).littleEndian, as: UInt32.self)
         attribution.baseAddress!.advanced(by: 4).copyMemory(from: bytes, byteCount: bytes.count)
         return attribution
+    }
+
+    /// `immersivemap_tiles_counts`' three doubles.
+    nonisolated(unsafe) static let tileCounts = UnsafeMutableBufferPointer<Double>.allocate(capacity: 3)
+
+    /// A tile worker's parser, made by `immersivemap_worker_start`.
+    nonisolated(unsafe) static var preparer: PortableTilePreparer?
+
+    /// `immersivemap_worker_prepare`'s length and entry, grown as needed.
+    nonisolated(unsafe) static var workerEntryBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1 << 16, alignment: 4)
+
+    /// The entry as its length (4 bytes, little endian) and its bytes, in
+    /// the worker's buffer.
+    static func workerEntry(_ entry: Data) -> UnsafeMutableRawBufferPointer {
+        if workerEntryBuffer.count < 4 + entry.count {
+            workerEntryBuffer.deallocate()
+            workerEntryBuffer = .allocate(byteCount: max(4 + entry.count, workerEntryBuffer.count * 2), alignment: 4)
+        }
+        workerEntryBuffer.storeBytes(of: UInt32(entry.count).littleEndian, as: UInt32.self)
+        entry.withUnsafeBytes { bytes in
+            workerEntryBuffer.baseAddress!.advanced(by: 4).copyMemory(from: bytes.baseAddress!, byteCount: bytes.count)
+        }
+        return workerEntryBuffer
     }
 
     /// The markers' buffer, with room for `count` doubles at least.

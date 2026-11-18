@@ -41,43 +41,12 @@ final class TileRenderStore: TileMaterializing, @unchecked Sendable {
         tileLoadingStatusReporter: TileLoadingStatusReporter?
     ) {
         self.tileTraceRecorder = tileTraceRecorder
-        let parseOptions = TileParseOptions(settings: config)
-        let preparedTileCacheIdentity = PreparedTileCacheIdentity(
-            preparedFormatVersion: PreparedTileDiskCaching.preparedFormatVersion,
-            styleRevision: styleRuntime.preparedTileStyleRevision,
-            tileSourceRevision: PreparedTileCacheIdentity.tileSourceRevision(for: config.tiles.network),
-            textRevision: textRenderer.preparedTileTextRevision,
-            labelLanguage: config.labels.language,
-            labelFallbackPolicy: config.labels.fallbackPolicy,
-            capitalMaximumZoom: UInt32(max(0, config.labels.settlementVisibility.capitalMaximumZoom)),
-            cityMaximumZoom: UInt32(max(0, config.labels.settlementVisibility.cityMaximumZoom)),
-            smallSettlementMaximumZoom: UInt32(max(0, config.labels.settlementVisibility.smallSettlementMaximumZoom)),
-            landmarkMinimumZoom: UInt32(max(0, config.labels.landmarks.minimumZoom)),
-            addTestBorders: config.tiles.parsing.addTestBorders,
-            labelsEnabled: config.labels.isEnabled,
-            groundFlatteningFromTileZoom: parseOptions.groundFlatteningFromTileZoom,
-            groundFlatteningGrid: parseOptions.groundFlatteningGrid,
-            groundFlatteningGridByTileZoomKey: parseOptions.groundFlatteningGridByTileZoomKey,
-            groundReliefEnabled: parseOptions.groundReliefEnabled,
-            buildingMinimumSourceZoom: parseOptions.buildingMinimumSourceZoom,
-            buildingDeepestSourceZoom: parseOptions.buildingDeepestSourceZoom,
-            overviewTilesEnabled: config.tiles.overview.isEnabled,
-            treeMinimumSourceZoom: parseOptions.treeMinimumSourceZoom,
-            treeMaximumPerTile: parseOptions.treeMaximumPerTile
-        )
-        let labelDecisions = TileLabelDecisions(style: styleRuntime.style,
-                                                glyphCoverage: textRenderer.glyphCoverage,
-                                                language: config.labels.language,
-                                                fallbackPolicy: config.labels.fallbackPolicy)
-        let tileParser = TileMvtParser(mapStyle: styleRuntime,
-                                       labelDecisions: labelDecisions,
-                                       options: parseOptions)
-        let textLabelsBuilder = TileTextLabelsBuilder(textRenderer: textRenderer)
-        let roadLabelsBuilder = TileRoadLabelsBuilder(textRenderer: textRenderer)
-        self.preparedDataBuilder = TilePreparedDataBuilder(tileParser: tileParser,
-                                                           textLabelsBuilder: textLabelsBuilder,
-                                                           roadLabelsBuilder: roadLabelsBuilder,
-                                                           surfaceLabelsBuilder: TileSurfaceLabelsBuilder(textRenderer: textRenderer))
+        let preparedTileCacheIdentity = PreparedTileCacheIdentity(settings: config,
+                                                                  styleRuntime: styleRuntime,
+                                                                  textLayout: textRenderer.layout)
+        self.preparedDataBuilder = TilePreparedDataBuilder(settings: config,
+                                                           styleRuntime: styleRuntime,
+                                                           textLayout: textRenderer.layout)
         self.metalTileFactory = MetalTileFactory(device: device, fileBlobLoader: fileGeometry?.load)
         workingSet = TileWorkingSetStore(tileTraceRecorder: tileTraceRecorder)
         // File entries are written only with the loader that reads them

@@ -47,6 +47,9 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   requests go through, none by default.
 /// - attribution: the page's own credits for the badge, as the class takes
 ///   them (ImmersiveMap.d.ts, `AttributionOptions`), the engine's when null.
+/// - tileWorkers: the workers that parse the tiles off the page's thread,
+///   each tileWorker.mjs behind `{ send(message, transfer), listen(handler) }`,
+///   none by default, when the tiles are parsed on the page's thread.
 /// - drawPoiIcons: given the POI icons' atlas layout the module describes,
 ///   returns the atlas's pixels (`drawPoiAtlas` of poiIcons.mjs) or null
 ///   for no icons, the default.
@@ -77,15 +80,19 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   milliseconds, as `{ calls, total, longest, overBudget }` each:
 ///   `frames` and `answers` (a request answered, which runs the tasks it
 ///   wakes, the tiles' parsing among them) the module's own time, and
-///   `submissions` the WebGPU host's inside them, apart. `overBudget`
-///   counts the calls longer than a frame at 60 Hz.
+///   `submissions` the WebGPU host's inside them, apart, and `tiles` the
+///   module's handling of a tile a worker prepared (its materialize).
+///   `overBudget` counts the calls longer than a frame at 60 Hz.
+/// - `tileWorkers()`: how many workers parse the tiles, and what became of
+///   the tiles they prepared, `{ workers, accepted, refused, failed }`:
+///   a refused or failed tile is parsed on the page's thread after all.
 /// - `host`, the WebGPU host, and `poiAtlasLayout`, the layout the icons
 ///   were drawn to.
 export async function startMap({
     device, module, shaders, resources, canvasTexture,
     archiveURL = '', multisample = true, fetch: fetchFunction = globalThis.fetch,
     warn = console.warn, print, wake = () => {}, downloadFailed = () => {}, rangeCache = null,
-    drawPoiIcons = () => null, attribution = null,
+    drawPoiIcons = () => null, attribution = null, tileWorkers = [],
 }) {
     const files = new Map([...resources].map(([name, bytes]) => [`${resourceFolder.slice(1)}/${name}`, bytes]));
     const wasi = new WASIShim({
@@ -111,7 +118,7 @@ export async function startMap({
     // WebGPU host's submissions inside them.
     const frameBudget = 1000 / 60;
     const stat = () => ({ calls: 0, total: 0, longest: 0, overBudget: 0 });
-    const timings = { frames: stat(), answers: stat(), submissions: stat() };
+    const timings = { frames: stat(), answers: stat(), tiles: stat(), submissions: stat() };
     const note = (entry, milliseconds) => {
         entry.calls += 1;
         entry.total += milliseconds;
@@ -159,6 +166,16 @@ export async function startMap({
                 note(timings.submissions, milliseconds);
             },
         },
+        immersivemap_tiles: {
+            prepare(id, x, y, z, pointer, length) {
+                // The worker with the fewest tiles waiting, the bytes
+                // copied out of the module's memory and moved to it.
+                const worker = workers.reduce((least, next) => (next.waiting < least.waiting ? next : least));
+                const bytes = new Uint8Array(memory(), pointer, length).slice();
+                worker.waiting += 1;
+                worker.send({ type: 'prepare', id, x, y, z, bytes }, [bytes.buffer]);
+            },
+        },
         immersivemap_fetch: {
             range(id, urlPointer, urlLength, headersPointer, headersLength, start, end) {
                 const url = text(urlPointer, urlLength);
@@ -187,6 +204,23 @@ export async function startMap({
     });
     instance.exports._initialize();
 
+    // The tile workers, each another instance of the module, started with
+    // the map's settings and the text's metrics, the `.json` files.
+    const workers = tileWorkers.map((worker) => ({ ...worker, waiting: 0 }));
+    const metrics = new Map([...resources].filter(([name]) => name.endsWith('.json')));
+    for (const worker of workers) {
+        worker.send({ type: 'start', module, resources: metrics, multisample, archiveURL });
+        worker.listen(({ id, entry }) => {
+            worker.waiting -= 1;
+            if (entry) {
+                const pointer = instance.exports.immersivemap_tiles_buffer(id, entry.length);
+                if (pointer !== 0) new Uint8Array(memory(), pointer, entry.length).set(entry);
+            }
+            timed(timings.tiles, () => instance.exports.immersivemap_tiles_finish(id, entry ? 1 : 0));
+            wake();
+        });
+    }
+
     // The POI icons, drawn by the page into the atlas the module lays out.
     const layoutPointer = instance.exports.immersivemap_poi_atlas_layout();
     const layoutLength = new DataView(memory(), layoutPointer, 4).getUint32(0, true);
@@ -207,7 +241,8 @@ export async function startMap({
     const started = instance.exports.immersivemap_map_start(engineFeatures(device), multisample ? 1 : 0,
                                                             archivePointer, archive.length,
                                                             atlasPointer, poiAtlas.length,
-                                                            attributionPointer, attributionJSON.length);
+                                                            attributionPointer, attributionJSON.length,
+                                                            workers.length > 0 ? 1 : 0);
     instance.exports.immersivemap_free(archivePointer);
     instance.exports.immersivemap_free(atlasPointer);
     instance.exports.immersivemap_free(attributionPointer);
@@ -240,6 +275,11 @@ export async function startMap({
             if (pointer === 0) return { credits: [], link: null };
             const length = new DataView(memory(), pointer, 4).getUint32(0, true);
             return JSON.parse(text(pointer + 4, length));
+        },
+        tileWorkers() {
+            const pointer = exports.immersivemap_tiles_counts();
+            const [accepted, refused, failed] = new Float64Array(memory(), pointer, 3);
+            return { workers: workers.length, accepted, refused, failed };
         },
         camera() {
             const pointer = exports.immersivemap_map_camera();

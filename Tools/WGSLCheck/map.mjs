@@ -13,11 +13,15 @@
 // centre, the tile cache (in memory here) not answering a second load or
 // keeping ranges of an archive replaced, a POI icon of the engine's with
 // no path in poiIcons.mjs (or one there the engine has not), no
-// OpenStreetMap credit in the attribution, or a page's own attribution
-// not in its place. Looks at no pixel: the page is judged in a
+// OpenStreetMap credit in the attribution, a page's own attribution not
+// in its place, or tile workers (worker_threads here, as Web Workers on a
+// page) that prepared no tile, or a tile of theirs refused or failed. It
+// then draws the same frames with no workers, and prints how long the
+// page's thread was held with them and without. Looks at no pixel: the page is judged in a
 // browser.
 
 import { create, globals } from 'webgpu';
+import { Worker } from 'node:worker_threads';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { repositoryRoot } from './wgsl.mjs';
@@ -79,6 +83,25 @@ let map = null;
 const frames = { drawn: 0 };
 const cache = new ArchiveRangeCache(new MemoryStore(), { warn: (message) => notes.push(message) });
 const loads = [];
+// Two tile workers, tileWorker.mjs behind the adapter startMap takes.
+const tileWorkers = Array.from({ length: 2 }, () => {
+    const worker = new Worker(join(repositoryRoot, 'Web', 'map', 'tileWorker.mjs'));
+    return {
+        send: (message, transfer) => worker.postMessage(message, transfer),
+        listen: (handler) => worker.on('message', handler),
+    };
+});
+/// The camera's moves of a 90 frame run, the same with workers and without.
+const move = (map, frame) => {
+    if (frame === 30) {
+        // A fast release: the globe glides on through the next frames.
+        map.pan(40, 10);
+        map.endPan(1500, 300);
+    }
+    if (frame === 50) map.zoom(1);
+    if (frame === 60) map.orbit(0.3, 0.4);
+};
+let withoutWorkers = null;
 try {
     const options = {
         device,
@@ -91,6 +114,7 @@ try {
         warn: (message) => notes.push(message),
         print: (stream, line) => output.push(`${stream === 2 ? 'stderr' : 'stdout'}: ${line}`),
         rangeCache: cache,
+        tileWorkers,
         // Node has no 2D canvas to draw Maki's paths with: the atlas is
         // each icon's square filled, in the layout the module gives, so the
         // upload runs on Dawn. The layout is held to the paths.
@@ -143,24 +167,24 @@ try {
             }
             if (places.some((place) => place.id === 2)) errors.push('map: a marker beyond the horizon was placed');
         }
-        if (frame === 30) {
-            // A fast release: the globe glides on through the next frames.
-            map.pan(40, 10);
-            map.endPan(1500, 300);
-        }
-        if (frame === 50) map.zoom(1);
-        if (frame === 60) map.orbit(0.3, 0.4);
+        move(map, frame);
         if (frame === 70) map.removeMarker(1);
         await device.queue.onSubmittedWorkDone();
         await new Promise((resolve) => setTimeout(resolve, 5));
     }
     if (map.markers().some((place) => place.id === 1)) errors.push('map: a removed marker is still placed');
+    // The workers did the parsing: a tile they prepared and the map refused
+    // or never got would have been parsed on the page's thread, silently.
+    const workerCounts = map.tileWorkers();
+    if (workerCounts.accepted === 0 || workerCounts.refused > 0 || workerCounts.failed > 0) {
+        errors.push(`map: the tile workers' tiles were ${JSON.stringify(workerCounts)}`);
+    }
 
     // A page loaded again: another map over the same cache, looking where
     // the first one started, its requests counted.
     const load = async (extra = {}) => {
         const before = { network: requests.archive, hits: cache.counts.hits };
-        const again = await startMap({ ...options, ...extra });
+        const again = await startMap({ ...options, tileWorkers: [], ...extra });
         again.look(45.46, 9.19, 5);
         for (let frame = 0; frame < 20; frame += 1) {
             again.frame(size[0], size[1], 1);
@@ -187,6 +211,17 @@ try {
         errors.push(`map: the page's own attribution reads ${JSON.stringify(own)}`);
     }
     if (cache.counts.dropped !== 1) errors.push(`map: a replaced archive dropped ${cache.counts.dropped} times from the tile cache, not once`);
+
+    // The same frames with no workers, every tile parsed on the page's
+    // thread, for the timings beside the first map's.
+    withoutWorkers = await startMap({ ...options, tileWorkers: [], rangeCache: null });
+    withoutWorkers.look(45.46, 9.19, 5);
+    for (let frame = 0; frame < 90; frame += 1) {
+        withoutWorkers.frame(size[0], size[1], 1);
+        move(withoutWorkers, frame);
+        await device.queue.onSubmittedWorkDone();
+        await new Promise((resolve) => setTimeout(resolve, 5));
+    }
 } catch (error) {
     errors.push(`map: ${error.stack ?? error.message}`);
 }
@@ -204,8 +239,11 @@ if (map) {
     // only, lighter than a city's at high zoom.
     const describe = (name, { calls, total, longest, overBudget }) =>
         `${name} ${calls} calls, longest ${longest.toFixed(1)} ms, total ${total.toFixed(0)} ms, ${overBudget} over 16.7 ms`;
-    console.log(`page thread (first map): ${describe('frames', map.timings.frames)}; ${describe('answers', map.timings.answers)}; `
-        + `${describe('WebGPU submissions', map.timings.submissions)}`);
+    const thread = (timings) => `${describe('frames', timings.frames)}; ${describe('answers', timings.answers)}; `
+        + `${describe('worker tiles', timings.tiles)}; ${describe('WebGPU submissions', timings.submissions)}`;
+    console.log(`tile workers: ${JSON.stringify(map.tileWorkers())}`);
+    console.log(`page thread with ${map.tileWorkers().workers} workers: ${thread(map.timings)}`);
+    if (withoutWorkers) console.log(`page thread without workers: ${thread(withoutWorkers.timings)}`);
     console.log(`tile cache: ${cache.counts.stored} stored, ${cache.counts.hits} answered, ${cache.counts.dropped} dropped; `
         + `loads again: ${loads.map(({ network, cached }) => `${network} from the network and ${cached} from the cache`).join(', then ')}`);
 }
