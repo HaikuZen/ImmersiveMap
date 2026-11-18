@@ -47,11 +47,15 @@ func mapFree(_ pointer: UnsafeMutableRawPointer?) {
 
 /// Makes the device and the map. `features` is `GPUDeviceFeatures`' raw
 /// value for what the page's WebGPU device offers, `multisample` asks for
-/// MSAA 4x, and the archive's URL, UTF-8 at `archive`, is the tile source, the
-/// engine's own when empty. Returns 1 when the map is made.
+/// MSAA 4x, the archive's URL, UTF-8 at `archive`, is the tile source, the
+/// engine's own when empty, and the bytes at `poiAtlas` are the POI icons'
+/// atlas the page drew (`immersivemap_poi_atlas_layout`), no icons when
+/// empty. Returns 1 when the map is made.
 @_expose(wasm, "immersivemap_map_start")
 @_cdecl("immersivemap_map_start")
-func mapStart(_ features: UInt32, _ multisample: Int32, _ archive: UnsafePointer<UInt8>?, _ archiveLength: Int32) -> Int32 {
+func mapStart(_ features: UInt32, _ multisample: Int32,
+              _ archive: UnsafePointer<UInt8>?, _ archiveLength: Int32,
+              _ poiAtlas: UnsafePointer<UInt8>?, _ poiAtlasLength: Int32) -> Int32 {
     PMTilesArchiveClient.hostFetcherMaker = { url, headers in BrowserFetch.fetcher(archiveURL: url, requestHeaders: headers) }
     var settings = ImmersiveMapSettings.default.msaa(isEnabled: multisample != 0)
     // A page has no disk the prepared tiles could be kept on.
@@ -62,11 +66,15 @@ func mapStart(_ features: UInt32, _ multisample: Int32, _ archive: UnsafePointer
        let url = URL(string: String(decoding: UnsafeBufferPointer(start: archive, count: Int(archiveLength)), as: UTF8.self)) {
         settings = settings.tileArchive(url)
     }
+    // Copied before the main actor's closure, which takes no pointer.
+    let atlas = poiAtlas.flatMap { pointer in
+        poiAtlasLength > 0 ? Array(UnsafeBufferPointer(start: pointer, count: Int(poiAtlasLength))) : nil
+    }
     let made = WebGPUDevice.browser(features: GPUDeviceFeatures(rawValue: UInt8(truncatingIfNeeded: features)))
     device = made
     return MainActor.assumeIsolated {
         do {
-            map = try PortableMapRenderer(device: made, settings: settings)
+            map = try PortableMapRenderer(device: made, settings: settings, poiAtlas: atlas)
             return 1
         } catch {
             print("ImmersiveMap: \(error)")
@@ -195,6 +203,16 @@ func mapCamera() -> UnsafeMutableRawPointer? {
     buffer[3] = Double(position.bearing)
     buffer[4] = Double(position.pitch)
     return UnsafeMutableRawPointer(buffer.baseAddress)
+}
+
+/// The POI icons' atlas the page draws for `immersivemap_map_start`
+/// (`PortableMapRenderer.poiAtlasLayoutDescription`): the length of its
+/// JSON as 4 bytes, little endian, then the JSON in UTF-8. The memory is
+/// the module's and lasts.
+@_expose(wasm, "immersivemap_poi_atlas_layout")
+@_cdecl("immersivemap_poi_atlas_layout")
+func poiAtlasLayout() -> UnsafeMutableRawPointer? {
+    UnsafeMutableRawPointer(PageMemory.poiAtlasLayout.baseAddress)
 }
 
 /// The page's `fetch` wants room for the answer of a request

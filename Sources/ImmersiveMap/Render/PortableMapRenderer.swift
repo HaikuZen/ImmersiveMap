@@ -53,10 +53,12 @@ package final class PortableMapRenderer {
     package private(set) var markerPositions: [PortableMarkerPosition] = []
 
     /// The world pass's sample count is the settings', 1 or 4: the two
-    /// counts every WebGPU device renders with. The clock is the media
-    /// clock unless a test drives its own.
+    /// counts every WebGPU device renders with. `poiAtlas` is the POI
+    /// icons' atlas the host drew (`poiAtlasLayoutDescription`), none by
+    /// default. The clock is the media clock unless a test drives its own.
     package init(device: any GPUDevice,
                  settings: ImmersiveMapSettings,
+                 poiAtlas: [UInt8]? = nil,
                  clock: @escaping () -> CFTimeInterval = { CACurrentMediaTime() }) throws {
         guard let commandQueue = device.makeCommandQueue() else {
             throw Unavailable()
@@ -74,7 +76,8 @@ package final class PortableMapRenderer {
                                                              maximumInitialVelocity: cameraSettings.globePanInertiaMaxInitialVelocity))
         camera = FrameCameraStateResolver(settings: settings)
         presentation = MapPresentationStateController(settings: settings)
-        engine = RenderFrameEngine(host: .portable(device: device, commandQueue: commandQueue, sampleCount: sampleCount),
+        engine = RenderFrameEngine(host: .portable(device: device, commandQueue: commandQueue,
+                                                   sampleCount: sampleCount, poiAtlas: poiAtlas),
                                    markerSource: markers,
                                    sceneModelSource: sceneModels,
                                    styleRuntime: MapStyleRuntime(settings: settings),
@@ -84,6 +87,13 @@ package final class PortableMapRenderer {
                                    eventSink: eventSink,
                                    tileTraceRecorder: TileTraceRecorder(),
                                    baseLabelTraceRecorder: BaseLabelTraceRecorder())
+    }
+
+    /// The POI icons' atlas a host draws for `init`, as JSON
+    /// (`PoiSpriteAtlasLayout.hostDescription`): where each icon goes and
+    /// in what format.
+    package static var poiAtlasLayoutDescription: String {
+        PoiSpriteAtlasLayout().hostDescription
     }
 
     /// Whether a frame of the size must be drawn: something changed since

@@ -196,4 +196,41 @@ struct PortableMapRendererTests {
         map.zoom(delta: 0.5)
         #expect(map.isGliding == false)
     }
+
+    /// The layout a page draws the POI icons to is the engine's own: every
+    /// icon's cell where the layout puts it, in an atlas of its side.
+    @Test func thePoiAtlasLayoutDescribesTheEnginesCells() throws {
+        let layout = PoiSpriteAtlasLayout()
+        let json = try #require(JSONSerialization.jsonObject(with: Data(PortableMapRenderer.poiAtlasLayoutDescription.utf8))
+            as? [String: Any])
+        #expect(json["side"] as? Int == layout.pixelSize)
+        #expect(json["cellSize"] as? Int == layout.descriptor.cellSize)
+        #expect(json["padding"] as? Int == layout.descriptor.cellPadding)
+        #expect((json["symbolInset"] as? Double).map { abs($0 - Double(PoiSpriteAtlasLayout.symbolInsetFraction)) < 1e-9 } == true)
+        let icons = try #require(json["icons"] as? [[String: Any]])
+        #expect(icons.count == PoiSpriteIcon.allCases.count)
+        for entry in icons {
+            let icon = try #require((entry["name"] as? String).flatMap(PoiSpriteIcon.init(rawValue:)))
+            let region = try #require(layout.region(for: icon))
+            #expect(entry["x"] as? Int == Int(region.pixelRect.minX))
+            #expect(entry["y"] as? Int == Int(region.pixelRect.minY))
+        }
+    }
+
+    /// The page's atlas becomes the POI texture whole, and one of another
+    /// size none: the icons are left blank rather than sampled out of place.
+    @Test func thePagesPoiAtlasIsUploadedWhenItFits() throws {
+        let side = PoiSpriteAtlasLayout().pixelSize
+        let fitting = RecordingGPUDevice()
+        _ = try PortableMapRenderer(device: fitting, settings: Self.offlineSettings(),
+                                    poiAtlas: [UInt8](repeating: 255, count: side * side * 4))
+        let atlas = try #require(fitting.textures.first { $0.width == side && $0.height == side })
+        #expect(atlas.format == .bgra8Unorm)
+        #expect(atlas.replacedRegions.count == 1)
+        #expect(atlas.replacedRegions.first.map { $0.width == side && $0.height == side } == true)
+
+        let wrong = RecordingGPUDevice()
+        _ = try PortableMapRenderer(device: wrong, settings: Self.offlineSettings(), poiAtlas: [UInt8](repeating: 255, count: 16))
+        #expect(wrong.textures.contains { $0.width == side && $0.height == side } == false)
+    }
 }

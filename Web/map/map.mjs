@@ -45,6 +45,9 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 /// - downloadFailed: called with `downloads` after each failed request.
 /// - rangeCache: an `ArchiveRangeCache` (rangeCache.mjs) the archives'
 ///   requests go through, none by default.
+/// - drawPoiIcons: given the POI icons' atlas layout the module describes,
+///   returns the atlas's pixels (`drawPoiAtlas` of poiIcons.mjs) or null
+///   for no icons, the default.
 /// Returns:
 /// - `frame(width, height, pixelsPerPoint)`, which runs what the module has
 ///   ready and draws a frame only when one is needed. It returns
@@ -65,11 +68,13 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 ///   threw, as it does when the archive's host refuses the page's origin, or
 ///   an HTTP error) and the first failure's text, for the page to show, as
 ///   the engine only logs them.
-/// - `host`, the WebGPU host.
+/// - `host`, the WebGPU host, and `poiAtlasLayout`, the layout the icons
+///   were drawn to.
 export async function startMap({
     device, module, shaders, resources, canvasTexture,
     archiveURL = '', multisample = true, fetch: fetchFunction = globalThis.fetch,
     warn = console.warn, print, wake = () => {}, downloadFailed = () => {}, rangeCache = null,
+    drawPoiIcons = () => null,
 }) {
     const files = new Map([...resources].map(([name, bytes]) => [`${resourceFolder.slice(1)}/${name}`, bytes]));
     const wasi = new WASIShim({
@@ -147,12 +152,26 @@ export async function startMap({
     });
     instance.exports._initialize();
 
+    // The POI icons, drawn by the page into the atlas the module lays out.
+    const layoutPointer = instance.exports.immersivemap_poi_atlas_layout();
+    const layoutLength = new DataView(memory(), layoutPointer, 4).getUint32(0, true);
+    const poiAtlasLayout = JSON.parse(text(layoutPointer + 4, layoutLength));
+    const poiAtlas = drawPoiIcons(poiAtlasLayout) ?? new Uint8Array();
+
+    /// Copies the bytes into memory of the module's, freed with `free`.
+    const place = (bytes) => {
+        const pointer = instance.exports.immersivemap_alloc(bytes.length);
+        new Uint8Array(memory(), pointer, bytes.length).set(bytes);
+        return pointer;
+    };
     const archive = encoder.encode(archiveURL);
-    const archivePointer = instance.exports.immersivemap_alloc(archive.length);
-    new Uint8Array(memory(), archivePointer, archive.length).set(archive);
+    const archivePointer = place(archive);
+    const atlasPointer = place(poiAtlas);
     const started = instance.exports.immersivemap_map_start(engineFeatures(device), multisample ? 1 : 0,
-                                                            archivePointer, archive.length);
+                                                            archivePointer, archive.length,
+                                                            atlasPointer, poiAtlas.length);
     instance.exports.immersivemap_free(archivePointer);
+    instance.exports.immersivemap_free(atlasPointer);
     if (started !== 1) throw new Error('The map could not be made');
 
     const exports = instance.exports;
@@ -163,6 +182,7 @@ export async function startMap({
     };
     return {
         host,
+        poiAtlasLayout,
         downloads,
         frame(width, height, pixelsPerPoint) {
             const result = exports.immersivemap_map_frame(width, height, pixelsPerPoint);

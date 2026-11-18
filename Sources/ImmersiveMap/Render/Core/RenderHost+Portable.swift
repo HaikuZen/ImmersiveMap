@@ -10,14 +10,17 @@ extension RenderHost {
 
     /// The host of a platform with nothing of its own to hand the core (a
     /// browser page): the engine's resources made on the device from the
-    /// resources folder, no POI icons (a clear texel, as the icons are
-    /// drawn with Apple's symbols), the tiles, the model tiles and the
-    /// trees copied from memory, no scene model assets and no avatars.
-    /// Without the resources folder the text has no atlases and no label
-    /// draws a glyph, which is logged.
+    /// resources folder, the POI icons' atlas the host drew (`poiAtlas`,
+    /// the pixels of `PoiSpriteAtlasLayout.hostDescription`'s atlas, or no
+    /// icons where it drew none, as Apple's symbols are drawn on Apple's
+    /// platforms alone), the tiles, the model tiles and the trees copied
+    /// from memory, no scene model assets and no avatars. Without the
+    /// resources folder the text has no atlases and no label draws a glyph,
+    /// which is logged, as is an atlas of the wrong size.
     static func portable(device: any GPUDevice,
                          commandQueue: any GPUCommandQueue,
-                         sampleCount: Int) -> RenderHost {
+                         sampleCount: Int,
+                         poiAtlas: [UInt8]? = nil) -> RenderHost {
         let location: ImmersiveMapResourceLocation?
         do {
             location = try ImmersiveMapResourceBundle.location()
@@ -31,7 +34,7 @@ extension RenderHost {
                                         resource: { location?.url(forResource: $0, withExtension: $1) })
         return RenderHost(resources: resources,
                           commandQueue: commandQueue,
-                          poiSpriteTexture: clearTexel(device: device),
+                          poiSpriteTexture: poiAtlasTexture(device: device, pixels: poiAtlas),
                           tileFileGeometry: nil,
                           modelTileFileLoader: nil,
                           treeFileLoader: nil,
@@ -43,6 +46,27 @@ extension RenderHost {
     /// alone.
     struct SceneModelAssetsUnavailable: Error, CustomStringConvertible {
         var description: String { "This platform reads no scene model asset." }
+    }
+
+    /// The POI atlas from the host's pixels, or a clear texel where it gave
+    /// none that fit the layout.
+    private static func poiAtlasTexture(device: any GPUDevice, pixels: [UInt8]?) -> any GPUTexture {
+        guard let pixels else { return clearTexel(device: device) }
+        let side = PoiSpriteAtlasLayout().pixelSize
+        guard pixels.count == side * side * 4 else {
+            logger.warning("ImmersiveMap: the POI icons' atlas has \(pixels.count, privacy: .public) bytes, not the \(side * side * 4, privacy: .public) of a \(side, privacy: .public) pixel square. The POIs draw no icons.")
+            return clearTexel(device: device)
+        }
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm, width: side, height: side)
+        descriptor.storage = .shared
+        guard let texture = device.makeTexture(descriptor) else {
+            fatalError("The device made no POI atlas texture")
+        }
+        pixels.withUnsafeBytes { bytes in
+            texture.replace(x: 0, y: 0, width: side, height: side, mipmapLevel: 0, slice: 0,
+                            bytes: bytes.baseAddress!, bytesPerRow: side * 4)
+        }
+        return texture
     }
 
     /// One transparent texel in the POI atlas's format: every icon samples

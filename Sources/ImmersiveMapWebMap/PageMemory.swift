@@ -10,6 +10,7 @@
 // its first use, as anywhere but in top-level code.
 
 #if arch(wasm32)
+import ImmersiveMap
 
 /// One thread: plain state.
 enum PageMemory {
@@ -18,6 +19,15 @@ enum PageMemory {
 
     /// `immersivemap_map_camera`'s five doubles.
     nonisolated(unsafe) static let camera = UnsafeMutableBufferPointer<Double>.allocate(capacity: 5)
+
+    /// `immersivemap_poi_atlas_layout`'s length and JSON, made once.
+    nonisolated(unsafe) static let poiAtlasLayout: UnsafeMutableRawBufferPointer = {
+        let json = Array(MainActor.assumeIsolated { PortableMapRenderer.poiAtlasLayoutDescription }.utf8)
+        let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 4 + json.count, alignment: 4)
+        buffer.storeBytes(of: UInt32(json.count).littleEndian, as: UInt32.self)
+        buffer.baseAddress!.advanced(by: 4).copyMemory(from: json, byteCount: json.count)
+        return buffer
+    }()
 
     /// The markers' buffer, with room for `count` doubles at least.
     static func markers(count: Int) -> UnsafeMutableBufferPointer<Double> {

@@ -24,7 +24,8 @@ final class PoiSpriteAtlas {
 
     /// The icons are drawn with Core Graphics and the platform's symbol
     /// images, so the atlas is made on Apple's platforms alone. The browser
-    /// host will hand the engine an atlas it drew.
+    /// page draws its own into the same layout
+    /// (`PoiSpriteAtlasLayout.hostDescription`).
     init(device: any GPUDevice,
          icons: [PoiSpriteIcon] = PoiSpriteIcon.allCases,
          descriptor: PoiSpriteAtlasDescriptor = .default) {
@@ -109,7 +110,8 @@ final class PoiSpriteAtlas {
                                  in rect: CGRect,
                                  descriptor: PoiSpriteAtlasDescriptor,
                                  context: CGContext) {
-        let iconRect = rect.insetBy(dx: rect.width * 0.16, dy: rect.height * 0.16)
+        let inset = PoiSpriteAtlasLayout.symbolInsetFraction
+        let iconRect = rect.insetBy(dx: rect.width * inset, dy: rect.height * inset)
         let pointSize = min(iconRect.width, iconRect.height)
         guard let symbolImage = makeSymbolImage(for: icon,
                                                 pointSize: pointSize,

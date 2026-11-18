@@ -10,8 +10,9 @@
 // WebGPU validation error, a trap in the module, no request reaching the
 // archive, a camera not read back where it was put, a first frame not
 // drawn, a marker at the camera's centre not placed at the canvas's
-// centre, or the tile cache (in memory here) not answering a second load
-// or keeping ranges of an archive replaced. Looks at no pixel: the page is judged in a
+// centre, the tile cache (in memory here) not answering a second load or
+// keeping ranges of an archive replaced, or a POI icon of the engine's
+// with no path in poiIcons.mjs (or one there the engine has not). Looks at no pixel: the page is judged in a
 // browser.
 
 import { create, globals } from 'webgpu';
@@ -24,6 +25,7 @@ Object.assign(globalThis, globals);
 const { chooseFeatures } = await import(join(repositoryRoot, 'Web', 'ImmersiveMapWebGPU.js'));
 const { startMap } = await import(join(repositoryRoot, 'Web', 'map', 'map.mjs'));
 const { ArchiveRangeCache, MemoryStore } = await import(join(repositoryRoot, 'Web', 'map', 'rangeCache.mjs'));
+const { poiIconPaths } = await import(join(repositoryRoot, 'Web', 'map', 'poiIcons.mjs'));
 
 const engine = join(repositoryRoot, 'Sources', 'ImmersiveMap');
 const path = process.argv[2] ?? join(repositoryRoot, 'Web', 'map', 'build', 'ImmersiveMapWebMap.wasm');
@@ -87,6 +89,26 @@ try {
         warn: (message) => notes.push(message),
         print: (stream, line) => output.push(`${stream === 2 ? 'stderr' : 'stdout'}: ${line}`),
         rangeCache: cache,
+        // Node has no 2D canvas to draw Maki's paths with: the atlas is
+        // each icon's square filled, in the layout the module gives, so the
+        // upload runs on Dawn. The layout is held to the paths.
+        drawPoiIcons: (layout) => {
+            const names = layout.icons.map(({ name }) => name).filter((name) => name !== 'marker');
+            for (const name of names) {
+                if (!poiIconPaths[name]) errors.push(`map: the POI icon ${name} has no path in poiIcons.mjs`);
+            }
+            for (const name of Object.keys(poiIconPaths)) {
+                if (!names.includes(name)) errors.push(`map: poiIcons.mjs draws ${name}, which the engine has no cell for`);
+            }
+            const pixels = new Uint8Array(layout.side * layout.side * 4);
+            const square = layout.cellSize - layout.padding * 2;
+            for (const { x, y } of layout.icons) {
+                for (let row = y + layout.padding; row < y + layout.padding + square; row += 1) {
+                    pixels.fill(255, (row * layout.side + x + layout.padding) * 4, (row * layout.side + x + layout.padding + square) * 4);
+                }
+            }
+            return pixels;
+        },
     };
     map = await startMap(options);
     map.look(45.46, 9.19, 5);

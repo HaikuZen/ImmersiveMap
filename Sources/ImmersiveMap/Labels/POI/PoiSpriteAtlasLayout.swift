@@ -164,3 +164,25 @@ struct PoiSpriteAtlasLayout {
         regionsByIcon[icon]
     }
 }
+
+extension PoiSpriteAtlasLayout {
+    /// What an icon's symbol leaves free on each side of its drawable
+    /// square (the cell less its padding), as a share of the square's side.
+    static let symbolInsetFraction: CGFloat = 0.16
+
+    /// The layout for a host that draws the icons itself (the browser page,
+    /// from an open icon set), as JSON: the atlas's side in pixels, the
+    /// cells' size and padding, the symbol's inset share, and each icon by
+    /// its style name with its cell's top left corner, in pixels from the
+    /// atlas's top left. The host fills the atlas the Apple platforms draw
+    /// (`PoiSpriteAtlas`): white symbols on transparent, `bgra8Unorm`,
+    /// premultiplied, rows from the top, the plain marker's cell left empty.
+    var hostDescription: String {
+        let icons = icons.compactMap { icon -> String? in
+            guard let region = region(for: icon) else { return nil }
+            return "{\"name\":\"\(icon.rawValue)\",\"x\":\(Int(region.pixelRect.minX)),\"y\":\(Int(region.pixelRect.minY))}"
+        }
+        return "{\"side\":\(pixelSize),\"cellSize\":\(descriptor.cellSize),\"padding\":\(descriptor.cellPadding),"
+            + "\"symbolInset\":\(Double(Self.symbolInsetFraction)),\"icons\":[\(icons.joined(separator: ","))]}"
+    }
+}

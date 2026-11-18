@@ -15,6 +15,7 @@
 import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
 import { startMap, fetchResources } from './map.mjs';
 import { ArchiveRangeCache, openBrowserStore } from './rangeCache.mjs';
+import { drawPoiAtlas } from './poiIcons.mjs';
 
 /// How a drag and the wheel move the camera.
 const input = {
@@ -130,6 +131,9 @@ export class ImmersiveMap {
             wake: () => this.#wake(),
             downloadFailed: (downloads) => this.#options.onDownloadFailure({ ...downloads }),
             rangeCache,
+            // Maki's icons (poiIcons.mjs), where Apple's platforms draw SF
+            // Symbols.
+            drawPoiIcons: drawPoiAtlas,
         });
         if (camera) this.lookAt(camera);
         if (this.#options.interactive) this.#listen();

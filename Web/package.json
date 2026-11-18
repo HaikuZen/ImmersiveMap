@@ -19,6 +19,7 @@
     "map/ImmersiveMap.d.ts",
     "map/map.mjs",
     "map/rangeCache.mjs",
+    "map/poiIcons.mjs",
     "map/build/"
   ],
   "sideEffects": false
