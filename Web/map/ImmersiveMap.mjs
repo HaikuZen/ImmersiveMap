@@ -35,6 +35,30 @@ const input = {
     releaseStillTime: 50,
 };
 
+/// The `attribution` option's object, checked before the module reads it.
+function checkAttribution(attribution) {
+    if (typeof attribution !== 'object' || attribution === null) return;
+    const { credits, link, showsEngineCredit } = attribution;
+    if (credits !== undefined) {
+        if (!Array.isArray(credits)) throw new TypeError('attribution.credits must be a list');
+        for (const credit of credits) {
+            if (typeof credit?.text !== 'string') throw new TypeError('Every attribution credit needs its text');
+            for (const key of ['minZoom', 'maxZoom']) {
+                if (credit[key] !== undefined && !Number.isFinite(credit[key]) && credit[key] !== Infinity) {
+                    throw new TypeError(`An attribution credit's ${key} must be a number`);
+                }
+            }
+            if ((credit.minZoom ?? 0) >= (credit.maxZoom ?? Infinity)) {
+                throw new TypeError(`The credit "${credit.text}" shows at no zoom`);
+            }
+        }
+    }
+    if (link !== undefined && link !== null && typeof link !== 'string') throw new TypeError('attribution.link must be a URL');
+    if (showsEngineCredit !== undefined && typeof showsEngineCredit !== 'boolean') {
+        throw new TypeError('attribution.showsEngineCredit must be true or false');
+    }
+}
+
 /// A key only `create` holds, so the constructor is not called directly.
 const creating = Symbol('ImmersiveMap.create');
 
@@ -44,6 +68,7 @@ export class ImmersiveMap {
     /// module does not load.
     static async create(container, options = {}) {
         if (!(container instanceof HTMLElement)) throw new TypeError('ImmersiveMap needs an element to fill');
+        checkAttribution(options.attribution);
         if (!navigator.gpu) throw new Error('This browser has no WebGPU.');
         const adapter = await navigator.gpu.requestAdapter();
         if (!adapter) throw new Error('No WebGPU adapter.');
@@ -153,6 +178,7 @@ export class ImmersiveMap {
             // Maki's icons (poiIcons.mjs), where Apple's platforms draw SF
             // Symbols.
             drawPoiIcons: drawPoiAtlas,
+            attribution: typeof this.#options.attribution === 'object' ? this.#options.attribution : null,
         });
         if (camera) this.lookAt(camera);
         if (this.#options.interactive) this.#listen();

@@ -64,17 +64,34 @@ export interface ImmersiveMapOptions {
      * The badge crediting the map's data in the bottom trailing corner, as
      * the Apple views show it: the tile source's credit, the engine's, and
      * the biomes' and the terrain's at the zooms they are on screen, a click
-     * opening the source's license page. True by default. The licenses of
-     * the data (ODbL for OpenStreetMap) require visible attribution near
-     * the map: hide it only where the page credits the data itself.
+     * opening the source's license page. True by default, with
+     * OpenStreetMap's credit for the tiles. An object sets the page's own,
+     * for an archive of other data. The licenses of the data (ODbL for
+     * OpenStreetMap) require visible attribution near the map: false hides
+     * the badge, only for a page that credits the data itself.
      */
-    attribution?: boolean;
+    attribution?: boolean | AttributionOptions;
     /** A WebGPU error or the device lost. `console.error` by default. */
     onError?: (message: string) => void;
     /** A warning of the WebGPU host. `console.warn` by default. */
     onWarning?: (message: string) => void;
     /** After each failed request of the tile archive. The engine only logs them. */
     onDownloadFailure?: (downloads: Downloads) => void;
+}
+
+/** A page's own attribution, as the Apple views' `attributionOverride`. */
+export interface AttributionOptions {
+    /**
+     * The tile source's credits, in place of OpenStreetMap's, in order. Each
+     * shows from `minZoom` up to, not including, `maxZoom`, every zoom when
+     * both are left out. The biomes' and the terrain's credits are added at
+     * their zooms either way. An empty list leaves the badge empty.
+     */
+    credits?: { text: string; minZoom?: number; maxZoom?: number }[];
+    /** Where a click on the badge leads, the source's license page. */
+    link?: string | null;
+    /** False leaves out "Powered by ImmersiveMap", a courtesy. True by default. */
+    showsEngineCredit?: boolean;
 }
 
 export interface MarkerOptions extends Coordinate {

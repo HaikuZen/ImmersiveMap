@@ -268,6 +268,84 @@ package final class PortableMapRenderer {
     }
 }
 
+/// A host's own attribution, as the Apple views take it
+/// (`AttributionSettings.attributionOverride`, `showsEngineCredit`), from
+/// JSON: `credits`, the tile source's credits in place of the default one,
+/// each `{"text": ..., "minZoom": ..., "maxZoom": ...}` with the zooms
+/// optional (shown from `minZoom` up to, not including, `maxZoom`), `link`,
+/// where a click on the badge leads, and `showsEngineCredit`, false to
+/// leave out the engine's own. A member left out keeps the settings'. The
+/// biomes' and the relief's credits are added at their zooms either way
+/// (`ImmersiveMapSettings.resolvedAttribution`).
+package struct PortableAttributionOptions: Equatable, Sendable {
+    package var credits: [ImmersiveMapAttribution.Credit]?
+    package var linkURL: URL?
+    package var showsEngineCredit: Bool?
+
+    /// A document that is not of this shape.
+    package struct Invalid: Error, CustomStringConvertible {
+        package let description: String
+    }
+
+    package init(json data: Data) throws {
+        let document = try JSONValue(parsing: data)
+        guard case .object = document else {
+            throw Invalid(description: "The attribution is not a JSON object.")
+        }
+        if let credits = document["credits"] {
+            guard case let .array(entries) = credits else {
+                throw Invalid(description: "The attribution's credits are not a list.")
+            }
+            self.credits = try entries.map(Self.credit)
+        }
+        if let link = document["link"], link.isNull == false {
+            guard case let .string(text) = link, let url = URL(string: text) else {
+                throw Invalid(description: "The attribution's link is not a URL.")
+            }
+            linkURL = url
+        }
+        if let shows = document["showsEngineCredit"] {
+            guard let value = shows.boolValue else {
+                throw Invalid(description: "The attribution's showsEngineCredit is not true or false.")
+            }
+            showsEngineCredit = value
+        }
+    }
+
+    private static func credit(_ entry: JSONValue) throws -> ImmersiveMapAttribution.Credit {
+        guard case let .string(text)? = entry["text"] else {
+            throw Invalid(description: "An attribution credit has no text.")
+        }
+        let minimum = entry["minZoom"]?.doubleValue
+        let maximum = entry["maxZoom"]?.doubleValue
+        guard minimum != nil || maximum != nil else {
+            return ImmersiveMapAttribution.Credit(text)
+        }
+        let lower = minimum ?? 0
+        let upper = maximum ?? .infinity
+        guard lower.isFinite, lower < upper else {
+            throw Invalid(description: "The credit \(text) shows at no zoom (from \(lower) to \(upper)).")
+        }
+        return ImmersiveMapAttribution.Credit(text, zoomRange: lower ..< upper)
+    }
+
+    /// The settings with the host's attribution in place.
+    package func applied(to settings: ImmersiveMapSettings) -> ImmersiveMapSettings {
+        var settings = settings
+        if let credits {
+            settings.attribution.attributionOverride = ImmersiveMapAttribution(credits: credits, linkURL: linkURL)
+        } else if let linkURL {
+            var attribution = settings.attribution.attributionOverride ?? ImmersiveMapTilesService.attribution
+            attribution.linkURL = linkURL
+            settings.attribution.attributionOverride = attribution
+        }
+        if let showsEngineCredit {
+            settings.attribution.showsEngineCredit = showsEngineCredit
+        }
+        return settings
+    }
+}
+
 /// The credits a host shows on its badge, in order, and where a click on
 /// it leads.
 package struct PortableAttribution: Equatable, Sendable {

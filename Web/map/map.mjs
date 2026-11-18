@@ -45,6 +45,8 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 /// - downloadFailed: called with `downloads` after each failed request.
 /// - rangeCache: an `ArchiveRangeCache` (rangeCache.mjs) the archives'
 ///   requests go through, none by default.
+/// - attribution: the page's own credits for the badge, as the class takes
+///   them (ImmersiveMap.d.ts, `AttributionOptions`), the engine's when null.
 /// - drawPoiIcons: given the POI icons' atlas layout the module describes,
 ///   returns the atlas's pixels (`drawPoiAtlas` of poiIcons.mjs) or null
 ///   for no icons, the default.
@@ -77,7 +79,7 @@ export async function startMap({
     device, module, shaders, resources, canvasTexture,
     archiveURL = '', multisample = true, fetch: fetchFunction = globalThis.fetch,
     warn = console.warn, print, wake = () => {}, downloadFailed = () => {}, rangeCache = null,
-    drawPoiIcons = () => null,
+    drawPoiIcons = () => null, attribution = null,
 }) {
     const files = new Map([...resources].map(([name, bytes]) => [`${resourceFolder.slice(1)}/${name}`, bytes]));
     const wasi = new WASIShim({
@@ -170,12 +172,16 @@ export async function startMap({
     const archive = encoder.encode(archiveURL);
     const archivePointer = place(archive);
     const atlasPointer = place(poiAtlas);
+    const attributionJSON = encoder.encode(attribution ? JSON.stringify(attribution) : '');
+    const attributionPointer = place(attributionJSON);
     const started = instance.exports.immersivemap_map_start(engineFeatures(device), multisample ? 1 : 0,
                                                             archivePointer, archive.length,
-                                                            atlasPointer, poiAtlas.length);
+                                                            atlasPointer, poiAtlas.length,
+                                                            attributionPointer, attributionJSON.length);
     instance.exports.immersivemap_free(archivePointer);
     instance.exports.immersivemap_free(atlasPointer);
-    if (started !== 1) throw new Error('The map could not be made');
+    instance.exports.immersivemap_free(attributionPointer);
+    if (started !== 1) throw new Error('The map could not be made (the module printed why)');
 
     const exports = instance.exports;
     /// Runs a call that changes the map, then wakes the page.

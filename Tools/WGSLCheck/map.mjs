@@ -12,8 +12,9 @@
 // drawn, a marker at the camera's centre not placed at the canvas's
 // centre, the tile cache (in memory here) not answering a second load or
 // keeping ranges of an archive replaced, a POI icon of the engine's with
-// no path in poiIcons.mjs (or one there the engine has not), or no
-// OpenStreetMap credit in the attribution. Looks at no pixel: the page is judged in a
+// no path in poiIcons.mjs (or one there the engine has not), no
+// OpenStreetMap credit in the attribution, or a page's own attribution
+// not in its place. Looks at no pixel: the page is judged in a
 // browser.
 
 import { create, globals } from 'webgpu';
@@ -157,9 +158,9 @@ try {
 
     // A page loaded again: another map over the same cache, looking where
     // the first one started, its requests counted.
-    const load = async () => {
+    const load = async (extra = {}) => {
         const before = { network: requests.archive, hits: cache.counts.hits };
-        const again = await startMap(options);
+        const again = await startMap({ ...options, ...extra });
         again.look(45.46, 9.19, 5);
         for (let frame = 0; frame < 20; frame += 1) {
             again.frame(size[0], size[1], 1);
@@ -168,7 +169,7 @@ try {
         }
         const counts = { network: requests.archive - before.network, cached: cache.counts.hits - before.hits };
         loads.push(counts);
-        return counts;
+        return { ...counts, map: again };
     };
     if (cache.counts.stored === 0) errors.push('map: the tile cache kept no range');
     const second = await load();
@@ -177,7 +178,14 @@ try {
     if (second.network === 0) errors.push('map: a second load read the archive\'s header from the tile cache');
     // The archive replaced on its host: what the cache holds is dropped.
     archiveETag = '"overview-replaced"';
-    await load();
+    // Another archive's data, credited by the page itself, with no engine
+    // credit: the page's credit takes OpenStreetMap's place.
+    const replaced = await load({ attribution: { credits: [{ text: '© Test data' }], link: 'https://example.invalid/license', showsEngineCredit: false } });
+    const own = replaced.map.attribution();
+    if (own.credits[0] !== '© Test data' || own.credits.includes('© OpenStreetMap')
+        || own.credits.includes('Powered by ImmersiveMap') || own.link !== 'https://example.invalid/license') {
+        errors.push(`map: the page's own attribution reads ${JSON.stringify(own)}`);
+    }
     if (cache.counts.dropped !== 1) errors.push(`map: a replaced archive dropped ${cache.counts.dropped} times from the tile cache, not once`);
 } catch (error) {
     errors.push(`map: ${error.stack ?? error.message}`);

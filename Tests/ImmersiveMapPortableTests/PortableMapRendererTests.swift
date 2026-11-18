@@ -258,4 +258,36 @@ struct PortableMapRendererTests {
         #expect(json["credits"] as? [String] == attribution.credits)
         #expect(json["link"] is NSNull)
     }
+
+    /// A page's own attribution takes the tile source's place, as the Apple
+    /// views' override does, and the engine still adds the biomes' credit.
+    @Test func aPagesAttributionTakesTheTileSourcesPlace() throws {
+        let json = #"{"credits":[{"text":"© City data"},{"text":"Roads © Agency","minZoom":10}],"link":"https://example.invalid/license","showsEngineCredit":false}"#
+        let options = try PortableAttributionOptions(json: Data(json.utf8))
+        #expect(options.credits == [ImmersiveMapAttribution.Credit("© City data"),
+                                    ImmersiveMapAttribution.Credit("Roads © Agency", zoomRange: 10 ..< .infinity)])
+        let settings = options.applied(to: Self.offlineSettings())
+        let map = try PortableMapRenderer(device: RecordingGPUDevice(), settings: settings)
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: 4)
+        #expect(map.attribution.credits == ["© City data", OverviewTileSource.creditText])
+        #expect(map.attribution.linkURL == "https://example.invalid/license")
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: 12)
+        #expect(map.attribution.credits == ["© City data", "Roads © Agency"])
+    }
+
+    @Test func aPagesLinkAloneKeepsTheDefaultCredit() throws {
+        let options = try PortableAttributionOptions(json: Data(#"{"link":"https://example.invalid/osm"}"#.utf8))
+        let settings = options.applied(to: Self.offlineSettings())
+        #expect(settings.resolvedAttribution.credits.map(\.text).contains(ImmersiveMapTilesService.attribution.credits[0].text))
+        #expect(settings.resolvedAttribution.linkURL?.absoluteString == "https://example.invalid/osm")
+    }
+
+    @Test func anAttributionOfAnotherShapeIsRefused() {
+        for json in [#"[1]"#, #"{"credits":"© x"}"#, #"{"credits":[{"minZoom":3}]}"#,
+                     #"{"credits":[{"text":"x","minZoom":5,"maxZoom":5}]}"#, #"{"showsEngineCredit":"no"}"#] {
+            #expect(throws: PortableAttributionOptions.Invalid.self) {
+                try PortableAttributionOptions(json: Data(json.utf8))
+            }
+        }
+    }
 }

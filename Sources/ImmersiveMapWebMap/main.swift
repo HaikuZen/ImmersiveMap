@@ -50,12 +50,15 @@ func mapFree(_ pointer: UnsafeMutableRawPointer?) {
 /// MSAA 4x, the archive's URL, UTF-8 at `archive`, is the tile source, the
 /// engine's own when empty, and the bytes at `poiAtlas` are the POI icons'
 /// atlas the page drew (`immersivemap_poi_atlas_layout`), no icons when
-/// empty. Returns 1 when the map is made.
+/// empty, and the JSON at `attribution` the page's own attribution
+/// (`PortableAttributionOptions`), the engine's when empty. Returns 1 when
+/// the map is made, 0 with the reason printed when it is not.
 @_expose(wasm, "immersivemap_map_start")
 @_cdecl("immersivemap_map_start")
 func mapStart(_ features: UInt32, _ multisample: Int32,
               _ archive: UnsafePointer<UInt8>?, _ archiveLength: Int32,
-              _ poiAtlas: UnsafePointer<UInt8>?, _ poiAtlasLength: Int32) -> Int32 {
+              _ poiAtlas: UnsafePointer<UInt8>?, _ poiAtlasLength: Int32,
+              _ attribution: UnsafePointer<UInt8>?, _ attributionLength: Int32) -> Int32 {
     PMTilesArchiveClient.hostFetcherMaker = { url, headers in BrowserFetch.fetcher(archiveURL: url, requestHeaders: headers) }
     var settings = ImmersiveMapSettings.default.msaa(isEnabled: multisample != 0)
     // A page has no disk the prepared tiles could be kept on.
@@ -65,6 +68,16 @@ func mapStart(_ features: UInt32, _ multisample: Int32,
     if let archive, archiveLength > 0,
        let url = URL(string: String(decoding: UnsafeBufferPointer(start: archive, count: Int(archiveLength)), as: UTF8.self)) {
         settings = settings.tileArchive(url)
+    }
+    if let attribution, attributionLength > 0 {
+        do {
+            let options = try PortableAttributionOptions(json: Data(UnsafeBufferPointer(start: attribution,
+                                                                                        count: Int(attributionLength))))
+            settings = options.applied(to: settings)
+        } catch {
+            print("ImmersiveMap: the page's attribution was not read: \(error)")
+            return 0
+        }
     }
     // Copied before the main actor's closure, which takes no pointer.
     let atlas = poiAtlas.flatMap { pointer in
