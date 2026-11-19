@@ -10,15 +10,22 @@ import Foundation
 /// its own, off Apple's platforms) from the source tree, which the tests'
 /// runner is given.
 enum TestResources {
-    private static let textResources = URL(fileURLWithPath: #filePath)
+    private static let engineSources = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("Sources/ImmersiveMap/Text/Resources")
+        .appendingPathComponent("Sources/ImmersiveMap")
+    /// The source folders the engine's resources are in.
+    private static let resourceFolders = ["Text/Resources", "Pins/Resources"]
 
     static func url(_ name: String, _ fileExtension: String) -> URL? {
         if let url = (try? ImmersiveMapResourceBundle.location())?.url(forResource: name, withExtension: fileExtension) {
             return url
         }
-        let url = textResources.appendingPathComponent("\(name).\(fileExtension)")
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        for folder in resourceFolders {
+            let url = engineSources.appendingPathComponent(folder).appendingPathComponent("\(name).\(fileExtension)")
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+        }
+        return nil
     }
 }

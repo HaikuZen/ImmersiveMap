@@ -63,6 +63,11 @@ package final class GPUProbeScene {
     private let fxaa: FXAAPipeline
     private let debugPolygons: PolygonsPipeline
     private let debugOverlay: DebugOverlayRenderer
+    private let pinPipelines: PinDrawing.Pipelines
+    private let pinFrame: PinDrawing.Frame
+    private let pinAtlas: any GPUTexture
+    private let pinField: any GPUTexture
+    private let pinBadgeAtlas: any GPUTexture
     private var targets: (width: Int, height: Int, color: any GPUTexture, depth: any GPUTexture, scene: any GPUTexture)?
 
     /// Nil where the device makes no resource, which no backend does for
@@ -90,7 +95,10 @@ package final class GPUProbeScene {
               let modelTile = Self.modelTile(device: device),
               let rasterAtlas = RasterTileDrawer.BakeAtlas.make(device: device, width: Self.rasterSize, height: Self.rasterSize),
               let rasterTexture = RasterTileDrawer.makeTexture(device: device, size: Self.rasterSize),
-              let rasterSampler = Self.rasterSampler(device: device) else {
+              let rasterSampler = Self.rasterSampler(device: device),
+              let pinFrame = Self.pinFrame(device: device),
+              let pinField = PinShapeDistanceField.makeTexture(device: device, shape: .picture()),
+              let pinBadgeAtlas = device.makeTexture(GPUTextureDescriptor(format: .bgra8Unorm, width: 1, height: 1)) else {
             return nil
         }
         self.device = device
@@ -133,7 +141,50 @@ package final class GPUProbeScene {
         debugPolygons = PolygonsPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
         debugOverlay = DebugOverlayRenderer(device: device)
         layerPipeline = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        // The map draws the pins in its overlay pass of one sample, the
+        // probe in its world pass of four.
+        pinPipelines = PinDrawing.Pipelines(pin: PinPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4),
+                                            countBadge: PinCountBadgePipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4),
+                                            beam: PinBeamPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4))
+        self.pinFrame = pinFrame
+        self.pinField = pinField
+        self.pinBadgeAtlas = pinBadgeAtlas
+        let atlas = PinTextureAtlas(device: device, atlasSize: 64, cellSize: 32, pagesMax: 1)
+        atlas.beginFrame(1)
+        _ = atlas.uploadImage(PinImage(width: 2, height: 2, premultipliedBGRA: [UInt8](repeating: 200, count: 16)))
+        pinAtlas = atlas.textureArray
     }
+
+    /// One pin pushed off its point, so its beam draws, with a counter: the
+    /// values the pins' renderer would write for it, given as constants.
+    private static func pinFrame(device: any GPUDevice) -> PinDrawing.Frame? {
+        let point = ScreenPointOutput(position: SIMD2(200, 150), depth: 0, visible: 1, visibilityAlpha: 1)
+        let instance = PinInstanceGPU(uvRect: SIMD4(0, 0, 0.5, 0.5), borderColor: SIMD4(1, 1, 1, 1),
+                                      squashScale: SIMD2(1, 1), atlasIndex: 0, flags: 0, morph: 0.5)
+        let badge = PinCountBadgeInstanceGPU(uvRect: SIMD4(0, 0, 1, 1), flags: 1, screenSizeScale: 1, contentAlpha: 1)
+        let anchor = ScreenPointOutput(position: SIMD2(160, 120), depth: 0, visible: 1, visibilityAlpha: 1)
+        let offset = PinOffset(value: SIMD2(40, 30), scale: 1)
+        guard let screenPoints = device.makeBuffer([point], storage: .shared),
+              let instances = device.makeBuffer([instance], storage: .shared),
+              let badges = device.makeBuffer([badge], storage: .shared),
+              let anchors = device.makeBuffer([anchor], storage: .shared),
+              let offsets = device.makeBuffer([offset], storage: .shared) else {
+            return nil
+        }
+        return PinDrawing.Frame(screenPoints: screenPoints, instances: instances, countBadgeInstances: badges,
+                                beamAnchors: anchors, beamOffsets: offsets,
+                                pinCount: 1, drawsBeams: true, drawsCountBadges: true)
+    }
+
+    /// The pins' styles at a size of 64 pixels, as a map's settings make them.
+    private static let pinStyles: PinDrawing.Styles = {
+        let pin = PinStyle(sizePx: 64, outlineWidthPx: 2)
+        return PinDrawing.Styles(pin: pin.gpu,
+                                 countBadge: PinCountBadgeStyle(sizePx: 64, pinStyle: pin).gpu,
+                                 beam: PinBeamStyleGPU(pinCenterOffsetPx: pin.bodyCenterOffsetPx,
+                                                       pinBodyHalfMinPx: pin.circleRadiusPx),
+                                 beamColor: SIMD4(1, 1, 1, 0.5))
+    }()
 
     /// The probe's sky: 64 stars on a spiral over the unit sphere, made with
     /// `+ - * /` and `sqrt` alone, which IEEE rounds the same everywhere.
@@ -637,6 +688,21 @@ package final class GPUProbeScene {
                                              bandTopRadians: 0.6),
                      groundSide: false)
         encoder.setDepthStencilState(depthDisabledState)
+
+        // A pin with its beam and its counter, in the drawable's pixels:
+        // x from the left, y from the bottom.
+        var pixels = matrix_identity_float4x4
+        pixels.columns.0.x = 2 / Float(width)
+        pixels.columns.1.y = 2 / Float(height)
+        pixels.columns.3 = SIMD4(-1, -1, 0, 1)
+        PinDrawing.draw(encoder: encoder,
+                        pipelines: pinPipelines,
+                        frame: pinFrame,
+                        styles: Self.pinStyles,
+                        screenMatrix: pixels,
+                        pinAtlas: pinAtlas,
+                        shapeField: pinField,
+                        countBadgeAtlas: { pinBadgeAtlas })
         encoder.endEncoding()
 
         // The FXAA pass: the resolved frame, smoothed into the target.

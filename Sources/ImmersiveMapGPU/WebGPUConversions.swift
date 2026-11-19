@@ -58,6 +58,7 @@ extension GPUPixelFormat {
         case .rgba8Unorm: return "rgba8unorm"
         case .r8Unorm: return "r8unorm"
         case .r16Float: return "r16float"
+        case .r16Unorm: return "r16unorm"
         case .depth32FloatStencil8: return "depth32float-stencil8"
         case .depth16Unorm: return "depth16unorm"
         case let .astc(blockWidth, blockHeight): return "astc-\(blockWidth)x\(blockHeight)-unorm"

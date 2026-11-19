@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
 import PortableFoundation
 
 /// Turns a pin shape into the distance field the pin shader cuts its frame
@@ -132,6 +133,92 @@ enum PinShapeDistanceField {
     static func encode(distanceTexels: Float) -> UInt16 {
         let unit = 0.5 - distanceTexels / (2.0 * distanceRangeTexels)
         return UInt16((min(max(unit, 0.0), 1.0) * 65535.0).rounded())
+    }
+
+    /// The texture of a shape's distance field: 16-bit fractions where the
+    /// device has them (Metal), 16-bit floats of the same values elsewhere
+    /// (WebGPU, where `r16unorm` is optional). A shape without a frame has
+    /// no field, and gets a single texel for the shader's texture slot. The
+    /// built-in bubble has its own texture in the resources, and none here,
+    /// as has a shape whose coverage cannot be had.
+    static func makeTexture(device: any GPUDevice, shape: PinShape) -> (any GPUTexture)? {
+        let side: Int
+        let values: [UInt16]
+        switch shape.outline {
+        case .bubble:
+            return nil
+        case .paths, .mask:
+            guard let field = encodedField(for: shape) else {
+                return nil
+            }
+            side = textureSize
+            values = field
+        case .picture:
+            side = 1
+            values = [framelessTexel]
+        }
+        let unorm = device.features.contains(.unorm16Textures)
+        var descriptor = GPUTextureDescriptor(format: unorm ? .r16Unorm : .r16Float, width: side, height: side)
+        descriptor.usage = .shaderRead
+        descriptor.storage = .shared
+        descriptor.label = "Pin shape distance field"
+        guard let texture = device.makeTexture(descriptor) else {
+            return nil
+        }
+        let texels = unorm ? values : values.map(halfBits(ofUnorm:))
+        texels.withUnsafeBytes { bytes in
+            guard let baseAddress = bytes.baseAddress else { return }
+            texture.replace(x: 0, y: 0, width: side, height: side, mipmapLevel: 0, slice: 0,
+                            bytes: baseAddress, bytesPerRow: side * MemoryLayout<UInt16>.stride)
+        }
+        return texture
+    }
+
+    /// Whether the engine can bake the shape's field here: on Apple's
+    /// platforms always, elsewhere a path shape needs the host's drawer.
+    static func canBake(_ shape: PinShape) -> Bool {
+        switch shape.outline {
+        case .bubble, .picture, .mask:
+            return true
+        case .paths:
+            #if canImport(CoreGraphics)
+            return true
+            #else
+            return PinPictureHost.drawer != nil
+            #endif
+        }
+    }
+
+    /// The IEEE half-precision bits of a 16-bit fraction's value
+    /// (`value / 65535`), rounded to nearest even, for a texture of 16-bit
+    /// floats. Values are in [0, 1], so no infinity or NaN arises.
+    static func halfBits(ofUnorm value: UInt16) -> UInt16 {
+        let float = Float(value) / 65535.0
+        let bits = float.bitPattern
+        let exponent = Int((bits >> 23) & 0xFF) - 127
+        var mantissa = bits & 0x7F_FFFF
+        if float == 0 {
+            return 0
+        }
+        if exponent < -14 {
+            // Subnormal half: the value in units of 2^-24.
+            let shift = UInt32(-exponent - 14 + 13)
+            mantissa |= 0x80_0000
+            guard shift < 32 else { return 0 }
+            var half = mantissa >> shift
+            let remainder = mantissa & ((1 << shift) - 1)
+            let halfway: UInt32 = 1 << (shift - 1)
+            if remainder > halfway || (remainder == halfway && (half & 1) == 1) {
+                half += 1
+            }
+            return UInt16(half)
+        }
+        var half = (UInt32(exponent + 15) << 10) | (mantissa >> 13)
+        let remainder = mantissa & 0x1FFF
+        if remainder > 0x1000 || (remainder == 0x1000 && (half & 1) == 1) {
+            half += 1
+        }
+        return UInt16(half)
     }
 
     // MARK: - Distance transform

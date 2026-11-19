@@ -409,7 +409,7 @@ extension GPUPixelFormat {
         switch self {
         case .bgra8Unorm, .rgba8Unorm: return width * height * 4
         case .r8Unorm: return width * height
-        case .r16Float, .depth16Unorm: return width * height * 2
+        case .r16Float, .r16Unorm, .depth16Unorm: return width * height * 2
         case .depth32FloatStencil8: return width * height * 8
         case let .astc(blockWidth, blockHeight):
             return ((width + blockWidth - 1) / blockWidth) * ((height + blockHeight - 1) / blockHeight) * 16

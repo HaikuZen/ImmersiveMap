@@ -201,11 +201,10 @@ final class SharedRenderResources {
                                      colorFormat: colorFormat,
                                      sampleCount: renderSampleCount,
                                      resource: { resourceBundle.url(forResource: $0, withExtension: $1) }) },
-            { pins = PinsRenderer.SharedResources.make(metalDevice: device,
-                                                          pixelFormat: pixelFormat,
-                                                          library: library,
-                                                          resourceBundle: resourceBundle,
-                                                          sampleCount: 1) },
+            { pins = PinsRenderer.SharedResources.make(device: gpuDevice,
+                                                       pixelFormat: colorFormat,
+                                                       pinSDF: try! PinSDFResource.load(device: device, bundle: resourceBundle),
+                                                       sampleCount: 1) },
         ]
         DispatchQueue.concurrentPerform(iterations: jobs.count) { jobs[$0]() }
         return Built(device: device,

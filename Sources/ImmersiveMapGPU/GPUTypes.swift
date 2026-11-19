@@ -17,6 +17,9 @@ package enum GPUPixelFormat: Hashable, Sendable {
     case rgba8Unorm
     case r8Unorm
     case r16Float
+    /// One 16-bit channel read as a fraction, in WebGPU behind an optional
+    /// feature (`GPUDeviceFeatures.unorm16Textures`).
+    case r16Unorm
     case depth32FloatStencil8
     case depth16Unorm
     /// ASTC, low dynamic range, by its block's width and height in texels.
@@ -368,4 +371,9 @@ package struct GPUDeviceFeatures: OptionSet, Hashable, Sendable {
     /// (`ModelTilePipeline`, the normal and the texture coordinate of a
     /// model tile at bytes 10 and 6).
     package static let unalignedVertexAttributes = GPUDeviceFeatures(rawValue: 1 << 5)
+    /// Textures of 16-bit fractions (`GPUPixelFormat.r16Unorm`), Metal's on
+    /// every device and WebGPU's behind an optional feature. A feature that
+    /// keeps a value in one reads it from a 16-bit float where the device
+    /// lacks this (`PinShapeDistanceField`, the pins' shape).
+    package static let unorm16Textures = GPUDeviceFeatures(rawValue: 1 << 6)
 }

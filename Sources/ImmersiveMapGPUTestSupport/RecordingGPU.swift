@@ -303,7 +303,7 @@ package final class RecordingGPUDevice: GPUDevice, @unchecked Sendable {
     package var textures: [RecordingTexture] { lock.withLock { _ in textureLog } }
     package var pipelines: [GPURenderPipelineDescriptor] { lock.withLock { _ in pipelineLog } }
 
-    package init(features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .astc, .pointSprites, .unalignedVertexAttributes],
+    package init(features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .astc, .pointSprites, .unalignedVertexAttributes, .unorm16Textures],
                  shaderFunctions: Set<String>? = nil) {
         self.features = features
         self.shaderFunctions = shaderFunctions

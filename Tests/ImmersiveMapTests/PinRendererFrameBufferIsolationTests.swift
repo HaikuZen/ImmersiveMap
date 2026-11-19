@@ -22,7 +22,7 @@ final class PinRendererFrameBufferIsolationTests: XCTestCase {
         ]
 
         for store in perFrameStores {
-            XCTAssertTrue(source.contains("private let \(store): FrameSlottedDynamicMetalBuffer"),
+            XCTAssertTrue(source.contains("private let \(store): GPUFrameSlottedBuffer"),
                           "\(store) must be isolated per in-flight frame slot.")
         }
     }

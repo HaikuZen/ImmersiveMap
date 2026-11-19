@@ -41,18 +41,21 @@ struct PortableEngineLayoutTests {
     }
 
     /// The folders left out whole, whatever their files import: `UI`, the
-    /// host of each Apple platform, and `Pins`, whose shapes, badges and
-    /// drawing are still Core Graphics' and Metal's, so that a file of it
-    /// that imports neither may still need one that does.
+    /// host of each Apple platform, and `Pins`, whose Apple-only files (the
+    /// Core Graphics pictures, the Metal texture loader, ImageIO's loader)
+    /// sit beside the portable ones, with the shaders and the bubble's
+    /// resources, which the portable package leaves out file by file.
     static let appleOnlyFolders: Set<String> = ["UI", "Pins"]
-    /// The files of those folders that build everywhere all the same: the
-    /// pins' picture, model, controller, tap event, clustering,
-    /// presentation, selection, shape and its distance field, and the
-    /// host's drawer of their pictures.
+    /// The files of those folders that build everywhere all the same: every
+    /// file of the pins but their Core Graphics pictures, the Metal texture
+    /// loader of the bubble, and the picture loader and factory of their
+    /// public API on Apple's platforms.
     static let portableInAppleOnlyFolders: Set<String> = [
         "Pins/Clustering/PinCollisionLayoutSolver.swift",
         "Pins/Clustering/PinCollisionMath.swift",
         "Pins/Clustering/PinScreenHashGrid.swift",
+        "Pins/Drawers/PinDrawing.swift",
+        "Pins/Drawers/RendererPinDrawer.swift",
         "Pins/ImmersiveMapPin.swift",
         "Pins/ImmersiveMapPinTapEvent.swift",
         "Pins/ImmersiveMapPinsController.swift",
@@ -61,14 +64,20 @@ struct PortableEngineLayoutTests {
         "Pins/PinImageSource.swift",
         "Pins/PinPictureDrawing.swift",
         "Pins/PinRenderSource.swift",
+        "Pins/PinRenderSubsystem.swift",
         "Pins/PinShape.swift",
         "Pins/PinShapePath.swift",
         "Pins/PinTypes.swift",
+        "Pins/PinsRenderer.swift",
+        "Pins/Pipelines/PinBeamPipeline.swift",
+        "Pins/Pipelines/PinPipeline.swift",
         "Pins/Presentation/PinPresentationStateStore.swift",
         "Pins/Presentation/PinVisibilityFadeStateStore.swift",
+        "Pins/Resources/PinSDFResource.swift",
         "Pins/Selection/PinSelection.swift",
         "Pins/Selection/PinSelectionProjector.swift",
-        "Pins/Textures/PinShapeDistanceField.swift"
+        "Pins/Textures/PinShapeDistanceField.swift",
+        "Pins/Textures/PinTextureAtlas.swift"
     ]
 
     /// What the rule in PortableEngineExclusions.txt names today.

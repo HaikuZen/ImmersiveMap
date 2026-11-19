@@ -21,10 +21,10 @@ extension RenderHost {
         // Metal's device is safe to use from any thread, the loads' queue
         // included.
         nonisolated(unsafe) let device = metal.device
-        let pinsRenderer = PinsRenderer(metalDevice: metal.device,
+        let pinsRenderer = PinsRenderer(device: shared.gpuDevice,
                                         sharedResources: shared.pins,
                                         config: config.pins)
-        let depthDisabledState = shared.depthDisabledState.metalState
+        let depthDisabledState = shared.depthDisabledState
         return RenderHost(resources: shared.core,
                           commandQueue: MetalCommandQueue(metal.commandQueue),
                           poiSpriteTexture: shared.poiSpriteAtlas.texture,

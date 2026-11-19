@@ -16,6 +16,7 @@ final class MetalBackendTests: XCTestCase {
         XCTAssertEqual(GPUPixelFormat.depth16Unorm.metal, .depth16Unorm)
         XCTAssertEqual(GPUPixelFormat(metal: .depth16Unorm), .depth16Unorm)
         XCTAssertEqual(GPUPixelFormat.r16Float.metal, .r16Float)
+        XCTAssertEqual(GPUPixelFormat.r16Unorm.metal, .r16Unorm)
         XCTAssertEqual(GPUPixelFormat.astc(blockWidth: 8, blockHeight: 8).metal, .astc_8x8_ldr)
         XCTAssertEqual(GPUPixelFormat.astc(blockWidth: 7, blockHeight: 3).metal, .invalid)
         XCTAssertEqual(GPUCompareFunction.lessEqual.metal, .lessEqual)

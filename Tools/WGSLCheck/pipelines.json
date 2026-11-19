@@ -672,6 +672,123 @@
 
       ],
       "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinBeamFragment"
+      },
+      "label" : "PinBeams",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinBeamVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinCountBadgeFragment"
+      },
+      "label" : "PinCountBadges",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinCountBadgeVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinFragment"
+      },
+      "label" : "Pins",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
       "label" : "PlacementDepthReset",
       "sampleCount" : 4,
       "targets" : [

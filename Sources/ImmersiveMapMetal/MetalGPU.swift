@@ -348,7 +348,7 @@ package final class MetalDevice: GPUDevice, @unchecked Sendable {
     /// device. ASTC is on Apple's own GPUs, not on the Intel and AMD ones of
     /// older Macs.
     package var features: GPUDeviceFeatures {
-        var features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .pointSprites, .unalignedVertexAttributes]
+        var features: GPUDeviceFeatures = [.depthClamp, .triangleEdges, .pointSprites, .unalignedVertexAttributes, .unorm16Textures]
         if device.supportsFamily(.apple2) {
             features.insert(.astc)
         }

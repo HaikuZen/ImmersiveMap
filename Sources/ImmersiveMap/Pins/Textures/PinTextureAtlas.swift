@@ -1,29 +1,25 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
-import CoreGraphics
+import ImmersiveMapGPU
 import os
+import PortableFoundation
 import simd
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
 
 enum PinTextureRasterizer {
-    private static let logger = Logger(subsystem: "ImmersiveMap", category: "Pins")
+    static let logger = Logger(subsystem: "ImmersiveMap", category: "Pins")
 
-    /// A pin's picture as the atlas's texels, `width` by `height`, rows from
-    /// the top: a picture of a `CGImage` drawn by Core Graphics as it always
-    /// was, a picture of pixels resampled.
+    /// A pin's picture as the atlas's texels, `width` by `height`,
+    /// premultiplied BGRA, rows from the top: a picture of a `CGImage` drawn
+    /// by Core Graphics as it always was, a picture of pixels resampled.
     static func makeBGRAData(for image: PinImage,
                              width: Int,
-                             height: Int) -> Data? {
+                             height: Int) -> [UInt8]? {
         switch image.storage {
+        #if canImport(CoreGraphics)
         case .cgImage(let cgImage):
             return makeBGRAData(for: cgImage, width: width, height: height)
+        #endif
         case .pixels(let pixels):
             if let warning = imageSizeWarning(sourceWidth: image.width,
                                               sourceHeight: image.height,
@@ -31,53 +27,12 @@ enum PinTextureRasterizer {
                                               targetHeight: height) {
                 logger.warning("\(warning, privacy: .public)")
             }
-            return Data(PinPixelResampler.resample(pixels,
-                                                   width: image.width,
-                                                   height: image.height,
-                                                   toWidth: width,
-                                                   height: height))
+            return PinPixelResampler.resample(pixels,
+                                              width: image.width,
+                                              height: image.height,
+                                              toWidth: width,
+                                              height: height)
         }
-    }
-
-    static func makeBGRAData(for image: CGImage,
-                             width: Int,
-                             height: Int,
-                             flipVertically: Bool = true) -> Data? {
-        if let warning = imageSizeWarning(sourceWidth: image.width,
-                                          sourceHeight: image.height,
-                                          targetWidth: width,
-                                          targetHeight: height) {
-            logger.warning("\(warning, privacy: .public)")
-        }
-
-        let bytesPerRow = width * 4
-        let byteCount = bytesPerRow * height
-        var data = Data(count: byteCount)
-        let didDraw = data.withUnsafeMutableBytes { bytes -> Bool in
-            guard let baseAddress = bytes.baseAddress else { return false }
-            let colorSpace = CGColorSpaceCreateDeviceRGB()
-            let alphaInfo = CGImageAlphaInfo.premultipliedFirst
-            let bitmapInfo = CGBitmapInfo.byteOrder32Little.union(CGBitmapInfo(rawValue: alphaInfo.rawValue))
-            guard let context = CGContext(data: baseAddress,
-                                          width: width,
-                                          height: height,
-                                          bitsPerComponent: 8,
-                                          bytesPerRow: bytesPerRow,
-                                          space: colorSpace,
-                                          bitmapInfo: bitmapInfo.rawValue)
-            else {
-                return false
-            }
-            if flipVertically {
-                context.translateBy(x: 0, y: CGFloat(height))
-                context.scaleBy(x: 1, y: -1)
-            }
-            context.clear(CGRect(x: 0, y: 0, width: width, height: height))
-            context.interpolationQuality = .high
-            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            return true
-        }
-        return didDraw ? data : nil
     }
 
     static func imageSizeWarning(sourceWidth: Int,
@@ -110,31 +65,27 @@ final class PinTextureAtlas {
         var lastUsedFrame: UInt64
     }
 
-    private let device: MTLDevice
     private let atlasSize: Int
     private let cellSize: Int
     private let pagesMax: Int
 
-    private(set) var textureArray: MTLTexture
+    private(set) var textureArray: any GPUTexture
     private var freeSlots: [PinAtlasSlot] = []
     private var slotsByImage: [ObjectIdentifier: SlotState] = [:]
     private var currentFrame: UInt64 = 0
 
-    init(device: MTLDevice, atlasSize: Int, cellSize: Int, pagesMax: Int) {
-        self.device = device
+    init(device: any GPUDevice, atlasSize: Int, cellSize: Int, pagesMax: Int) {
         self.atlasSize = atlasSize
         self.cellSize = cellSize
         self.pagesMax = pagesMax
         precondition(atlasSize % cellSize == 0, "Atlas size must be divisible by pin cell size.")
-        let descriptor = MTLTextureDescriptor()
-        descriptor.textureType = .type2DArray
-        descriptor.width = atlasSize
-        descriptor.height = atlasSize
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm, width: atlasSize, height: atlasSize)
+        descriptor.type = .type2DArray
         descriptor.arrayLength = pagesMax
-        descriptor.pixelFormat = .bgra8Unorm
-        descriptor.usage = [.shaderRead]
-        descriptor.storageMode = .shared
-        guard let textureArray = device.makeTexture(descriptor: descriptor) else {
+        descriptor.usage = .shaderRead
+        descriptor.storage = .shared
+        descriptor.label = "PinAtlas"
+        guard let textureArray = device.makeTexture(descriptor) else {
             fatalError("Failed to create pin atlas texture array.")
         }
         self.textureArray = textureArray
@@ -175,25 +126,20 @@ final class PinTextureAtlas {
         guard let slot = takeSlot() else {
             return nil
         }
-        let bytesPerRow = cellSize * 4
-        let byteCount = bytesPerRow * cellSize
-        guard let data = PinTextureRasterizer.makeBGRAData(for: image,
-                                                              width: cellSize,
-                                                              height: cellSize)
+        guard let texels = PinTextureRasterizer.makeBGRAData(for: image,
+                                                             width: cellSize,
+                                                             height: cellSize)
         else {
             freeSlots.append(slot)
             return nil
         }
 
-        data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+        texels.withUnsafeBytes { bytes in
             guard let base = bytes.baseAddress else { return }
-            let region = MTLRegionMake2D(slot.cellX * cellSize, slot.cellY * cellSize, cellSize, cellSize)
-            textureArray.replace(region: region,
-                                 mipmapLevel: 0,
-                                 slice: slot.pageIndex,
-                                 withBytes: base,
-                                 bytesPerRow: bytesPerRow,
-                                 bytesPerImage: byteCount)
+            textureArray.replace(x: slot.cellX * cellSize, y: slot.cellY * cellSize,
+                                 width: cellSize, height: cellSize,
+                                 mipmapLevel: 0, slice: slot.pageIndex,
+                                 bytes: base, bytesPerRow: cellSize * 4)
         }
         slotsByImage[key] = SlotState(slot: slot, lastUsedFrame: currentFrame)
         return slot
@@ -236,17 +182,27 @@ final class PinTextureAtlas {
     }
 }
 
-
-
-
-
-
 struct PinCountBadgeAtlasSlot {
     let uvRect: SIMD4<Float>
 }
 
+/// Where a merged pin's counter picture comes from: Core Graphics on
+/// Apple's platforms (`PinTextureRasterizer+CoreGraphics.swift`), the
+/// host's drawer elsewhere (`PinPictureHost`), nil where there is none.
+enum PinCountBadgePicture {
+    static func make(_ key: PinCountBadgeKey, side: Int) -> PinImage? {
+        #if canImport(CoreGraphics)
+        return makeBadgeImage(for: key, side: side)
+        #else
+        return PinPictureHost.drawer?.countBadge(text: key.text, side: side)
+        #endif
+    }
+}
+
 /// Atlas of round bubble counters for merged pins: a white circle with the
-/// number of merged pins; values above 999 are drawn as "999+".
+/// number of merged pins; values above 999 are drawn as "999+". A counter
+/// with no picture (no drawer off Apple's platforms) has no slot, and the
+/// pin is drawn without it.
 final class PinCountBadgeAtlas {
     static let maximumCount = PinCountBadgeKey.maximumCount
 
@@ -254,26 +210,27 @@ final class PinCountBadgeAtlas {
     private let columns: Int
     private let rows: Int
 
-    private(set) var texture: MTLTexture
+    private(set) var texture: any GPUTexture
     private var slotsByKey: [PinCountBadgeKey: PinCountBadgeAtlasSlot] = [:]
+    /// The counters that had no picture, asked for once.
+    private var missingKeys: Set<PinCountBadgeKey> = []
 
-    init(device: MTLDevice,
+    init(device: any GPUDevice,
          badgePixelSize: Int,
          columns: Int = 20) {
         self.cellSize = max(1, badgePixelSize)
         self.columns = max(1, columns)
-        self.rows = Int(ceil(Double(Self.maximumCount + 1) / Double(self.columns)))
+        self.rows = (Self.maximumCount + 1 + self.columns - 1) / self.columns
 
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
-                                                                  width: self.cellSize * self.columns,
-                                                                  height: self.cellSize * self.rows,
-                                                                  mipmapped: false)
-        descriptor.usage = [.shaderRead]
-        descriptor.storageMode = .shared
-        guard let texture = device.makeTexture(descriptor: descriptor) else {
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm,
+                                              width: self.cellSize * self.columns,
+                                              height: self.cellSize * self.rows)
+        descriptor.usage = .shaderRead
+        descriptor.storage = .shared
+        descriptor.label = "PinCountBadgeAtlas"
+        guard let texture = device.makeTexture(descriptor) else {
             fatalError("Failed to create pin count badge atlas texture.")
         }
-        texture.label = "PinCountBadgeAtlas"
         self.texture = texture
     }
 
@@ -282,8 +239,15 @@ final class PinCountBadgeAtlas {
         if let existing = slotsByKey[key] {
             return existing
         }
+        guard missingKeys.contains(key) == false else {
+            return nil
+        }
 
-        guard let image = makeBadgeImage(for: key) else {
+        guard let image = PinCountBadgePicture.make(key, side: cellSize),
+              let texels = PinTextureRasterizer.makeBGRAData(for: image,
+                                                             width: cellSize,
+                                                             height: cellSize) else {
+            missingKeys.insert(key)
             return nil
         }
 
@@ -292,20 +256,11 @@ final class PinCountBadgeAtlas {
         let row = atlasIndex / columns
         let minX = column * cellSize
         let minY = row * cellSize
-        let bytesPerRow = cellSize * 4
-        guard let data = PinTextureRasterizer.makeBGRAData(for: image,
-                                                              width: cellSize,
-                                                              height: cellSize)
-        else {
-            return nil
-        }
-
-        data.withUnsafeBytes { bytes in
+        texels.withUnsafeBytes { bytes in
             guard let baseAddress = bytes.baseAddress else { return }
-            texture.replace(region: MTLRegionMake2D(minX, minY, cellSize, cellSize),
-                            mipmapLevel: 0,
-                            withBytes: baseAddress,
-                            bytesPerRow: bytesPerRow)
+            texture.replace(x: minX, y: minY, width: cellSize, height: cellSize,
+                            mipmapLevel: 0, slice: 0,
+                            bytes: baseAddress, bytesPerRow: cellSize * 4)
         }
 
         let invWidth = 1.0 / Float(texture.width)
@@ -319,42 +274,4 @@ final class PinCountBadgeAtlas {
         slotsByKey[key] = slot
         return slot
     }
-
-    private func makeBadgeImage(for key: PinCountBadgeKey) -> CGImage? {
-        let size = CGSize(width: cellSize, height: cellSize)
-        return PlatformGraphicsImageRenderer.makeCGImage(size: size) { _ in
-            let bounds = CGRect(origin: .zero, size: size)
-            let inset = max(size.width * 0.05, 1.5)
-            let circleRect = bounds.insetBy(dx: inset, dy: inset)
-            let circlePath = PlatformBezierPath(ovalIn: circleRect)
-            PlatformColor.white.setFill()
-            circlePath.fill()
-            PlatformColor(white: 0.0, alpha: 0.10).setStroke()
-            circlePath.lineWidth = max(size.width * 0.03, 1.0)
-            circlePath.stroke()
-
-            let textValue = key.text
-
-            // Three-digit values are squeezed so they don't spill out of the circle.
-            let baseFontSize = size.height * 0.44
-            let fontScale = CGFloat(PinCountBadgeKey.fontScale(characterCount: textValue.count))
-            let font = PlatformFont.monospacedDigitSystemFont(ofSize: baseFontSize * fontScale,
-                                                              weight: .bold)
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: PlatformColor(white: 0.08, alpha: 1.0)
-            ]
-            let text = textValue as NSString
-            let textSize = text.size(withAttributes: attributes)
-            let textRect = CGRect(x: circleRect.midX - textSize.width * 0.5,
-                                  y: circleRect.midY - textSize.height * 0.5,
-                                  width: ceil(textSize.width),
-                                  height: ceil(textSize.height))
-            text.draw(in: textRect, withAttributes: attributes)
-        }
-    }
 }
-
-
-
-

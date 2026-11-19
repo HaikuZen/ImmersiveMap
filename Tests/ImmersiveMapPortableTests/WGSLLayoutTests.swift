@@ -170,6 +170,62 @@ final class WGSLLayoutTests: XCTestCase {
         ])
     }
 
+    func testThePinsMatchTheirSwiftTwins() throws {
+        let common = "Pins/Shaders/PinCommon.wgsl"
+        try assertLayout("ScreenPointOutput", in: common, matches: ScreenPointOutput.self, offsets: [
+            MemoryLayout<ScreenPointOutput>.offset(of: \.position),
+            MemoryLayout<ScreenPointOutput>.offset(of: \.depth),
+            MemoryLayout<ScreenPointOutput>.offset(of: \.visible),
+            MemoryLayout<ScreenPointOutput>.offset(of: \.visibilityAlpha),
+        ])
+        try assertLayout("PinInstanceGPU", in: common, matches: PinInstanceGPU.self, offsets: [
+            MemoryLayout<PinInstanceGPU>.offset(of: \.uvRect),
+            MemoryLayout<PinInstanceGPU>.offset(of: \.borderColor),
+            MemoryLayout<PinInstanceGPU>.offset(of: \.squashScale),
+            MemoryLayout<PinInstanceGPU>.offset(of: \.atlasIndex),
+            MemoryLayout<PinInstanceGPU>.offset(of: \.flags),
+            MemoryLayout<PinInstanceGPU>.offset(of: \.morph),
+            MemoryLayout<PinInstanceGPU>.offset(of: \._pad0),
+            MemoryLayout<PinInstanceGPU>.offset(of: \._pad1),
+        ])
+        try assertLayout("PinCountBadgeInstanceGPU", in: common, matches: PinCountBadgeInstanceGPU.self, offsets: [
+            MemoryLayout<PinCountBadgeInstanceGPU>.offset(of: \.uvRect),
+            MemoryLayout<PinCountBadgeInstanceGPU>.offset(of: \.flags),
+            MemoryLayout<PinCountBadgeInstanceGPU>.offset(of: \.screenSizeScale),
+            MemoryLayout<PinCountBadgeInstanceGPU>.offset(of: \.contentAlpha),
+            MemoryLayout<PinCountBadgeInstanceGPU>.offset(of: \._padding),
+        ])
+        try assertLayout("PinOffset", in: common, matches: PinOffset.self, offsets: [
+            MemoryLayout<PinOffset>.offset(of: \.value),
+            MemoryLayout<PinOffset>.offset(of: \.scale),
+            MemoryLayout<PinOffset>.offset(of: \._padding),
+        ])
+        try assertLayout("PinBeamStyleGPU", in: common, matches: PinBeamStyleGPU.self, offsets: [
+            MemoryLayout<PinBeamStyleGPU>.offset(of: \.pinCenterOffsetPx),
+            MemoryLayout<PinBeamStyleGPU>.offset(of: \.pinBodyHalfMinPx),
+            MemoryLayout<PinBeamStyleGPU>.offset(of: \._padding),
+        ])
+        try assertLayout("PinStyleGPU", in: common, matches: PinStyleGPU.self, offsets: [
+            MemoryLayout<PinStyleGPU>.offset(of: \.sizePx),
+            MemoryLayout<PinStyleGPU>.offset(of: \.anchorUv),
+            MemoryLayout<PinStyleGPU>.offset(of: \.bodyCenterUv),
+            MemoryLayout<PinStyleGPU>.offset(of: \.bodyHalfUv),
+            MemoryLayout<PinStyleGPU>.offset(of: \.circleRadiusUv),
+            MemoryLayout<PinStyleGPU>.offset(of: \.outlineWidthPx),
+            MemoryLayout<PinStyleGPU>.offset(of: \.contentInsetPx),
+            MemoryLayout<PinStyleGPU>.offset(of: \.distanceRangeTexels),
+            MemoryLayout<PinStyleGPU>.offset(of: \.fillColor),
+            MemoryLayout<PinStyleGPU>.offset(of: \.frameless),
+            MemoryLayout<PinStyleGPU>.offset(of: \.distanceInAlpha),
+            MemoryLayout<PinStyleGPU>.offset(of: \._pad1),
+        ])
+        try assertLayout("PinCountBadgeStyleGPU", in: common, matches: PinCountBadgeStyleGPU.self, offsets: [
+            MemoryLayout<PinCountBadgeStyleGPU>.offset(of: \.sizePx),
+            MemoryLayout<PinCountBadgeStyleGPU>.offset(of: \.originXPx),
+            MemoryLayout<PinCountBadgeStyleGPU>.offset(of: \.originYPx),
+        ])
+    }
+
     func testTheLabelsMatchTheirSwiftTwins() throws {
         let common = "Labels/Shaders/Shared/LabelTextCommon.wgsl"
         try assertLayout("ScreenPointOutput", in: common, matches: ScreenPointOutput.self, offsets: [

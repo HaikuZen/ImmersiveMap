@@ -86,6 +86,10 @@ final class WGSLPipelineManifestTests: XCTestCase {
         _ = FXAAPipeline(device: device, pixelFormat: .bgra8Unorm)
         _ = PolygonsPipeline(device: device, pixelFormat: .bgra8Unorm)
         _ = LayerPipeline(device: device, pixelFormat: .bgra8Unorm, sampleCount: 4)
+        // The pins draw in the overlay pass, with one sample.
+        _ = PinPipeline(device: device, pixelFormat: .bgra8Unorm)
+        _ = PinCountBadgePipeline(device: device, pixelFormat: .bgra8Unorm)
+        _ = PinBeamPipeline(device: device, pixelFormat: .bgra8Unorm)
         // The starfield as WebGPU draws it, on a device without point
         // sprites, and the model tiles as it reads their vertex, on one
         // without unaligned attributes.
