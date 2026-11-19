@@ -238,9 +238,14 @@ enum PinPixelResampler {
 extension PinImage {
     /// The picture a pin shows while its remote picture loads, when it was
     /// given no placeholder of its own. Apple's platforms draw it with Core
-    /// Graphics (`PinImageLoader`). Here it is the same dark square without
-    /// the figure on it, until the host draws the pins' pictures.
+    /// Graphics (`PinImageLoader`). Here the host's drawer draws it
+    /// (`PinPictureHost`), made on first use, so the host sets its drawer
+    /// before it makes a pin. Without one it is the same dark square
+    /// without the figure on it.
     public static let defaultPlaceholder: PinImage = {
+        if let drawn = PinPictureHost.drawer?.placeholder(side: 64) {
+            return drawn
+        }
         let side = 64
         // 0.18, 0.20, 0.24 of the Apple placeholder, opaque, as BGRA.
         let texel: [UInt8] = [61, 51, 46, 255]

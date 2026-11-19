@@ -46,8 +46,9 @@ struct PortableEngineLayoutTests {
     /// that imports neither may still need one that does.
     static let appleOnlyFolders: Set<String> = ["UI", "Pins"]
     /// The files of those folders that build everywhere all the same: the
-    /// pins' picture, model, controller, tap event, clustering and
-    /// presentation.
+    /// pins' picture, model, controller, tap event, clustering,
+    /// presentation, selection, shape and its distance field, and the
+    /// host's drawer of their pictures.
     static let portableInAppleOnlyFolders: Set<String> = [
         "Pins/Clustering/PinCollisionLayoutSolver.swift",
         "Pins/Clustering/PinCollisionMath.swift",
@@ -58,9 +59,16 @@ struct PortableEngineLayoutTests {
         "Pins/LazyPinRenderResource.swift",
         "Pins/PinImage.swift",
         "Pins/PinImageSource.swift",
+        "Pins/PinPictureDrawing.swift",
         "Pins/PinRenderSource.swift",
+        "Pins/PinShape.swift",
+        "Pins/PinShapePath.swift",
+        "Pins/PinTypes.swift",
         "Pins/Presentation/PinPresentationStateStore.swift",
-        "Pins/Presentation/PinVisibilityFadeStateStore.swift"
+        "Pins/Presentation/PinVisibilityFadeStateStore.swift",
+        "Pins/Selection/PinSelection.swift",
+        "Pins/Selection/PinSelectionProjector.swift",
+        "Pins/Textures/PinShapeDistanceField.swift"
     ]
 
     /// What the rule in PortableEngineExclusions.txt names today.

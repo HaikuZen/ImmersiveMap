@@ -245,22 +245,17 @@ struct PinCountBadgeAtlasSlot {
     let uvRect: SIMD4<Float>
 }
 
-private enum PinCountBadgeAtlasKey: Hashable {
-    case count(Int)
-    case overflow
-}
-
 /// Atlas of round bubble counters for merged pins: a white circle with the
 /// number of merged pins; values above 999 are drawn as "999+".
 final class PinCountBadgeAtlas {
-    static let maximumCount = 999
+    static let maximumCount = PinCountBadgeKey.maximumCount
 
     private let cellSize: Int
     private let columns: Int
     private let rows: Int
 
     private(set) var texture: MTLTexture
-    private var slotsByKey: [PinCountBadgeAtlasKey: PinCountBadgeAtlasSlot] = [:]
+    private var slotsByKey: [PinCountBadgeKey: PinCountBadgeAtlasSlot] = [:]
 
     init(device: MTLDevice,
          badgePixelSize: Int,
@@ -283,9 +278,7 @@ final class PinCountBadgeAtlas {
     }
 
     func slot(for badge: PinCountBadge) -> PinCountBadgeAtlasSlot? {
-        let key: PinCountBadgeAtlasKey = badge.count > Self.maximumCount
-            ? .overflow
-            : .count(max(1, badge.count))
+        let key = PinCountBadgeKey(badge)
         if let existing = slotsByKey[key] {
             return existing
         }
@@ -294,13 +287,7 @@ final class PinCountBadgeAtlas {
             return nil
         }
 
-        let atlasIndex: Int
-        switch key {
-        case .count(let count):
-            atlasIndex = count - 1
-        case .overflow:
-            atlasIndex = Self.maximumCount
-        }
+        let atlasIndex = key.atlasIndex
         let column = atlasIndex % columns
         let row = atlasIndex / columns
         let minX = column * cellSize
@@ -333,7 +320,7 @@ final class PinCountBadgeAtlas {
         return slot
     }
 
-    private func makeBadgeImage(for key: PinCountBadgeAtlasKey) -> CGImage? {
+    private func makeBadgeImage(for key: PinCountBadgeKey) -> CGImage? {
         let size = CGSize(width: cellSize, height: cellSize)
         return PlatformGraphicsImageRenderer.makeCGImage(size: size) { _ in
             let bounds = CGRect(origin: .zero, size: size)
@@ -346,17 +333,11 @@ final class PinCountBadgeAtlas {
             circlePath.lineWidth = max(size.width * 0.03, 1.0)
             circlePath.stroke()
 
-            let textValue: String
-            switch key {
-            case .count(let count):
-                textValue = "\(count)"
-            case .overflow:
-                textValue = "\(Self.maximumCount)+"
-            }
+            let textValue = key.text
 
             // Three-digit values are squeezed so they don't spill out of the circle.
             let baseFontSize = size.height * 0.44
-            let fontScale: CGFloat = textValue.count <= 2 ? 1.0 : (textValue.count == 3 ? 0.82 : 0.66)
+            let fontScale = CGFloat(PinCountBadgeKey.fontScale(characterCount: textValue.count))
             let font = PlatformFont.monospacedDigitSystemFont(ofSize: baseFontSize * fontScale,
                                                               weight: .bold)
             let attributes: [NSAttributedString.Key: Any] = [
