@@ -124,6 +124,12 @@ struct PortableMapRendererTests {
                                                image: picture))
         #expect(map.render(into: target, width: 64, height: 48, pixelsPerPoint: 2))
         #expect(device.textures.contains { $0.descriptor.label == "PinAtlas" })
+        // A tap a little above the drawing's centre, in points, lands on the
+        // pin's body, which stands on its point.
+        #expect(map.pin(atX: 16, y: 10, pixelsPerPoint: 2) == 1)
+        map.pinsController.remove(ids: [1])
+        #expect(map.render(into: target, width: 64, height: 48, pixelsPerPoint: 2))
+        #expect(map.pin(atX: 16, y: 10, pixelsPerPoint: 2) == nil)
     }
 
     /// A pin added, changed or removed asks for a frame, as the camera does.

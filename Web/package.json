@@ -20,6 +20,7 @@
     "map/map.mjs",
     "map/rangeCache.mjs",
     "map/poiIcons.mjs",
+    "map/pinPictures.mjs",
     "map/tileWorker.mjs",
     "map/build/"
   ],

@@ -105,6 +105,19 @@ package final class PortableMapRenderer {
         pins.controller
     }
 
+    /// The pin drawn at the point, in points from the drawing's top left
+    /// corner, a point being `pixelsPerPoint` pixels, on the last frame
+    /// drawn: the topmost, as the Apple views test a tap. Nil where none is.
+    package func pin(atX x: Double, y: Double, pixelsPerPoint: Double) -> UInt64? {
+        let snapshot = eventSink.pinSelectionSnapshot
+        guard snapshot.entries.isEmpty == false, snapshot.drawSize.height > 0 else { return nil }
+        let pixel = SelectionPointMath.pixelPoint(from: CGPoint(x: x, y: y),
+                                                  drawSize: snapshot.drawSize,
+                                                  contentsScale: CGFloat(pixelsPerPoint))
+        guard case .pin(let id) = snapshot.hitTest(point: pixel) else { return nil }
+        return id
+    }
+
     /// The POI icons' atlas a host draws for `init`, as JSON
     /// (`PoiSpriteAtlasLayout.hostDescription`): where each icon goes and
     /// in what format.
@@ -515,7 +528,23 @@ private final class PortableEventSink: RenderFrameEventSink, @unchecked Sendable
         lock.unlock()
     }
 
-    func updateSelectionPickData(_ pickData: [any SelectionPickData]) {}
+    /// The pins of the last frame drawn, as a tap is tested against them.
+    private var pinPickData: PinSelectionSnapshot = .empty
+
+    var pinSelectionSnapshot: PinSelectionSnapshot {
+        lock.lock()
+        defer { lock.unlock() }
+        return pinPickData
+    }
+
+    func updateSelectionPickData(_ pickData: [any SelectionPickData]) {
+        guard let pins = pickData.lazy.compactMap({ $0 as? PinSelectionSnapshot }).last else { return }
+        lock.lock()
+        if pins.frameIndex >= pinPickData.frameIndex {
+            pinPickData = pins
+        }
+        lock.unlock()
+    }
     func completeSceneModelPathAnimations(_ results: [SceneModelPathAnimationResult]) {}
     func updateDebugOverlayHUDSnapshot(_ snapshot: DebugOverlayHUDSnapshot?) {}
 }

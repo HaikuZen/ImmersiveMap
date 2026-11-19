@@ -27,7 +27,8 @@
 // with the page's fetch, drawn only when something changed. Drag to move,
 // the wheel or a pinch to zoom, a right drag or a Shift drag to turn and
 // tilt. `?archive=<url>` reads another tile archive, `?msaa=0` turns MSAA
-// off, `?markers=0` leaves out the sample markers, `?tilecache=0` reads
+// off, `?markers=0` leaves out the sample markers, `?pins=0` the sample
+// pins (a tap on one says which in the status line), `?tilecache=0` reads
 // every range from the network, `?credit=<text>` credits another archive's
 // data in place of OpenStreetMap (`&creditlink=<url>` its license page),
 // `?stats=1` shows how long the module holds the page's thread,
@@ -83,6 +84,7 @@ try {
         onError: (message) => { errors.push(message); show(); },
         onWarning: (message) => { notes.push(message); show(); },
         onDownloadFailure: show,
+        onPinTap: (pin) => say(`Tapped the pin of ${pin.data}`),
     });
     show();
     if (showStats) setInterval(show, 1000);
@@ -95,6 +97,31 @@ try {
             element.className = 'marker';
             element.append(Object.assign(document.createElement('span'), { textContent: name }));
             map.addMarker({ latitude, longitude, element });
+        }
+    }
+    if (query.get('pins') !== '0') {
+        // Pictures drawn on a canvas, one a colour, shared by the pins of
+        // that colour, and a counter on some.
+        const picture = (color) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 128;
+            const context = canvas.getContext('2d');
+            context.fillStyle = color;
+            context.fillRect(0, 0, 128, 128);
+            context.fillStyle = 'rgba(255, 255, 255, 0.85)';
+            context.beginPath();
+            context.arc(64, 64, 34, 0, Math.PI * 2);
+            context.fill();
+            return canvas;
+        };
+        const warm = picture('#e4572e');
+        const cool = picture('#2e86ab');
+        for (const [latitude, longitude, name, image, badge] of [
+            [51.5072, -0.1276, 'London', warm, 0], [52.52, 13.405, 'Berlin', cool, 4],
+            [40.4168, -3.7038, 'Madrid', warm, 0], [59.3293, 18.0686, 'Stockholm', cool, 12],
+            [34.0522, -118.2437, 'Los Angeles', warm, 0], [-23.5505, -46.6333, 'São Paulo', cool, 0],
+        ]) {
+            map.addPin({ latitude, longitude, image, badge, data: name });
         }
     }
 } catch (error) {

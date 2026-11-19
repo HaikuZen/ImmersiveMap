@@ -154,6 +154,13 @@ try {
     // A marker where the camera looks, and one on the far side of the globe.
     map.setMarker(1, 45.46, 9.19);
     map.setMarker(2, -45.46, -170.81);
+    // A pin where the camera looks, drawn by the engine: Node has no 2D
+    // canvas, so it is the bubble with a picture of the run's own pixels,
+    // with no counter. Its body stands above its point, the bubble's tail
+    // on it.
+    const picture = map.addPicture({ width: 64, height: 64, rgba: new Uint8Array(64 * 64 * 4).fill(200) });
+    map.setPin(7, { latitude: 45.46, longitude: 9.19, picture, badge: 3 });
+    let pinChecked = false;
     // Frames with the event loop turning between them, so the requests'
     // answers and the GPU's completions arrive as on a page. Every one is
     // offered, as a page that keeps asking would: a frame not needed draws
@@ -170,12 +177,29 @@ try {
             }
             if (places.some((place) => place.id === 2)) errors.push('map: a marker beyond the horizon was placed');
         }
+        if (frame === 2) {
+            const hit = map.pinAt(size[0] / 2, size[1] / 2 - 12, 1);
+            if (hit !== 7) errors.push(`map: a tap on the pin above the canvas's centre found ${hit}, not pin 7`);
+            if (map.pinAt(4, 4, 1) !== null) errors.push('map: a tap in the corner found a pin');
+            pinChecked = true;
+        }
         move(map, frame);
         if (frame === 70) map.removeMarker(1);
+        if (frame === 70) map.removePin(7);
         await device.queue.onSubmittedWorkDone();
         await new Promise((resolve) => setTimeout(resolve, 5));
     }
     if (map.markers().some((place) => place.id === 1)) errors.push('map: a removed marker is still placed');
+    if (!pinChecked) errors.push('map: the pin was not checked');
+    for (let x = 0; x < size[0]; x += 8) {
+        for (let y = 0; y < size[1]; y += 8) {
+            if (map.pinAt(x, y, 1) !== null) {
+                errors.push('map: a removed pin is still hit');
+                x = size[0];
+                break;
+            }
+        }
+    }
     // The workers did the parsing: a tile they prepared and the map refused
     // or never got would have been parsed on the page's thread, silently.
     const workerCounts = map.tileWorkers();

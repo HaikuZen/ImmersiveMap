@@ -171,6 +171,111 @@ func mapMarkers() -> UnsafeMutableRawPointer? {
     return UnsafeMutableRawPointer(buffer.baseAddress)
 }
 
+/// Sets the pins' picture drawer and remote picture loader, before
+/// `immersivemap_map_start`: the drawer where the page has a 2D canvas
+/// (`drawsPictures`), the loader where it can fetch and decode a picture
+/// (`loadsImages`). Without them a pin's shape other than the bubble is
+/// drawn as the bubble, a counter is left out and a remote picture keeps
+/// the placeholder.
+@_expose(wasm, "immersivemap_pins_start")
+@_cdecl("immersivemap_pins_start")
+func pinsStart(_ drawsPictures: Int32, _ loadsImages: Int32) {
+    BrowserPins.start(drawsPictures: drawsPictures != 0, loadsImages: loadsImages != 0)
+}
+
+/// A picture for pins, `width` by `height` pixels of straight RGBA at
+/// `rgba` (a canvas's `getImageData`), kept until released. Returns its id,
+/// 0 for a size of no pixels. Pins given the same id share the picture.
+@_expose(wasm, "immersivemap_pin_picture")
+@_cdecl("immersivemap_pin_picture")
+func pinPicture(_ width: Int32, _ height: Int32, _ rgba: UnsafePointer<UInt8>?) -> UInt32 {
+    guard let rgba, width > 0, height > 0 else { return 0 }
+    return BrowserPins.addPicture(width: Int(width), height: Int(height), rgba: rgba)
+}
+
+/// Lets go of a picture. Pins that show it keep it until they change.
+@_expose(wasm, "immersivemap_pin_picture_release")
+@_cdecl("immersivemap_pin_picture_release")
+func pinPictureRelease(_ id: UInt32) {
+    BrowserPins.pictures[id] = nil
+}
+
+/// Places the pin of the page's id, or changes it: at the point, showing
+/// the picture of id `picture`, or the picture at the URL, UTF-8 at `url`,
+/// with that picture (or the placeholder) until it loads. `badge` is the
+/// counter's number, none when 0. `border` is the outline's colour as RGBA
+/// bytes, red highest, used when bit 1 of `flags` is set, the settings'
+/// otherwise. `scale` sizes the pin, `priority` draws it over pins of less,
+/// bit 0 of `flags` draws it as selected. Returns 1 when placed, 0 when the
+/// pin has no picture.
+@_expose(wasm, "immersivemap_map_set_pin")
+@_cdecl("immersivemap_map_set_pin")
+func mapSetPin(_ id: UInt32, _ latitude: Double, _ longitude: Double,
+               _ picture: UInt32, _ url: UnsafePointer<UInt8>?, _ urlLength: Int32,
+               _ badge: Int32, _ border: UInt32, _ scale: Double, _ priority: Int32, _ flags: Int32) -> Int32 {
+    let image = BrowserPins.pictures[picture]
+    let remote = url.flatMap { url in
+        urlLength > 0 ? URL(string: String(decoding: UnsafeBufferPointer(start: url, count: Int(urlLength)), as: UTF8.self)) : nil
+    }
+    let source: PinImageSource
+    if let remote {
+        source = .remote(remote, placeholder: image)
+    } else if let image {
+        source = .image(image)
+    } else {
+        return 0
+    }
+    var borderColor: SIMD4<Float>?
+    if flags & 2 != 0 {
+        borderColor = SIMD4<Float>(Float((border >> 24) & 0xFF), Float((border >> 16) & 0xFF),
+                                   Float((border >> 8) & 0xFF), Float(border & 0xFF)) / 255
+    }
+    let pin = ImmersiveMapPin(id: UInt64(id),
+                              coordinate: GeoCoordinate(latitude: latitude, longitude: longitude),
+                              image: source,
+                              countBadge: badge > 0 ? PinCountBadge(count: Int(badge)) : nil,
+                              borderColor: borderColor,
+                              screenSizeScale: Float(scale),
+                              isSelected: flags & 1 != 0,
+                              drawPriority: Int(priority))
+    MainActor.assumeIsolated { map?.pinsController.upsert([pin]) }
+    return 1
+}
+
+/// Takes the pin of the page's id away.
+@_expose(wasm, "immersivemap_map_remove_pin")
+@_cdecl("immersivemap_map_remove_pin")
+func mapRemovePin(_ id: UInt32) {
+    MainActor.assumeIsolated { map?.pinsController.remove(ids: [UInt64(id)]) }
+}
+
+/// The page's id of the pin drawn at the point, in points from the
+/// canvas's top left corner, on the last frame drawn, -1 where none is.
+@_expose(wasm, "immersivemap_map_pin_at")
+@_cdecl("immersivemap_map_pin_at")
+func mapPinAt(_ x: Double, _ y: Double, _ pixelsPerPoint: Double) -> Double {
+    MainActor.assumeIsolated {
+        // Converted as a number: `map(Double.init)` takes `init(bitPattern:)`.
+        map?.pin(atX: x, y: y, pixelsPerPoint: pixelsPerPoint).map { Double($0) } ?? -1
+    }
+}
+
+/// The page wants room for a loaded picture (BrowserPins.swift).
+@_expose(wasm, "immersivemap_pins_image_buffer")
+@_cdecl("immersivemap_pins_image_buffer")
+func pinsImageBuffer(_ id: UInt32, _ width: Int32, _ height: Int32) -> UnsafeMutableRawPointer? {
+    BrowserPins.imageBuffer(id: id, width: Int(width), height: Int(height))
+}
+
+/// The page loaded a picture into the buffer (`loaded` 1) or could not
+/// (0), and the tasks it wakes run now.
+@_expose(wasm, "immersivemap_pins_image_finish")
+@_cdecl("immersivemap_pins_image_finish")
+func pinsImageFinish(_ id: UInt32, _ loaded: Int32) {
+    BrowserPins.finishImage(id: id, loaded: loaded != 0)
+    runReadyTasks()
+}
+
 /// A drag of the points. Stops a glide.
 @_expose(wasm, "immersivemap_map_pan")
 @_cdecl("immersivemap_map_pan")

@@ -53,6 +53,10 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 /// - drawPoiIcons: given the POI icons' atlas layout the module describes,
 ///   returns the atlas's pixels (`drawPoiAtlas` of poiIcons.mjs) or null
 ///   for no icons, the default.
+/// - pinPictures: the pins' pictures the page draws and loads
+///   (`makePinPictures` of pinPictures.mjs), null for none, the default,
+///   when a pin's shape other than the bubble is drawn as the bubble, a
+///   counter is left out and a remote picture keeps the placeholder.
 /// Returns:
 /// - `frame(width, height, pixelsPerPoint)`, which runs what the module has
 ///   ready and draws a frame only when one is needed. It returns
@@ -67,6 +71,14 @@ async function fetchRange({ url, headers, start, end }, fetchFunction) {
 /// - `attribution()`: the credits the map's data asks for at the camera's
 ///   zoom, `{ credits, link }`, the words in order and where a click on
 ///   them leads (null for nowhere).
+/// - The pins, which the engine draws: `addPicture({ width, height, rgba })`
+///   keeps a picture (straight RGBA) and returns its id, which pins share,
+///   `releasePicture(id)`, `setPin(id, { latitude, longitude, picture, url,
+///   badge, border, scale, priority, selected })` with an id of the page's
+///   places or changes a pin (a `url` is loaded, the `picture` shown until
+///   then; `border` is `[r, g, b, a]` from 0 to 1), `removePin(id)`, and
+///   `pinAt(x, y, pixelsPerPoint)`, the id of the pin drawn at the point on
+///   the last frame, in points from the canvas's top left corner, or null.
 /// - The markers: `setMarker(id, lat, lon)` with an id of the page's (an
 ///   integer from 0 to 2^32 - 1), `removeMarker(id)`, and `markers()`, the
 ///   places on the last frame drawn, `{ id, x, y, alpha }` in points from the
@@ -92,7 +104,7 @@ export async function startMap({
     device, module, shaders, resources, canvasTexture,
     archiveURL = '', multisample = true, fetch: fetchFunction = globalThis.fetch,
     warn = console.warn, print, wake = () => {}, downloadFailed = () => {}, rangeCache = null,
-    drawPoiIcons = () => null, attribution = null, tileWorkers = [],
+    drawPoiIcons = () => null, attribution = null, tileWorkers = [], pinPictures = null,
 }) {
     const files = new Map([...resources].map(([name, bytes]) => [`${resourceFolder.slice(1)}/${name}`, bytes]));
     const wasi = new WASIShim({
@@ -176,6 +188,42 @@ export async function startMap({
                 worker.send({ type: 'prepare', id, x, y, z, bytes }, [bytes.buffer]);
             },
         },
+        immersivemap_pins: {
+            // Drawn at once, into the module's memory.
+            coverage(jsonPointer, jsonLength, side, margin, out) {
+                const inside = pinPictures?.coverage(text(jsonPointer, jsonLength), side, margin);
+                if (!inside) return 0;
+                new Uint8Array(memory(), out, side * side).set(inside);
+                return 1;
+            },
+            badge(textPointer, textLength, side, out) {
+                const pixels = pinPictures?.badge(text(textPointer, textLength), side);
+                if (!pixels) return 0;
+                new Uint8Array(memory(), out, side * side * 4).set(pixels);
+                return 1;
+            },
+            placeholder(side, out) {
+                const pixels = pinPictures?.placeholder(side);
+                if (!pixels) return 0;
+                new Uint8Array(memory(), out, side * side * 4).set(pixels);
+                return 1;
+            },
+            // Answered on a later turn of the event loop.
+            image(id, urlPointer, urlLength) {
+                const url = text(urlPointer, urlLength);
+                Promise.resolve(pinPictures?.load(url)).then(({ width, height, rgba }) => {
+                    const pointer = instance.exports.immersivemap_pins_image_buffer(id, width, height);
+                    if (pointer === 0) throw new Error('the module made no room for the picture');
+                    new Uint8Array(memory(), pointer, width * height * 4).set(rgba);
+                    timed(timings.answers, () => instance.exports.immersivemap_pins_image_finish(id, 1));
+                    wake();
+                }).catch((error) => {
+                    warn(`ImmersiveMap: the pin's picture at ${url} did not load: ${error?.message ?? error}`);
+                    timed(timings.answers, () => instance.exports.immersivemap_pins_image_finish(id, 0));
+                    wake();
+                });
+            },
+        },
         immersivemap_fetch: {
             range(id, urlPointer, urlLength, headersPointer, headersLength, start, end) {
                 const url = text(urlPointer, urlLength);
@@ -238,6 +286,8 @@ export async function startMap({
     const atlasPointer = place(poiAtlas);
     const attributionJSON = encoder.encode(attribution ? JSON.stringify(attribution) : '');
     const attributionPointer = place(attributionJSON);
+    // The pins' drawer and loader, before the map makes its pins.
+    instance.exports.immersivemap_pins_start(pinPictures ? 1 : 0, pinPictures ? 1 : 0);
     const started = instance.exports.immersivemap_map_start(engineFeatures(device), multisample ? 1 : 0,
                                                             archivePointer, archive.length,
                                                             atlasPointer, poiAtlas.length,
@@ -270,6 +320,31 @@ export async function startMap({
         look: changing((latitude, longitude, zoom) => exports.immersivemap_map_look(latitude, longitude, zoom)),
         setMarker: changing((id, latitude, longitude) => exports.immersivemap_map_set_marker(id, latitude, longitude)),
         removeMarker: changing((id) => exports.immersivemap_map_remove_marker(id)),
+        addPicture({ width, height, rgba }) {
+            const pointer = place(rgba);
+            const id = exports.immersivemap_pin_picture(width, height, pointer);
+            exports.immersivemap_free(pointer);
+            if (id === 0) throw new TypeError('A pin\'s picture has no pixels');
+            return id;
+        },
+        releasePicture: (id) => exports.immersivemap_pin_picture_release(id),
+        setPin: changing((id, { latitude, longitude, picture = 0, url = '', badge = 0, border = null,
+                                scale = 1, priority = 0, selected = false }) => {
+            const urlBytes = encoder.encode(url ? String(url) : '');
+            const urlPointer = place(urlBytes);
+            const byte = (value) => Math.max(0, Math.min(255, Math.round(value * 255)));
+            const packed = border ? ((byte(border[0]) << 24) | (byte(border[1]) << 16) | (byte(border[2]) << 8) | byte(border[3] ?? 1)) >>> 0 : 0;
+            const placed = exports.immersivemap_map_set_pin(id, latitude, longitude, picture, urlPointer, urlBytes.length,
+                                                            Math.max(0, Math.floor(badge)), packed, scale, Math.floor(priority),
+                                                            (selected ? 1 : 0) | (border ? 2 : 0));
+            exports.immersivemap_free(urlPointer);
+            if (placed !== 1) throw new TypeError('A pin needs a picture or a URL');
+        }),
+        removePin: changing((id) => exports.immersivemap_map_remove_pin(id)),
+        pinAt(x, y, pixelsPerPoint) {
+            const id = exports.immersivemap_map_pin_at(x, y, pixelsPerPoint);
+            return id < 0 ? null : id;
+        },
         attribution() {
             const pointer = exports.immersivemap_map_attribution();
             if (pointer === 0) return { credits: [], link: null };

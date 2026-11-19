@@ -89,6 +89,20 @@ final class PinTextureAtlasTests: XCTestCase {
         }
     }
 
+    /// A picture in a cell stays alive while the cell holds it, so no new
+    /// picture can come to its identity and be taken for it.
+    func testASlotKeepsItsPictureAlive() throws {
+        let atlas = PinTextureAtlas(device: device, atlasSize: 128, cellSize: 64, pagesMax: 1)
+        atlas.beginFrame(1)
+        weak var released: PinImage?
+        do {
+            let image = Self.makeImage(gray: 0x30)
+            released = image
+            XCTAssertNotNil(atlas.uploadImage(image))
+        }
+        XCTAssertNotNil(released, "the atlas holds the picture of its cell")
+    }
+
     #if !canImport(CoreGraphics)
     /// Without the host's drawer a counter has no picture and no slot, and
     /// the atlas does not ask again.

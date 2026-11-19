@@ -117,6 +117,8 @@ export interface ImmersiveMapOptions {
     onWarning?: (message: string) => void;
     /** After each failed request of the tile archive. The engine only logs them. */
     onDownloadFailure?: (downloads: Downloads) => void;
+    /** A tap on a pin, the topmost under the pointer, with the point in points from the canvas's top left corner. */
+    onPinTap?: (pin: Pin, point: { x: number; y: number }) => void;
 }
 
 /** A page's own attribution, as the Apple views' `attributionOverride`. */
@@ -153,6 +155,43 @@ export interface Marker {
     remove(): void;
 }
 
+/** A picture of the page's a pin shows. Pins given the same object share one picture. */
+export type PinPicture = HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | ImageBitmap | ImageData;
+
+export interface PinOptions extends Coordinate {
+    /**
+     * A URL to load (the archive's origin rules apply: another origin must
+     * allow the page's), or a picture of the page's. An image element must
+     * have loaded.
+     */
+    image: string | URL | PinPicture;
+    /** Shown while a URL loads. The map's own placeholder by default. */
+    placeholder?: PinPicture | null;
+    /** A counter's number on the pin, none when 0. Above 999 it reads "999+". */
+    badge?: number;
+    /** The outline's colour, `[r, g, b, a]` from 0 to 1. The map's own by default. */
+    borderColor?: [number, number, number, number] | null;
+    /** Sizes the pin. 1 by default. */
+    scale?: number;
+    /** Draws the pin over pins of less. 0 by default. */
+    priority?: number;
+    /** Draws the pin as selected. */
+    selected?: boolean;
+    /** Anything of the page's, carried on the pin as `data`. */
+    data?: unknown;
+}
+
+export interface Pin {
+    readonly id: number;
+    readonly data: unknown;
+    /** Moves the pin to the point. */
+    setPosition(coordinate: Coordinate): void;
+    /** Changes what was given to `addPin`. */
+    update(changes: Partial<Omit<PinOptions, 'data'>>): void;
+    /** Takes the pin away. */
+    remove(): void;
+}
+
 export declare class ImmersiveMap {
     /**
      * Makes the map in the element, which it fills: a canvas and a layer of
@@ -186,6 +225,15 @@ export declare class ImmersiveMap {
      * and hidden beyond it.
      */
     addMarker(options: MarkerOptions): Marker;
+
+    /**
+     * A pin, drawn by the map itself in its own frame, as the Apple views
+     * draw theirs: pushed apart from its neighbours, grouped, faded in and
+     * out. Its look (size, shape, fill) is the map's.
+     */
+    addPin(options: PinOptions): Pin;
+    /** The pin drawn at the point, in points from the canvas's top left corner, on the last frame, or null. */
+    pinAt(x: number, y: number): Pin | null;
 
     /** Stops drawing, lets go of the input and the GPU device, and takes the canvas and the markers out of the element. */
     destroy(): void;

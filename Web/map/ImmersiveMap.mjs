@@ -18,6 +18,7 @@ import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
 import { startMap, fetchResources } from './map.mjs';
 import { ArchiveRangeCache, openBrowserStore } from './rangeCache.mjs';
 import { drawPoiAtlas } from './poiIcons.mjs';
+import { makePinPictures } from './pinPictures.mjs';
 
 /// How a drag and the wheel move the camera.
 const input = {
@@ -34,6 +35,9 @@ const input = {
     /// for `releaseStillTime` (it stopped before lifting).
     releaseVelocityWindow: 100,
     releaseStillTime: 50,
+    /// A press that moves less than this many points before it lifts is a
+    /// tap, which may land on a pin.
+    tapSlop: 6,
 };
 
 /// The `attribution` option's object, checked before the module reads it.
@@ -92,6 +96,14 @@ export class ImmersiveMap {
     #options;
     #markers = new Map();
     #nextMarkerID = 1;
+    #pins = new Map();
+    #nextPinID = 1;
+    #pinPictures = null;
+    /// The module's pictures by the page's source (an element, an
+    /// `ImageData`), with the pins that show each: pins of one source share
+    /// one picture.
+    #pictures = new Map();
+    #pixelsPerPoint = 1;
     #frameRequest = null;
     #idleTick = null;
     #listeners = new AbortController();
@@ -109,6 +121,7 @@ export class ImmersiveMap {
             onError: (message) => console.error(message),
             onWarning: (message) => console.warn(message),
             onDownloadFailure: () => {},
+            onPinTap: () => {},
             attribution: true,
             ...options,
         };
@@ -190,6 +203,9 @@ export class ImmersiveMap {
             // Maki's icons (poiIcons.mjs), where Apple's platforms draw SF
             // Symbols.
             drawPoiIcons: drawPoiAtlas,
+            // The pins' counters, shapes and placeholder, drawn with a 2D
+            // canvas where Apple's platforms draw them with Core Graphics.
+            pinPictures: (this.#pinPictures = makePinPictures()),
             attribution: typeof this.#options.attribution === 'object' ? this.#options.attribution : null,
         });
         if (camera) this.lookAt(camera);
@@ -258,6 +274,110 @@ export class ImmersiveMap {
                 map.#map?.removeMarker(id);
             },
         };
+    }
+
+    // MARK: - Pins
+
+    /// A pin, drawn by the map itself (in the map's own frame, unlike a
+    /// marker): its `image` is a URL to load (the `placeholder`, or the
+    /// map's own, shown until then) or a picture of the page's (an image
+    /// element, a canvas, an `ImageBitmap`, an `ImageData`), pins of one
+    /// picture sharing it. `badge` is a counter's number, `borderColor`
+    /// `[r, g, b, a]` from 0 to 1 (the map's own by default), `scale`
+    /// sizes the pin, `priority` draws it over pins of less, `selected`
+    /// draws it as selected. `onPinTap` hears a tap on it. Returns the
+    /// pin, to change, move or remove.
+    addPin({ latitude, longitude, image, placeholder = null, badge = 0, borderColor = null,
+             scale = 1, priority = 0, selected = false, data = undefined }) {
+        if (image === undefined || image === null) throw new TypeError('A pin needs an image');
+        const id = this.#nextPinID;
+        this.#nextPinID = this.#nextPinID >= 0xFFFFFFFF ? 1 : this.#nextPinID + 1;
+        const map = this;
+        const state = { latitude, longitude, image, placeholder, badge, borderColor, scale, priority, selected, pictures: [] };
+        const pin = {
+            id,
+            data,
+            /// Moves the pin to the point.
+            setPosition({ latitude, longitude }) {
+                if (!map.#pins.has(id)) return;
+                Object.assign(state, { latitude, longitude });
+                map.#placePin(id, state);
+            },
+            /// Changes what was given to `addPin`: the image, the counter,
+            /// the look, the selection.
+            update(changes) {
+                if (!map.#pins.has(id)) return;
+                Object.assign(state, changes);
+                map.#placePin(id, state);
+            },
+            /// Takes the pin away.
+            remove() {
+                if (!map.#pins.delete(id)) return;
+                map.#map?.removePin(id);
+                map.#releasePictures(state.pictures);
+                state.pictures = [];
+            },
+        };
+        this.#pins.set(id, { pin, state });
+        this.#placePin(id, state);
+        return pin;
+    }
+
+    /// The pin as the module holds it, its pictures taken anew.
+    #placePin(id, state) {
+        if (!this.#map) return;
+        const isURL = typeof state.image === 'string' || state.image instanceof URL;
+        const sources = [isURL ? state.placeholder : state.image].filter((source) => source);
+        const pictures = sources.map((source) => this.#picture(source));
+        this.#releasePictures(state.pictures);
+        state.pictures = pictures;
+        this.#map.setPin(id, {
+            latitude: state.latitude,
+            longitude: state.longitude,
+            picture: pictures[0] ?? 0,
+            url: isURL ? String(state.image) : '',
+            badge: state.badge,
+            border: state.borderColor,
+            scale: state.scale,
+            priority: state.priority,
+            selected: state.selected,
+        });
+    }
+
+    /// The module's picture of the source, shared by the pins that show it.
+    #picture(source) {
+        let entry = this.#pictures.get(source);
+        if (!entry) {
+            const pixels = typeof ImageData === 'function' && source instanceof ImageData
+                ? { width: source.width, height: source.height, rgba: source.data }
+                : this.#pinPictures?.pixels(source);
+            if (!pixels) throw new TypeError('This page cannot read a pin\'s picture without a 2D canvas: give an ImageData');
+            entry = { id: this.#map.addPicture(pixels), users: 0 };
+            this.#pictures.set(source, entry);
+        }
+        entry.users += 1;
+        return entry.id;
+    }
+
+    #releasePictures(ids) {
+        for (const id of ids) {
+            for (const [source, entry] of this.#pictures) {
+                if (entry.id !== id) continue;
+                entry.users -= 1;
+                if (entry.users <= 0) {
+                    this.#pictures.delete(source);
+                    this.#map?.releasePicture(id);
+                }
+                break;
+            }
+        }
+    }
+
+    /// The pin drawn at the point, in points from the canvas's top left
+    /// corner, on the last frame, or null.
+    pinAt(x, y) {
+        const id = this.#map?.pinAt(x, y, this.#pixelsPerPoint);
+        return id === null || id === undefined ? null : (this.#pins.get(id)?.pin ?? null);
     }
 
     #placeMarkers() {
@@ -336,6 +456,8 @@ export class ImmersiveMap {
         this.#markerLayer.remove();
         this.#badge?.remove();
         this.#markers.clear();
+        this.#pins.clear();
+        this.#pictures.clear();
         this.#map = null;
         this.#device.destroy();
     }
@@ -365,6 +487,7 @@ export class ImmersiveMap {
             this.#canvas.width = width;
             this.#canvas.height = height;
         }
+        this.#pixelsPerPoint = scale;
         const { needsFrame, drew } = this.#map.frame(width, height, scale);
         if (drew) {
             this.#placeMarkers();
@@ -416,9 +539,13 @@ export class ImmersiveMap {
         let lastPinch = null;
 
         canvas.addEventListener('contextmenu', (event) => event.preventDefault(), { signal });
+        // A press of one pointer that has not moved further than a tap's
+        // slop: where it went down.
+        let press = null;
         canvas.addEventListener('pointerdown', (event) => {
             canvas.setPointerCapture(event.pointerId);
             pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            press = pointers.size === 1 ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
             if (pointers.size === 1) {
                 orbiting = event.button === 2 || event.shiftKey;
             } else if (pointers.size === 2) {
@@ -433,6 +560,7 @@ export class ImmersiveMap {
             if (!pointer || !this.#map) return;
             const dx = event.clientX - pointer.x;
             const dy = event.clientY - pointer.y;
+            if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > input.tapSlop) press = null;
             pointer.x = event.clientX;
             pointer.y = event.clientY;
             if (pointers.size === 1) {
@@ -456,6 +584,12 @@ export class ImmersiveMap {
         const lift = (event) => {
             const wasDragging = pointers.size === 1 && !orbiting;
             if (!pointers.delete(event.pointerId)) return;
+            if (press?.id === event.pointerId && event.type === 'pointerup') {
+                const bounds = canvas.getBoundingClientRect();
+                const pin = this.pinAt(event.clientX - bounds.left, event.clientY - bounds.top);
+                if (pin) this.#options.onPinTap(pin, { x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+            }
+            press = null;
             // Only a one-finger drag glides on, not the end of a pinch.
             endPan(...(wasDragging && event.type === 'pointerup' ? releaseVelocity(event.timeStamp) : [0, 0]));
             lastPinch = null;

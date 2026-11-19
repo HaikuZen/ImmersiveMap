@@ -43,6 +43,13 @@ async function start({ module, resources, multisample, archiveURL }) {
         immersivemap_webgpu: { submit: refused('GPU') },
         immersivemap_fetch: { range: refused('network') },
         immersivemap_tiles: { prepare: refused('workers of its own') },
+        // A worker draws no pins: nothing drawn, no picture loaded.
+        immersivemap_pins: {
+            coverage: () => 0,
+            badge: () => 0,
+            placeholder: () => 0,
+            image: refused('pin pictures'),
+        },
     });
     wasi.bind(instance);
     instance.exports._initialize();

@@ -58,11 +58,16 @@ struct PinAtlasSlot {
 /// (`PinImage.atlasKey`, the `CGImage`'s for a picture of one) rather than
 /// pin id: thousands of pins sharing images share one slot. On overflow
 /// the least recently used slot not touched by the current frame is evicted -
-/// the atlas works as a cache of the visible scene.
+/// the atlas works as a cache of the visible scene. A slot keeps its
+/// picture alive: an identity is unique only while its object lives, and a
+/// picture freed while its cell stayed would let a new one at the same
+/// address be taken for it and show the old pixels.
 final class PinTextureAtlas {
     private struct SlotState {
         var slot: PinAtlasSlot
         var lastUsedFrame: UInt64
+        /// Held, not read: it keeps the key's object alive.
+        let image: PinImage
     }
 
     private let atlasSize: Int
@@ -141,7 +146,7 @@ final class PinTextureAtlas {
                                  mipmapLevel: 0, slice: slot.pageIndex,
                                  bytes: base, bytesPerRow: cellSize * 4)
         }
-        slotsByImage[key] = SlotState(slot: slot, lastUsedFrame: currentFrame)
+        slotsByImage[key] = SlotState(slot: slot, lastUsedFrame: currentFrame, image: image)
         return slot
     }
 
