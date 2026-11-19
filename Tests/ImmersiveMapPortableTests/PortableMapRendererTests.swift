@@ -17,20 +17,26 @@ struct PortableMapRendererTests {
     /// The engine loads its tree model from its resources folder when it
     /// starts, and stops a debug build where there is none, as in the
     /// portable package, which has no resources of its own. Where no folder
-    /// is found, one of the tests' own holds the model, named by the
-    /// variable the engine reads, made once for the run. The other lookups
-    /// of the run find the same files there or none, as before.
+    /// is found, one of the tests' own holds the model and the pins'
+    /// bubble, named by the variable the engine reads, made once for the
+    /// run. The other lookups of the run find the same files there or none,
+    /// as before.
     private static let resources: Void = {
         guard (try? ImmersiveMapResourceBundle.location()) == nil else { return }
-        let sources = URL(fileURLWithPath: #filePath)
+        let engine = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/ImmersiveMap/Tile/Trees/Resources")
+            .appendingPathComponent("Sources/ImmersiveMap")
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("PortableMapRendererTests-\(UUID().uuidString)", isDirectory: true)
-        let name = "\(TreeModelStore.resourceName).\(TreeModelStore.resourceExtension)"
+        let files = ["Tile/Trees/Resources/\(TreeModelStore.resourceName).\(TreeModelStore.resourceExtension)",
+                     "Pins/Resources/\(PinSDFResource.baseName).png",
+                     "Pins/Resources/\(PinSDFResource.baseName).json"]
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try Data(contentsOf: sources.appendingPathComponent(name)).write(to: folder.appendingPathComponent(name))
+            for file in files {
+                let source = engine.appendingPathComponent(file)
+                try Data(contentsOf: source).write(to: folder.appendingPathComponent(source.lastPathComponent))
+            }
         } catch {
             Issue.record("The tests' resources folder could not be made: \(error)")
         }
@@ -100,6 +106,43 @@ struct PortableMapRendererTests {
         let third = demand.take()
         #expect(third)
         #expect(demand.isRequested == false)
+    }
+
+    /// The pins are the engine's, as on Apple's platforms: their pipelines
+    /// are made with the map, and a pin where the camera looks puts its
+    /// picture in the pins' atlas when a frame is drawn.
+    @Test func thePinsAreDrawnByTheEngine() throws {
+        let device = RecordingGPUDevice()
+        let map = try PortableMapRenderer(device: device, settings: Self.offlineSettings())
+        #expect(device.pipelines.contains { $0.vertexFunction.name == "pinVertex" })
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm, width: 64, height: 48)
+        descriptor.usage = [.renderTarget]
+        let target = try #require(device.makeTexture(descriptor))
+        map.setCamera(latitudeDegrees: 45.46, longitudeDegrees: 9.19, zoom: 4)
+        let picture = PinImage(width: 2, height: 2, premultipliedBGRA: [UInt8](repeating: 255, count: 16))
+        map.pinsController.add(ImmersiveMapPin(id: 1, coordinate: GeoCoordinate(latitude: 45.46, longitude: 9.19),
+                                               image: picture))
+        #expect(map.render(into: target, width: 64, height: 48, pixelsPerPoint: 2))
+        #expect(device.textures.contains { $0.descriptor.label == "PinAtlas" })
+    }
+
+    /// A pin added, changed or removed asks for a frame, as the camera does.
+    @Test func aPinChangeAsksForAFrame() throws {
+        let device = RecordingGPUDevice()
+        let map = try PortableMapRenderer(device: device, settings: Self.offlineSettings())
+        var descriptor = GPUTextureDescriptor(format: .bgra8Unorm, width: 64, height: 48)
+        descriptor.usage = [.renderTarget]
+        let target = try #require(device.makeTexture(descriptor))
+        // Frames until the map is still: the first frames start the tiles'
+        // and the labels' work.
+        for _ in 0 ..< 10 where map.needsFrame(width: 64, height: 48, pixelsPerPoint: 2) {
+            map.render(into: target, width: 64, height: 48, pixelsPerPoint: 2)
+        }
+        #expect(map.needsFrame(width: 64, height: 48, pixelsPerPoint: 2) == false)
+        let picture = PinImage(width: 2, height: 2, premultipliedBGRA: [UInt8](repeating: 255, count: 16))
+        map.pinsController.add(ImmersiveMapPin(id: 1, coordinate: GeoCoordinate(latitude: 10, longitude: 20),
+                                               image: picture))
+        #expect(map.needsFrame(width: 64, height: 48, pixelsPerPoint: 2))
     }
 
     @Test func aNewMapAndANewSizeNeedAFrame() throws {

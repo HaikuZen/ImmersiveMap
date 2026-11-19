@@ -14,13 +14,16 @@ extension RenderHost {
     /// the pixels of `PoiSpriteAtlasLayout.hostDescription`'s atlas, or no
     /// icons where it drew none, as Apple's symbols are drawn on Apple's
     /// platforms alone), the tiles, the model tiles and the trees copied
-    /// from memory, no scene model assets and no pins. Without the
-    /// resources folder the text has no atlases and no label draws a glyph,
-    /// which is logged, as is an atlas of the wrong size.
+    /// from memory, no scene model assets, and the pins of `pins` when it
+    /// is given, drawn with the bubble's field from the resources folder.
+    /// Without the resources folder the text has no atlases and no label
+    /// draws a glyph, and there are no pins, which is logged, as is an
+    /// atlas of the wrong size.
     static func portable(device: any GPUDevice,
                          commandQueue: any GPUCommandQueue,
                          sampleCount: Int,
-                         poiAtlas: [UInt8]? = nil) -> RenderHost {
+                         poiAtlas: [UInt8]? = nil,
+                         pins: (source: any PinRenderSource, settings: ImmersiveMapSettings.PinSettings)? = nil) -> RenderHost {
         let location: ImmersiveMapResourceLocation?
         do {
             location = try ImmersiveMapResourceBundle.location()
@@ -40,7 +43,36 @@ extension RenderHost {
                           treeFileLoader: nil,
                           layerFileLoader: nil,
                           loadSceneModelAsset: { _ in throw SceneModelAssetsUnavailable() },
-                          makePinSubsystem: nil)
+                          makePinSubsystem: pinSubsystemMaker(device: device,
+                                                              resources: resources,
+                                                              resource: { location?.url(forResource: $0, withExtension: $1) },
+                                                              pins: pins))
+    }
+
+    /// The pins' subsystem, as Apple's host makes it: pipelines of one
+    /// sample for the overlay pass, the bubble's field decoded from the
+    /// resources folder. Nil without pins, or without the bubble's files.
+    static func pinSubsystemMaker(device: any GPUDevice,
+                                  resources: RenderResources,
+                                  resource: (String, String) -> URL?,
+                                          pins: (source: any PinRenderSource, settings: ImmersiveMapSettings.PinSettings)?)
+        -> (() -> any RenderSubsystem & RenderPassAvailabilityProvider)? {
+        guard let pins else { return nil }
+        let pinSDF: PinSDFResource
+        do {
+            pinSDF = try PinSDFResource.load(device: device, resource: resource)
+        } catch {
+            logger.warning("ImmersiveMap: the pins' bubble did not load (\(String(describing: error), privacy: .public)). The map draws no pins.")
+            return nil
+        }
+        let shared = PinsRenderer.SharedResources.make(device: device, pixelFormat: .bgra8Unorm, pinSDF: pinSDF, sampleCount: 1)
+        let renderer = PinsRenderer(device: device, sharedResources: shared, config: pins.settings)
+        let depthDisabledState = resources.depthDisabledState
+        return {
+            PinRenderSubsystem(pinsRenderer: renderer,
+                               pinSource: pins.source,
+                               depthDisabledState: depthDisabledState)
+        }
     }
 
     /// A scene model's asset is read with Model I/O, on Apple's platforms

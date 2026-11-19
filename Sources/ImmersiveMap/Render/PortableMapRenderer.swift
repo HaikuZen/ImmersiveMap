@@ -9,10 +9,12 @@ import QuartzCore
 
 /// The map for a host that is no Apple view (the browser program,
 /// `ImmersiveMapWebMap`): the frame engine over the platform's GPU device
-/// (`RenderHost.portable`), with no scene models, no layers of the app's and
-/// no pins, the camera moves a pointer and a wheel make, and markers the
-/// host draws itself at the positions each frame projects them to
-/// (`markerPositions`), as the Apple views place their annotations.
+/// (`RenderHost.portable`), with no scene models and no layers of the
+/// app's, the camera moves a pointer and a wheel make, markers the host
+/// draws itself at the positions each frame projects them to
+/// (`markerPositions`), as the Apple views place their annotations, and
+/// the pins of `pinsController`, which the engine draws, as on Apple's
+/// platforms. A change to the pins asks for a frame.
 ///
 /// Rendering is on demand, as on Apple's platforms: the host asks
 /// `needsFrame` once a display frame and calls `render` only when it is
@@ -36,6 +38,7 @@ package final class PortableMapRenderer {
     // contract does not promise to.
     private let markers = PortableMarkers()
     private let sceneModels = NoSceneModels()
+    private let pins: PortablePins
     private let eventSink = PortableEventSink()
     /// What asked for a frame on this side: the camera, the markers, the
     /// drawing size.
@@ -76,8 +79,13 @@ package final class PortableMapRenderer {
                                                              maximumInitialVelocity: cameraSettings.globePanInertiaMaxInitialVelocity))
         camera = FrameCameraStateResolver(settings: settings)
         presentation = MapPresentationStateController(settings: settings)
+        pins = PortablePins()
+        pins.controller.setChangeHandler({ [eventSink] in
+            eventSink.invalidate(.externalStateChanged)
+        }, owner: pins)
         engine = RenderFrameEngine(host: .portable(device: device, commandQueue: commandQueue,
-                                                   sampleCount: sampleCount, poiAtlas: poiAtlas),
+                                                   sampleCount: sampleCount, poiAtlas: poiAtlas,
+                                                   pins: (source: pins, settings: settings.pins)),
                                    annotationSource: markers,
                                    sceneModelSource: sceneModels,
                                    styleRuntime: MapStyleRuntime(settings: settings),
@@ -87,6 +95,14 @@ package final class PortableMapRenderer {
                                    eventSink: eventSink,
                                    tileTraceRecorder: TileTraceRecorder(),
                                    baseLabelTraceRecorder: BaseLabelTraceRecorder())
+    }
+
+    /// The map's pins: add, change and remove them here, as an app does
+    /// through the Apple views' controller. The host sets its picture
+    /// drawer and remote loader (`PinPictureHost`, `PinRemoteImages`)
+    /// before it makes the renderer.
+    package var pinsController: ImmersiveMapPinsController {
+        pins.controller
     }
 
     /// The POI icons' atlas a host draws for `init`, as JSON
@@ -432,6 +448,13 @@ private final class PortableMarkers: AnnotationRenderSource {
             bases[id].map { AnnotationProjectionEntry(id: id, basis: $0) }
         })
     }
+}
+
+/// The renderer's one pins controller, for the engine.
+private final class PortablePins: PinRenderSource {
+    let controller = ImmersiveMapPinsController()
+
+    var currentPinController: ImmersiveMapPinsController? { controller }
 }
 
 private final class NoSceneModels: SceneModelRenderSource {

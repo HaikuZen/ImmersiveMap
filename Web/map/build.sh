@@ -5,8 +5,9 @@
 # Builds the map page into Web/map/build/: the ImmersiveMapWebMap module for
 # WebAssembly (the slim build, release, its debug information stripped), the
 # shader bundle, and the engine's resources (the text atlases, the overview
-# archive, the tree model) with their list. Then open the page through a
-# local server, for a browser fetches nothing from a file:// page:
+# archive, the tree model, the pins' bubble) with their list. Then open the
+# page through a local server, for a browser fetches nothing from a file://
+# page:
 #
 #   Web/map/build.sh
 #   python3 -m http.server --directory Web 8000
@@ -55,7 +56,8 @@ node "$root/Tools/WGSLCheck/bundle.mjs" "$output/shaders.json"
 
 # The resources, flat, as the engine looks them up by name.
 cp "$engine"/Text/Resources/* "$engine/Tile/Overview/Resources/overview.pmtiles" \
-    "$engine/Tile/Trees/Resources/tree_broadleaf.immtree" "$output/resources/"
+    "$engine/Tile/Trees/Resources/tree_broadleaf.immtree" \
+    "$engine/Pins/Resources/pin_sdf.png" "$engine/Pins/Resources/pin_sdf.json" "$output/resources/"
 (cd "$output/resources" && ls | grep -v '^resources.json$' \
     | awk 'BEGIN { printf "[" } { printf "%s\"%s\"", (NR > 1 ? "," : ""), $0 } END { print "]" }' > resources.json)
 echo "built $output"

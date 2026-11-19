@@ -45,6 +45,9 @@ for (const name of readdirSync(join(engine, 'Text', 'Resources'))) {
 }
 resources.set('overview.pmtiles', readFileSync(archivePath));
 resources.set('tree_broadleaf.immtree', readFileSync(join(engine, 'Tile', 'Trees', 'Resources', 'tree_broadleaf.immtree')));
+for (const name of ['pin_sdf.png', 'pin_sdf.json']) {
+    resources.set(name, readFileSync(join(engine, 'Pins', 'Resources', name)));
+}
 
 // The archive's ranges from the file. Any other URL has no network.
 const archive = readFileSync(archivePath);
