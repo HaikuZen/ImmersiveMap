@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// Tap event on a map pin pin.
 /// Delivered on every tap on a pin regardless of selection state,

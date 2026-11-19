@@ -41,13 +41,27 @@ struct PortableEngineLayoutTests {
     }
 
     /// The folders left out whole, whatever their files import: `UI`, the
-    /// host of each Apple platform, and `Pins`, whose public API takes
-    /// Core Graphics images and draws its badges with Core Graphics, until
-    /// the pins have an image type of the engine's own.
+    /// host of each Apple platform, and `Pins`, whose shapes, badges and
+    /// drawing are still Core Graphics' and Metal's, so that a file of it
+    /// that imports neither may still need one that does.
     static let appleOnlyFolders: Set<String> = ["UI", "Pins"]
-    /// The files of those folders that build everywhere all the same, plain
-    /// values the portable engine carries.
-    static let portableInAppleOnlyFolders: Set<String> = []
+    /// The files of those folders that build everywhere all the same: the
+    /// pins' picture, model, controller, tap event, clustering and
+    /// presentation.
+    static let portableInAppleOnlyFolders: Set<String> = [
+        "Pins/Clustering/PinCollisionLayoutSolver.swift",
+        "Pins/Clustering/PinCollisionMath.swift",
+        "Pins/Clustering/PinScreenHashGrid.swift",
+        "Pins/ImmersiveMapPin.swift",
+        "Pins/ImmersiveMapPinTapEvent.swift",
+        "Pins/ImmersiveMapPinsController.swift",
+        "Pins/LazyPinRenderResource.swift",
+        "Pins/PinImage.swift",
+        "Pins/PinImageSource.swift",
+        "Pins/PinRenderSource.swift",
+        "Pins/Presentation/PinPresentationStateStore.swift",
+        "Pins/Presentation/PinVisibilityFadeStateStore.swift"
+    ]
 
     /// What the rule in PortableEngineExclusions.txt names today.
     static func expectedExclusions() throws -> Set<String> {

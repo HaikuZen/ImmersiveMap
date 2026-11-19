@@ -14,8 +14,19 @@ public enum PinImageLoaderError: Error, Equatable {
     case cannotDecodeImage
 }
 
+extension PinImage {
+    /// The picture a pin shows while its remote picture loads, when it was
+    /// given no placeholder of its own.
+    public static let defaultPlaceholder = PinImage(cgImage: PinImageLoader.defaultPlaceholderCGImage)
+}
+
 public enum PinImageLoader {
     public static let defaultPlaceholderCGImage: CGImage = makeDefaultPlaceholderCGImage()
+
+    /// Loads and decodes a pin's remote picture.
+    public static func load(from url: URL) async throws -> PinImage {
+        PinImage(cgImage: try await loadCGImage(from: url))
+    }
 
     public static func loadCGImage(from url: URL) async throws -> CGImage {
         let (data, response) = try await URLSession.shared.data(from: url)

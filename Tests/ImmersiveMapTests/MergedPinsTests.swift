@@ -29,7 +29,7 @@ final class MergedPinsTests: XCTestCase {
 
         let merged = try XCTUnwrap(snapshot.pins.first { $0.id == mergedID })
         XCTAssertEqual(merged.countBadge?.count, 2)
-        XCTAssertTrue(merged.image === imageA, "The cycle starts with the first member's image")
+        XCTAssertTrue(merged.image.cgImage === imageA, "The cycle starts with the first member's image")
         XCTAssertEqual(merged.coordinate.latitude, 11.0, accuracy: 0.05)
         XCTAssertEqual(merged.coordinate.longitude, 21.0, accuracy: 0.05)
     }
@@ -59,12 +59,12 @@ final class MergedPinsTests: XCTestCase {
         controller.advanceMergedImageCycle(mergedID: mergedID)
         var snapshot = try XCTUnwrap(controller.consumeSnapshot())
         var merged = try XCTUnwrap(snapshot.pins.first { $0.id == mergedID })
-        XCTAssertTrue(merged.image === imageB, "The first step of the cycle shows the second member")
+        XCTAssertTrue(merged.image.cgImage === imageB, "The first step of the cycle shows the second member")
 
         controller.advanceMergedImageCycle(mergedID: mergedID)
         snapshot = try XCTUnwrap(controller.consumeSnapshot())
         merged = try XCTUnwrap(snapshot.pins.first { $0.id == mergedID })
-        XCTAssertTrue(merged.image === imageA, "The cycle comes back to the first member")
+        XCTAssertTrue(merged.image.cgImage === imageA, "The cycle comes back to the first member")
     }
 
     func testImageCycleTimerAdvancesAutomatically() throws {
@@ -84,7 +84,7 @@ final class MergedPinsTests: XCTestCase {
 
         wait(for: [cycled], timeout: 2.0)
         let merged = try XCTUnwrap(controller.pin(id: mergedID))
-        XCTAssertTrue(merged.image === imageB)
+        XCTAssertTrue(merged.image.cgImage === imageB)
     }
 
     func testUnmergeRestoresMembers() throws {

@@ -15,6 +15,30 @@ import AppKit
 enum PinTextureRasterizer {
     private static let logger = Logger(subsystem: "ImmersiveMap", category: "Pins")
 
+    /// A pin's picture as the atlas's texels, `width` by `height`, rows from
+    /// the top: a picture of a `CGImage` drawn by Core Graphics as it always
+    /// was, a picture of pixels resampled.
+    static func makeBGRAData(for image: PinImage,
+                             width: Int,
+                             height: Int) -> Data? {
+        switch image.storage {
+        case .cgImage(let cgImage):
+            return makeBGRAData(for: cgImage, width: width, height: height)
+        case .pixels(let pixels):
+            if let warning = imageSizeWarning(sourceWidth: image.width,
+                                              sourceHeight: image.height,
+                                              targetWidth: width,
+                                              targetHeight: height) {
+                logger.warning("\(warning, privacy: .public)")
+            }
+            return Data(PinPixelResampler.resample(pixels,
+                                                   width: image.width,
+                                                   height: image.height,
+                                                   toWidth: width,
+                                                   height: height))
+        }
+    }
+
     static func makeBGRAData(for image: CGImage,
                              width: Int,
                              height: Int,
@@ -75,7 +99,8 @@ struct PinAtlasSlot {
     let uvRect: SIMD4<Float>
 }
 
-/// Atlas of pin images. Slots are keyed by CGImage identity rather than
+/// Atlas of pin images. Slots are keyed by the picture's identity
+/// (`PinImage.atlasKey`, the `CGImage`'s for a picture of one) rather than
 /// pin id: thousands of pins sharing images share one slot. On overflow
 /// the least recently used slot not touched by the current frame is evicted -
 /// the atlas works as a cache of the visible scene.
@@ -128,8 +153,8 @@ final class PinTextureAtlas {
     }
 
     /// Slot of an already-uploaded image; marks it as used this frame.
-    func slot(for image: CGImage) -> PinAtlasSlot? {
-        let key = ObjectIdentifier(image)
+    func slot(for image: PinImage) -> PinAtlasSlot? {
+        let key = image.atlasKey
         guard var state = slotsByImage[key] else {
             return nil
         }
@@ -142,8 +167,8 @@ final class PinTextureAtlas {
 
     /// Uploads the image into a free slot (or evicts the LRU one) and returns
     /// it; nil means the atlas is fully occupied by this frame's images.
-    func uploadImage(_ image: CGImage) -> PinAtlasSlot? {
-        let key = ObjectIdentifier(image)
+    func uploadImage(_ image: PinImage) -> PinAtlasSlot? {
+        let key = image.atlasKey
         if let existing = slotsByImage[key] {
             return existing.slot
         }

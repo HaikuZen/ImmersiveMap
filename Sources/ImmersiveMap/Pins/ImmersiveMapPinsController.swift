@@ -1,9 +1,11 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import CoreGraphics
+import PortableFoundation
 import simd
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -35,10 +37,15 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
     }
 
     private let lock = NSLock()
-    private let imageLoader: @Sendable (URL) async throws -> CGImage
+    private let imageLoader: @Sendable (URL) async throws -> PinImage
     private var pinsById: [UInt64: ImmersiveMapPin] = [:]
     private var mergedGroupsById: [UInt64: MergedPinGroup] = [:]
-    private var imageCycleTimersById: [UInt64: DispatchSourceTimer] = [:]
+    /// Each merged pin's next image-cycle step, a work item on the main
+    /// queue that schedules the one after it: Dispatch's timer sources are
+    /// missing where there is no Dispatch (WebAssembly), and the portable
+    /// `DispatchQueue` has `asyncAfter` and cancellable work items.
+    private var imageCycleTimersById: [UInt64: (step: DispatchWorkItem, generation: UInt64)] = [:]
+    private var imageCycleGeneration: UInt64 = 0
     private var removedIds: Set<UInt64> = []
     private var imageUpdateIds: Set<UInt64> = []
     private var loadingRemoteImageURLsById: [UInt64: URL] = [:]
@@ -48,12 +55,10 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
     private weak var changeHandlerOwner: AnyObject?
 
     public convenience init() {
-        self.init(imageLoader: { url in
-            try await PinImageLoader.loadCGImage(from: url)
-        })
+        self.init(imageLoader: PinRemoteImages.loader)
     }
 
-    init(imageLoader: @escaping @Sendable (URL) async throws -> CGImage) {
+    init(imageLoader: @escaping @Sendable (URL) async throws -> PinImage) {
         self.imageLoader = imageLoader
     }
 
@@ -201,7 +206,7 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
     }
 
     public func update(id: UInt64,
-                       image: CGImage? = nil,
+                       image: PinImage? = nil,
                        borderColor: SIMD4<Float>? = nil,
                        isSelected: Bool? = nil) {
         lock.lock()
@@ -227,7 +232,7 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
         }
         if let image {
             pin.image = image
-            pin.imageSource = .cgImage(image)
+            pin.imageSource = .image(image)
             imageUpdateIds.insert(id)
         }
         if let borderColor {
@@ -242,6 +247,18 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
         notifyChanged()
     }
 
+#if canImport(CoreGraphics)
+    public func update(id: UInt64,
+                       image: CGImage,
+                       borderColor: SIMD4<Float>? = nil,
+                       isSelected: Bool? = nil) {
+        update(id: id,
+               image: PinImage(cgImage: image),
+               borderColor: borderColor,
+               isSelected: isSelected)
+    }
+#endif
+
 #if canImport(UIKit)
     public func update(id: UInt64,
                        image: UIImage,
@@ -251,7 +268,7 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
             preconditionFailure("UIImage must have CGImage backing.")
         }
         update(id: id,
-               image: cgImage,
+               image: PinImage(cgImage: cgImage),
                borderColor: borderColor,
                isSelected: isSelected)
     }
@@ -264,7 +281,7 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
             preconditionFailure("NSImage must be convertible to CGImage.")
         }
         update(id: id,
-               image: cgImage,
+               image: PinImage(cgImage: cgImage),
                borderColor: borderColor,
                isSelected: isSelected)
     }
@@ -384,7 +401,7 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
         var merged = group.template
         merged.coordinate = Self.averageCoordinate(of: members.map(\.coordinate))
         merged.image = cycleMember.image
-        merged.imageSource = .cgImage(cycleMember.image)
+        merged.imageSource = .image(cycleMember.image)
         merged.countBadge = PinCountBadge(count: members.count)
         return merged
     }
@@ -443,18 +460,37 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
             return
         }
 
-        let timer = DispatchSource.makeTimerSource(queue: .main)
-        timer.schedule(deadline: .now() + group.imageCycleInterval,
-                       repeating: group.imageCycleInterval)
-        timer.setEventHandler { [weak self] in
-            self?.advanceMergedImageCycle(mergedID: mergedID)
+        scheduleImageCycleStepLocked(mergedID: mergedID, interval: group.imageCycleInterval)
+    }
+
+    private func scheduleImageCycleStepLocked(mergedID: UInt64, interval: TimeInterval) {
+        imageCycleGeneration &+= 1
+        let generation = imageCycleGeneration
+        let step = DispatchWorkItem { [weak self] in
+            guard let self, self.isCurrentImageCycleStep(mergedID: mergedID, generation: generation) else {
+                return
+            }
+            self.advanceMergedImageCycle(mergedID: mergedID)
+            self.lock.lock()
+            // Only the step still scheduled for the group schedules the next:
+            // a step cancelled or replaced while it ran ends the chain.
+            if self.imageCycleTimersById[mergedID]?.generation == generation {
+                self.scheduleImageCycleStepLocked(mergedID: mergedID, interval: interval)
+            }
+            self.lock.unlock()
         }
-        timer.activate()
-        imageCycleTimersById[mergedID] = timer
+        imageCycleTimersById[mergedID] = (step, generation)
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: step)
+    }
+
+    private func isCurrentImageCycleStep(mergedID: UInt64, generation: UInt64) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return imageCycleTimersById[mergedID]?.generation == generation
     }
 
     private func cancelImageCycleTimerLocked(mergedID: UInt64) {
-        imageCycleTimersById.removeValue(forKey: mergedID)?.cancel()
+        imageCycleTimersById.removeValue(forKey: mergedID)?.step.cancel()
     }
 
     func setChangeHandler(_ handler: (() -> Void)?, owner: AnyObject) {
@@ -542,7 +578,7 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
         }
     }
 
-    private func applyRemoteImage(_ image: CGImage, pinID: UInt64, url: URL) {
+    private func applyRemoteImage(_ image: PinImage, pinID: UInt64, url: URL) {
         lock.lock()
         var shouldNotify = false
         if var pin = pinsById[pinID],
@@ -581,7 +617,7 @@ public final class ImmersiveMapPinsController: @unchecked Sendable {
 
     deinit {
         for timer in imageCycleTimersById.values {
-            timer.cancel()
+            timer.step.cancel()
         }
     }
 }
