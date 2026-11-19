@@ -1,75 +1,96 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import ImmersiveMapGPU
+import simd
 
+/// One star as the shaders read it: a vertex of the point draw, an entry of
+/// the quads' storage buffer (StarfieldStars.metal, StarfieldStars.wgsl).
+/// The last three floats are the stride's tail, named so a buffer carries
+/// zeros there and not whatever the stack held.
+struct StarfieldStarVertex {
+    let position: SIMD3<Float>
+    let size: Float
+    let brightness: Float
+    let temperature: Float
+    let twinklePhase: Float
+    let halo: Float
+    let _gap0: Float = 0, _gap1: Float = 0, _gap2: Float = 0
+}
+
+/// The stars' frame values (`StarfieldParams` in the shaders): the pan
+/// rotation and the sky's radius over the globe's. The gap before
+/// `padding`, which a `SIMD3` aligns to 16, is named.
+struct StarfieldParamsUniform {
+    let rotation: matrix_float4x4
+    let radiusScale: Float
+    let _gap0: Float = 0, _gap1: Float = 0, _gap2: Float = 0
+    let padding: SIMD3<Float>
+}
+
+/// The quads' own value (StarfieldStars.wgsl): the drawable's size in
+/// pixels, which a point's size in pixels is turned into clip space by.
+struct StarfieldQuadUniform {
+    let viewportSizePx: SIMD2<Float>
+}
+
+/// The stars' pipeline. Metal draws each star as a sized point sprite. A
+/// device without point sprites (WebGPU, `GPUDeviceFeatures.pointSprites`)
+/// draws each as a quad of six vertices, instanced, the star read from a
+/// storage buffer by the instance index and the sprite's coordinate made
+/// from the corner, which draws the same pixels.
 final class StarfieldPipeline {
-    private struct StarVertex {
-        let position: SIMD3<Float>
-        let size: Float
-        let brightness: Float
-        let temperature: Float
-        let twinklePhase: Float
-        let halo: Float
-    }
+    let starsPipelineState: any GPURenderPipeline
+    /// Whether the stars draw as instanced quads, the device having no point
+    /// sprites.
+    let drawsQuads: Bool
 
-    let starsPipelineState: MTLRenderPipelineState
-
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary,
+    init(device: any GPUDevice,
+         pixelFormat: GPUPixelFormat,
          sampleCount: Int = 1) {
-        let vertexFunction = library.makeFunction(name: "starfieldVertexShader")
-        let fragmentFunction = library.makeFunction(name: "starfieldFragmentShader")
+        drawsQuads = device.features.contains(.pointSprites) == false
 
-        let vertexDescriptor = MTLVertexDescriptor()
-        vertexDescriptor.attributes[0].format = .float3
-        vertexDescriptor.attributes[0].offset = 0
-        vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.attributes[1].format = .float
-        vertexDescriptor.attributes[1].offset = MemoryLayout<SIMD3<Float>>.stride
-        vertexDescriptor.attributes[1].bufferIndex = 0
-        vertexDescriptor.attributes[2].format = .float
-        vertexDescriptor.attributes[2].offset = MemoryLayout<SIMD3<Float>>.stride + MemoryLayout<Float>.stride
-        vertexDescriptor.attributes[2].bufferIndex = 0
-        vertexDescriptor.attributes[3].format = .float
-        vertexDescriptor.attributes[3].offset = MemoryLayout<SIMD3<Float>>.stride + MemoryLayout<Float>.stride * 2
-        vertexDescriptor.attributes[3].bufferIndex = 0
-        vertexDescriptor.attributes[4].format = .float
-        vertexDescriptor.attributes[4].offset = MemoryLayout<SIMD3<Float>>.stride + MemoryLayout<Float>.stride * 3
-        vertexDescriptor.attributes[4].bufferIndex = 0
-        vertexDescriptor.attributes[5].format = .float
-        vertexDescriptor.attributes[5].offset = MemoryLayout<SIMD3<Float>>.stride + MemoryLayout<Float>.stride * 4
-        vertexDescriptor.attributes[5].bufferIndex = 0
-        vertexDescriptor.layouts[0].stride = MemoryLayout<StarVertex>.stride
-        vertexDescriptor.layouts[0].stepFunction = .perVertex
-
-        let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.vertexFunction = vertexFunction
-        pipelineDescriptor.fragmentFunction = fragmentFunction
-        pipelineDescriptor.vertexDescriptor = vertexDescriptor
-        pipelineDescriptor.rasterSampleCount = sampleCount
-        pipelineDescriptor.colorAttachments[0].pixelFormat = pixelFormat
-        pipelineDescriptor.depthAttachmentPixelFormat = .depth32Float_stencil8
-        pipelineDescriptor.stencilAttachmentPixelFormat = .depth32Float_stencil8
-        pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
-        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
-        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
-        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        var color = GPUColorTarget(format: pixelFormat)
         // Additive stars, with .one for the alpha channel: coverage accumulates
         // like the color instead of being squared by the source alpha.
-        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .one
-        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .one
+        color.blend = (color: GPUBlendComponent(source: .sourceAlpha, destination: .one),
+                       alpha: GPUBlendComponent(source: .one, destination: .one))
+
+        var descriptor: GPURenderPipelineDescriptor
+        if drawsQuads {
+            descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "starfieldQuadVertexShader"),
+                                                     fragmentFunction: GPUShaderFunction(name: "starfieldQuadFragmentShader"),
+                                                     colorTargets: [color])
+            descriptor.label = "StarfieldQuads"
+        } else {
+            let floatSize = MemoryLayout<Float>.stride
+            let positionSize = MemoryLayout<SIMD3<Float>>.stride
+            var layout = GPUVertexLayout()
+            layout.attributes[0] = GPUVertexAttribute(format: .float3, offset: 0, bufferIndex: 0)
+            for attribute in 1 ... 5 {
+                layout.attributes[attribute] = GPUVertexAttribute(format: .float,
+                                                                  offset: positionSize + floatSize * (attribute - 1),
+                                                                  bufferIndex: 0)
+            }
+            layout.strides[0] = MemoryLayout<StarfieldStarVertex>.stride
+            descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "starfieldVertexShader"),
+                                                     fragmentFunction: GPUShaderFunction(name: "starfieldFragmentShader"),
+                                                     colorTargets: [color])
+            descriptor.label = "Starfield"
+            descriptor.vertexLayout = layout
+            descriptor.topology = .point
+        }
+        descriptor.depthStencilFormat = .depth32FloatStencil8
+        descriptor.sampleCount = sampleCount
 
         do {
-            starsPipelineState = try metalDevice.makeRenderPipelineState(descriptor: pipelineDescriptor)
+            starsPipelineState = try device.makeRenderPipeline(descriptor)
         } catch {
             fatalError("Failed to create starfield pipeline: \(error)")
         }
     }
 
-    func selectStarsPipeline(renderEncoder: MTLRenderCommandEncoder) {
-        renderEncoder.setRenderPipelineState(starsPipelineState)
+    func selectStarsPipeline(renderEncoder: any GPURenderEncoder) {
+        renderEncoder.setPipeline(starsPipelineState)
     }
 }

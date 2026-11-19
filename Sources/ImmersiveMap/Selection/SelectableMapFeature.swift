@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// A map feature whose objects a tap or the app can select. The one way
 /// into the selection: a feature conforms in its own folder

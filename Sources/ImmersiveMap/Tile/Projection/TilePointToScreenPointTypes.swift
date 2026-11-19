@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 import simd
 
 struct TilePointInput {
@@ -28,6 +28,9 @@ struct ScreenPointOutput {
     var depth: Float
     var visible: UInt32
     var visibilityAlpha: Float
+    /// The gap to the stride, which `position` aligns to 8, named: Swift would leave its bytes as whatever
+    /// the stack held, and they would go to the GPU with the constant data.
+    var _gap0: Float = 0
 
     init(position: SIMD2<Float>,
          depth: Float,

@@ -1,16 +1,16 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 final class PostProcessingRenderSubsystem: RenderSubsystem {
     let name: String = "PostProcessing"
 
     private let fxaaPipeline: FXAAPipeline
-    private let inputTextureProvider: () -> MTLTexture?
+    private let inputTextureProvider: () -> (any GPUTexture)?
 
     init(fxaaPipeline: FXAAPipeline,
-         inputTextureProvider: @escaping () -> MTLTexture?) {
+         inputTextureProvider: @escaping () -> (any GPUTexture)?) {
         self.fxaaPipeline = fxaaPipeline
         self.inputTextureProvider = inputTextureProvider
     }
@@ -19,7 +19,7 @@ final class PostProcessingRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .postProcessing,
               let inputTexture = inputTextureProvider() else {
             return
@@ -27,7 +27,8 @@ final class PostProcessingRenderSubsystem: RenderSubsystem {
 
         fxaaPipeline.draw(renderEncoder: encoder,
                           sourceTexture: inputTexture,
-                          drawSize: frameContext.drawSize)
+                          width: Float(frameContext.drawSize.width),
+                          height: Float(frameContext.drawSize.height))
     }
 
     func handleMemoryWarning() {}

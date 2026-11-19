@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// The ground of the raster targets, the slots of a ring rule with a raster
@@ -23,7 +24,8 @@ import simd
 /// never a hole where the vector ground would not be one. The tiles drawn
 /// again in a frame are drawn in one pass, each in its own window of one
 /// shared atlas, and copied from there into their textures with their mip
-/// chains in one blit (`prepareGPU`).
+/// chains in one blit (`prepareGPU`). The GPU work is `RasterTileDrawer`'s,
+/// on the GPU interface.
 ///
 /// A texture is opaque and owns its pixels as an opaque fill does: it
 /// writes a depth half a rank step behind the ground's first, so the
@@ -44,7 +46,7 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
     private struct Source {
         let metalTile: MetalTile
         var size: Int
-        var texture: MTLTexture?
+        var texture: (any GPUTexture)?
         var placements: [Placement] = []
         /// What the texture is drawn from this frame (`bakeSignature`),
         /// and whether it must be drawn into again for it.
@@ -59,7 +61,7 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         let metalTile: MetalTile
         let size: Int
         var signature: UInt64?
-        let texture: MTLTexture
+        let texture: any GPUTexture
     }
 
     /// A wrap copy a source is drawn at, and the terrain it shades by and
@@ -71,21 +73,21 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         var displacement: Tile?
     }
 
-    private let device: MTLDevice
+    private let device: any GPUDevice
     private let pipeline: RasterTilePipeline
     private let grid: RasterTileGrid
-    private let sampler: MTLSamplerState?
+    private let sampler: (any GPUSampler)?
     private let mipLevelBias: Float
-    private let groundOwnerState: MTLDepthStencilState
-    private let sphereOpaqueOwnerState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let groundOwnerState: any GPUDepthStencilState
+    private let sphereOpaqueOwnerState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     private let debugOverlayControls: DebugOverlayControlState
-    private let groundShadowMaskTextureProvider: () -> MTLTexture?
-    private let groundShadowMaskFallbackTexture: MTLTexture
+    private let groundShadowMaskTextureProvider: () -> (any GPUTexture)?
+    private let groundShadowMaskFallbackTexture: any GPUTexture
     /// The shadow map the relief's draws sample at their raised points
     /// (`GroundShadowMaskBinding.cascades`), and its depth fallback.
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture?
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: (any GPUTexture)?
     private let groundFlattening: ImmersiveMapSettings.TileSettings.GroundFlatteningSettings
 
     /// The frame's sources, by the tile drawn, finest first.
@@ -94,15 +96,15 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
     private var bakedByTile: [Tile: Baked] = [:]
     /// The textures of the tiles that left the raster slots, by size, for
     /// the next ones: a pan trades a few each frame.
-    private var freeTextures: [Int: [MTLTexture]] = [:]
+    private var freeTextures: [Int: [any GPUTexture]] = [:]
     /// The atlas the frame's draws go through: multisampled (memoryless
     /// where the GPU keeps a pass's samples on chip) and resolved, grown to
     /// the largest frame's need.
-    private var bakeAtlas: (samples: MTLTexture, resolved: MTLTexture)?
+    private var bakeAtlas: RasterTileDrawer.BakeAtlas?
     /// The textures this frame's pass draws, recorded as drawn once the
     /// frame is committed (`frameCommitted`): a frame dropped after its
     /// encoding never ran its pass, and its tiles draw again.
-    private var pendingBakes: [(tile: Tile, texture: MTLTexture, signature: UInt64)] = []
+    private var pendingBakes: [(tile: Tile, texture: any GPUTexture, signature: UInt64)] = []
 
     /// How many free textures a size keeps: the frames of a pan, where the
     /// need moves by a few.
@@ -112,33 +114,32 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
     /// alpha off between two draws, under anything the eye sees.
     static let fadeSteps: Float = 64
 
-    init(device: MTLDevice,
+    init(device: any GPUDevice,
          pipeline: RasterTilePipeline,
          settings: ImmersiveMapSettings.TileSettings.RasterizationSettings,
-         groundOwnerState: MTLDepthStencilState,
-         sphereOpaqueOwnerState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
+         groundOwnerState: any GPUDepthStencilState,
+         sphereOpaqueOwnerState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
          debugOverlayControls: DebugOverlayControlState,
-         groundShadowMaskTextureProvider: @escaping () -> MTLTexture?,
-         groundShadowMaskFallbackTexture: MTLTexture,
-         shadowMapTextureProvider: @escaping () -> MTLTexture? = { nil },
-         shadowFallbackTexture: MTLTexture? = nil,
+         groundShadowMaskTextureProvider: @escaping () -> (any GPUTexture)?,
+         groundShadowMaskFallbackTexture: any GPUTexture,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)? = { nil },
+         shadowFallbackTexture: (any GPUTexture)? = nil,
          groundFlattening: ImmersiveMapSettings.TileSettings.GroundFlatteningSettings = .init()) {
         self.device = device
         self.pipeline = pipeline
         self.groundFlattening = groundFlattening
         self.grid = RasterTileGrid(device: device)
-        let descriptor = MTLSamplerDescriptor()
+        var descriptor = GPUSamplerDescriptor()
         descriptor.minFilter = .linear
         descriptor.magFilter = .linear
         descriptor.mipFilter = .linear
         descriptor.maxAnisotropy = min(max(settings.maximumAnisotropy, 1), 16)
         // The edge texels repeat past the tile: a tile's mips never reach
         // into the texture's opposite side.
-        descriptor.sAddressMode = .clampToEdge
-        descriptor.tAddressMode = .clampToEdge
-        descriptor.label = "RasterTileSampler"
-        self.sampler = device.makeSamplerState(descriptor: descriptor)
+        descriptor.addressModeU = .clampToEdge
+        descriptor.addressModeV = .clampToEdge
+        self.sampler = device.makeSampler(descriptor)
         self.mipLevelBias = settings.mipLevelBias
         self.groundOwnerState = groundOwnerState
         self.sphereOpaqueOwnerState = sphereOpaqueOwnerState
@@ -267,12 +268,12 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         }
     }
 
-    private func freeTexture(size: Int) -> MTLTexture? {
+    private func freeTexture(size: Int) -> (any GPUTexture)? {
         if var free = freeTextures[size], let texture = free.popLast() {
             freeTextures[size] = free
             return texture
         }
-        return RasterTileTexture.make(device: device, size: size)
+        return RasterTileDrawer.makeTexture(device: device, size: size)
     }
 
     /// The stencil value of a source (`TileSourceStencilPriority`).
@@ -284,60 +285,30 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
     // MARK: - The textures
 
     /// Draws the fills of the sources whose texture must be drawn again
-    /// this frame (`Source.needsBake`), and only theirs, in one pass on the
-    /// frame's command buffer: each in its own window of the atlas, through
-    /// the atlas's samples, resolved at the pass's end. Then one blit copies
-    /// each window into its tile's texture and makes the texture's mip
-    /// chain. The fades are the planning zoom's, as the vector ground draws
-    /// them. A frame that draws no texture encodes nothing.
+    /// this frame (`Source.needsBake`), and only theirs, on the frame's
+    /// command buffer (`RasterTileDrawer.bake`), at the planning zoom's
+    /// fades, as the vector ground draws them. A frame that draws no
+    /// texture encodes nothing.
     func prepareGPU(frameContext: FrameContext, resourceRegistry _: RenderResourceRegistry) {
         let drawn = sources.indices.filter { sources[$0].needsBake && sources[$0].texture != nil }
-        guard drawn.isEmpty == false, let commandBuffer = frameContext.commandBuffer else { return }
-        let cell = drawn.reduce(0) { max($0, sources[$1].size) }
-        let columns = Int(Double(drawn.count).squareRoot().rounded(.up))
-        let rows = (drawn.count + columns - 1) / columns
-        guard let atlas = atlas(width: columns * cell, height: rows * cell) else { return }
-
-        let base = frameContext.services.baseColors.map
-        let descriptor = MTLRenderPassDescriptor()
-        descriptor.colorAttachments[0].texture = atlas.samples
-        descriptor.colorAttachments[0].resolveTexture = atlas.resolved
-        descriptor.colorAttachments[0].loadAction = .clear
-        descriptor.colorAttachments[0].clearColor = MTLClearColor(red: Double(base.x), green: Double(base.y),
-                                                                  blue: Double(base.z), alpha: 1)
-        descriptor.colorAttachments[0].storeAction = .multisampleResolve
-        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else { return }
-        encoder.label = "RasterTiles \(drawn.count)"
-        encoder.setRenderPipelineState(pipeline.bakePipelineState)
-        encoder.setCullMode(.none)
-        var fade = TileOverviewFadeUniform(pixelsPerPoint: 1, cameraZoom: Float(frameContext.planningZoom))
-        var windows: [(index: Int, origin: MTLOrigin)] = []
-        for (slot, index) in drawn.enumerated() {
-            let size = sources[index].size
-            let origin = MTLOrigin(x: (slot % columns) * cell, y: (slot / columns) * cell, z: 0)
-            // The tile's extent fills its window: the clip volume is the
-            // window, so nothing of a tile reaches its neighbour's.
-            encoder.setViewport(MTLViewport(originX: Double(origin.x), originY: Double(origin.y),
-                                            width: Double(size), height: Double(size), znear: 0, zfar: 1))
-            encoder.setScissorRect(MTLScissorRect(x: origin.x, y: origin.y, width: size, height: size))
-            Self.encodeFills(of: sources[index].metalTile.tileBuffers.ground, fade: &fade, encoder: encoder)
-            windows.append((index, origin))
+        guard let layout = RasterTileDrawer.atlasLayout(sizes: drawn.map { sources[$0].size }),
+              let commandBuffer = frameContext.gpuCommandBuffer,
+              let atlas = atlas(width: layout.width, height: layout.height) else { return }
+        let bakes = drawn.compactMap { index in
+            sources[index].texture.map {
+                RasterTileDrawer.Bake(ground: sources[index].metalTile.tileBuffers.ground, size: sources[index].size, texture: $0)
+            }
         }
-        encoder.endEncoding()
-
-        guard let blit = commandBuffer.makeBlitCommandEncoder() else { return }
-        blit.label = "RasterTileCopies"
-        for window in windows {
-            guard let texture = sources[window.index].texture else { continue }
-            let size = sources[window.index].size
-            blit.copy(from: atlas.resolved, sourceSlice: 0, sourceLevel: 0, sourceOrigin: window.origin,
-                      sourceSize: MTLSize(width: size, height: size, depth: 1),
-                      to: texture, destinationSlice: 0, destinationLevel: 0,
-                      destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
-            blit.generateMipmaps(for: texture)
-            pendingBakes.append((sources[window.index].metalTile.tile, texture, sources[window.index].signature))
+        guard RasterTileDrawer.bake(bakes,
+                                    atlas: atlas,
+                                    commandBuffer: commandBuffer,
+                                    pipeline: pipeline,
+                                    baseColor: frameContext.services.baseColors.map,
+                                    planningZoom: frameContext.planningZoom) else { return }
+        for index in drawn {
+            guard let texture = sources[index].texture else { continue }
+            pendingBakes.append((sources[index].metalTile.tile, texture, sources[index].signature))
         }
-        blit.endEncoding()
     }
 
     /// The frame's pass is on the GPU: its textures are drawn, from the
@@ -351,92 +322,28 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
 
     /// The atlas the frame's draws go through, at least `width` by
     /// `height`, grown when a frame needs more.
-    private func atlas(width: Int, height: Int) -> (samples: MTLTexture, resolved: MTLTexture)? {
+    private func atlas(width: Int, height: Int) -> RasterTileDrawer.BakeAtlas? {
         if let bakeAtlas, bakeAtlas.resolved.width >= width, bakeAtlas.resolved.height >= height {
             return bakeAtlas
         }
-        let side = (width: max(width, bakeAtlas?.resolved.width ?? 0), height: max(height, bakeAtlas?.resolved.height ?? 0))
-        let samples = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: RasterTileTexture.pixelFormat,
-                                                               width: side.width,
-                                                               height: side.height,
-                                                               mipmapped: false)
-        samples.textureType = .type2DMultisample
-        samples.sampleCount = RasterTilePipeline.bakeSampleCount
-        samples.usage = [.renderTarget]
-        samples.storageMode = device.supportsFamily(.apple2) ? .memoryless : .private
-        let resolved = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: RasterTileTexture.pixelFormat,
-                                                                width: side.width,
-                                                                height: side.height,
-                                                                mipmapped: false)
-        resolved.usage = [.renderTarget]
-        resolved.storageMode = .private
-        guard let samplesTexture = device.makeTexture(descriptor: samples),
-              let resolvedTexture = device.makeTexture(descriptor: resolved) else {
-            return nil
-        }
-        samplesTexture.label = "RasterTileAtlasSamples"
-        resolvedTexture.label = "RasterTileAtlas"
-        bakeAtlas = (samplesTexture, resolvedTexture)
+        bakeAtlas = RasterTileDrawer.BakeAtlas.make(device: device,
+                                                    width: max(width, bakeAtlas?.resolved.width ?? 0),
+                                                    height: max(height, bakeAtlas?.resolved.height ?? 0))
         return bakeAtlas
-    }
-
-    /// The fill runs of a ground layer, in buffer order (bottom to top),
-    /// adjacent runs in one draw. The ribbons are left out: the lines are
-    /// never in a raster tile. A run faded out at the frame's zoom is left
-    /// out, as the vector ground leaves it out, and the rest take their
-    /// fade's alpha in the shader. A layer without a run table draws
-    /// nothing, as the vector ground's class passes do.
-    private static func encodeFills(of ground: TileBuffers.GeometryLayer,
-                                    fade: inout TileOverviewFadeUniform,
-                                    encoder: MTLRenderCommandEncoder) {
-        guard ground.indicesCount > 0,
-              let indices = ground.indices,
-              let vertices = ground.vertices,
-              let styles = ground.styles,
-              let styleZoomFade = ground.styleZoomFade else { return }
-        encoder.setVertexBuffer(vertices.buffer, offset: vertices.offset, index: 0)
-        encoder.setVertexBuffer(styles.buffer, offset: styles.offset, index: 2)
-        encoder.setVertexBuffer(styleZoomFade.buffer, offset: styleZoomFade.offset, index: 4)
-        encoder.setVertexBytes(&fade, length: MemoryLayout<TileOverviewFadeUniform>.stride, index: 11)
-        let indexByteWidth = ground.indexType == .uint16 ? 2 : 4
-        var spanStart = 0
-        var spanCount = 0
-        func flush() {
-            guard spanCount > 0 else { return }
-            encoder.drawIndexedPrimitives(type: .triangle,
-                                          indexCount: spanCount,
-                                          indexType: ground.indexType,
-                                          indexBuffer: indices.buffer,
-                                          indexBufferOffset: indices.offset + spanStart * indexByteWidth)
-            spanCount = 0
-        }
-        for run in ground.styleRuns {
-            guard run.indexCount > 0,
-                  run.isFillsClass,
-                  TileStyleFadeMath.fadeIsZero(zoomFade: run.zoomFade, overviewFade: fade) == false else {
-                flush()
-                continue
-            }
-            if spanCount > 0, spanStart + spanCount == Int(run.indexStart) {
-                spanCount += Int(run.indexCount)
-            } else {
-                flush()
-                spanStart = Int(run.indexStart)
-                spanCount = Int(run.indexCount)
-            }
-        }
-        flush()
     }
 
     // MARK: - The draws
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard sources.isEmpty == false, let sampler else { return }
+        let sampling = RasterTileDrawer.Sampling(sampler: sampler,
+                                                 mipLevelBias: mipLevelBias,
+                                                 wireframe: debugOverlayControls.snapshot().wireframeEnabled)
         switch (layer, frameContext.renderSurfaceMode) {
         case (.flatMapSurface, .flat):
-            encodeFlat(encoder: encoder, frameContext: frameContext, sampler: sampler)
+            encodeFlat(encoder: encoder, frameContext: frameContext, sampling: sampling)
         case (.globeVectorSurface, .spherical):
-            encodeSphere(encoder: encoder, frameContext: frameContext, sampler: sampler)
+            encodeSphere(encoder: encoder, frameContext: frameContext, sampling: sampling)
         default:
             return
         }
@@ -457,38 +364,20 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         bakeAtlas = nil
     }
 
-    private func encodeFlat(encoder: MTLRenderCommandEncoder,
+    private func encodeFlat(encoder: any GPURenderEncoder,
                             frameContext: FrameContext,
-                            sampler: MTLSamplerState) {
-        encoder.pushDebugGroup("ground.rasterTiles")
-        beginDraws(encoder: encoder, sampler: sampler)
-        encoder.setRenderPipelineState(pipeline.flatPipelineState)
-        encoder.setDepthStencilState(groundOwnerState)
-        var cameraUniform = frameContext.cameraUniform
-        encoder.setVertexBytes(&cameraUniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
+                            sampling: RasterTileDrawer.Sampling) {
         let groundShadowMask = GroundShadowMaskBinding.resolve(frameContext: frameContext,
                                                                maskTexture: groundShadowMaskTextureProvider(),
                                                                fallbackTexture: groundShadowMaskFallbackTexture,
                                                                shadowMapTexture: shadowMapTextureProvider(),
                                                                shadowFallbackTexture: shadowFallbackTexture ?? groundShadowMaskFallbackTexture)
-        var shadowUniform = groundShadowMask.uniform
-        encoder.setFragmentBytes(&shadowUniform, length: MemoryLayout<ShadowUniform>.stride, index: 3)
-        encoder.setFragmentTexture(groundShadowMask.texture, index: 1)
-        // The relief's variant samples the cascades at its raised points.
-        encoder.setFragmentTexture(groundShadowMask.cascades, index: 2)
-        GroundFogUniform.bind(GroundFogUniform.resolve(frameContext: frameContext), encoder: encoder)
         let flatRenderState = frameContext.resolvedPresentation.flatRenderState
-        // The relief variant for a tile whose terrain is in, the plain one
-        // for the rest, selected only where it changes from the last draw.
-        var selectedRelief = false
         let groundRelief = frameContext.services.groundRelief
+        var items: [RasterTileDrawer.FlatItem] = []
         for source in sources {
             guard let texture = source.texture else { continue }
             let tile = source.metalTile.tile
-            encoder.setFragmentTexture(texture, index: 0)
-            // The tile-priority value, the tile's zoom, tested equal to
-            // the planner's marks (TileSourceStencilPriority).
-            encoder.setStencilReferenceValue(Self.reference(of: source))
             for placement in source.placements {
                 // The world tile is the horizon backdrop, flat on the plane
                 // (`TileWorkingSetSubsystem.horizonBackdrops`): no band
@@ -502,18 +391,6 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
                     RasterTileGrid.reliefCells(gridCells: groundFlattening.grid(forTileZoom: tile.z), relief: $0, rasterSize: source.size)
                 } ?? 0
                 guard let mesh = grid.mesh(forTileZoom: tile.z, atLeast: cells) else { continue }
-                if (relief != nil) != selectedRelief {
-                    selectedRelief = relief != nil
-                    encoder.setRenderPipelineState(selectedRelief ? pipeline.flatReliefPipelineState : pipeline.flatPipelineState)
-                }
-                if let relief, let groundRelief {
-                    GroundReliefUniform.bind(relief,
-                                             shading: shading,
-                                             over: tile,
-                                             frame: groundRelief,
-                                             renderMapSize: flatRenderState.renderMapSize,
-                                             encoder: encoder)
-                }
                 let originAndSize = ImmersiveMapProjection.flatTileOriginAndSize(x: tile.x,
                                                                                  y: tile.y,
                                                                                  z: tile.z,
@@ -529,15 +406,30 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
                 let floorLift: Float = tile.z <= TileCulling.flatBackdropZoomLevel
                     ? Self.backdropFloorLift(relief: groundRelief)
                     : 0
-                var modelMatrix = Matrix.translationMatrix(x: originAndSize.x,
+                let modelMatrix = Matrix.translationMatrix(x: originAndSize.x,
                                                            y: originAndSize.y,
                                                            z: floorLift) * Matrix.scaleMatrix(sx: scale, sy: scale, sz: 1)
-                encoder.setVertexBytes(&modelMatrix, length: MemoryLayout<matrix_float4x4>.stride, index: 3)
-                draw(mesh: mesh, encoder: encoder)
+                items.append(RasterTileDrawer.FlatItem(texture: texture,
+                                                       stencilReference: Self.reference(of: source),
+                                                       mesh: mesh,
+                                                       modelMatrix: modelMatrix,
+                                                       relief: relief.map { (relief: $0, shading: shading, tile: tile) }))
             }
         }
-        endDraws(encoder: encoder)
-        encoder.popDebugGroup()
+        RasterTileDrawer.drawFlat(items,
+                                  encoder: encoder,
+                                  cameraUniform: frameContext.cameraUniform,
+                                  groundShadow: RasterTileDrawer.GroundShadow(
+                                      uniform: groundShadowMask.uniform,
+                                      mask: groundShadowMask.texture,
+                                      cascades: groundShadowMask.cascades),
+                                  groundFog: GroundFogUniform.resolve(frameContext: frameContext),
+                                  groundRelief: groundRelief,
+                                  renderMapSize: flatRenderState.renderMapSize,
+                                  sampling: sampling,
+                                  pipeline: pipeline,
+                                  groundOwnerState: groundOwnerState,
+                                  depthDisabledState: depthDisabledState)
     }
 
     /// The world z the horizon backdrop lies at on the relief: the frame's
@@ -549,75 +441,31 @@ final class RasterTileRenderSubsystem: RenderSubsystem {
         return metres * relief.worldUnitsPerMetre * relief.strength
     }
 
-    private func encodeSphere(encoder: MTLRenderCommandEncoder,
+    private func encodeSphere(encoder: any GPURenderEncoder,
                               frameContext: FrameContext,
-                              sampler: MTLSamplerState) {
+                              sampling: RasterTileDrawer.Sampling) {
         let globe = frameContext.globeRenderUniform
-        let pureSphere = GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
-                                                            transition: globe.transition)
-        encoder.pushDebugGroup("ground.rasterTiles")
-        beginDraws(encoder: encoder, sampler: sampler, globeLight: GlobeLightUniform.resolve(frameContext: frameContext))
-        encoder.setRenderPipelineState(pureSphere ? pipeline.spherePurePipelineState : pipeline.sphereMorphPipelineState)
-        encoder.setDepthStencilState(sphereOpaqueOwnerState)
-        var cameraUniform = frameContext.cameraUniform
-        var globeValue = globe
-        var globeFrame = GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: frameContext.cameraUniform.matrix)
-        encoder.setVertexBytes(&cameraUniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        encoder.setVertexBytes(&globeValue, length: MemoryLayout<GlobeUniform>.stride, index: 8)
-        encoder.setVertexBytes(&globeFrame, length: MemoryLayout<GlobeFrameConstantsUniform>.stride, index: 10)
         // The sphere has one copy of the world, and a tile draws whole at
         // its own place whatever slot it stands in: once per source.
-        for source in sources {
-            guard let texture = source.texture else { continue }
-            let tile = source.metalTile.tile
-            guard let mesh = grid.mesh(forTileZoom: tile.z) else { continue }
-            var surfaceTile = GlobeSurfaceTileUniform(tile: tile)
-            encoder.setVertexBytes(&surfaceTile, length: MemoryLayout<GlobeSurfaceTileUniform>.stride, index: 9)
-            encoder.setStencilReferenceValue(Self.reference(of: source))
-            encoder.setFragmentTexture(texture, index: 0)
-            draw(mesh: mesh, encoder: encoder)
+        let items = sources.compactMap { source -> RasterTileDrawer.SphereItem? in
+            guard let texture = source.texture,
+                  let mesh = grid.mesh(forTileZoom: source.metalTile.tile.z) else { return nil }
+            return RasterTileDrawer.SphereItem(texture: texture,
+                                               stencilReference: Self.reference(of: source),
+                                               mesh: mesh,
+                                               tile: source.metalTile.tile)
         }
-        endDraws(encoder: encoder)
-        encoder.popDebugGroup()
-    }
-
-    /// Every grid triangle is counter-clockwise in render space, as every
-    /// tile triangle is, and neither surface mirrors: back faces are culled,
-    /// which on the sphere removes its far side.
-    /// `globeLight` is the sun on the globe, which the sphere's rings shade
-    /// by as the vector surface does, none on the plane.
-    private func beginDraws(encoder: MTLRenderCommandEncoder,
-                            sampler: MTLSamplerState,
-                            globeLight: GlobeLightUniform = .disabled) {
-        encoder.setFrontFacing(.counterClockwise)
-        encoder.setCullMode(.back)
-        if debugOverlayControls.snapshot().wireframeEnabled {
-            encoder.setTriangleFillMode(.lines)
-        }
-        var sampling = RasterTileSamplingUniform(mipLevelBias: mipLevelBias)
-        encoder.setFragmentBytes(&sampling, length: MemoryLayout<RasterTileSamplingUniform>.stride, index: 1)
-        GlobeLightUniform.bind(globeLight, encoder: encoder)
-        encoder.setFragmentSamplerState(sampler, index: 0)
-    }
-
-    private func endDraws(encoder: MTLRenderCommandEncoder) {
-        encoder.setTriangleFillMode(.fill)
-        encoder.setCullMode(.none)
-        encoder.setFrontFacing(.clockwise)
-        encoder.setDepthStencilState(depthDisabledState)
-    }
-
-    private func draw(mesh: RasterTileGrid.Mesh, encoder: MTLRenderCommandEncoder) {
-        encoder.setVertexBuffer(mesh.vertices, offset: 0, index: 0)
-        encoder.drawIndexedPrimitives(type: .triangle,
-                                      indexCount: mesh.indexCount,
-                                      indexType: mesh.indexType,
-                                      indexBuffer: mesh.indices,
-                                      indexBufferOffset: 0)
+        RasterTileDrawer.drawSphere(items,
+                                    encoder: encoder,
+                                    cameraUniform: frameContext.cameraUniform,
+                                    globe: globe,
+                                    globeLight: GlobeLightUniform.resolve(frameContext: frameContext),
+                                    pureSphere: GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
+                                                                                  transition: globe.transition),
+                                    sampling: sampling,
+                                    pipeline: pipeline,
+                                    sphereOpaqueOwnerState: sphereOpaqueOwnerState,
+                                    depthDisabledState: depthDisabledState)
     }
 }
 
-/// Mirror of `TileRasterSampling` in TileRaster.metal (fragment buffer 1).
-struct RasterTileSamplingUniform {
-    var mipLevelBias: Float
-}

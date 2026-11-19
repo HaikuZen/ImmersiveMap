@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Progress of an offline tour video export.
 public struct ImmersiveMapVideoExportProgress: Sendable, Equatable {

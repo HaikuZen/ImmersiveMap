@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import XCTest
 
@@ -25,11 +26,11 @@ final class TextAtlasRawResourceTests: XCTestCase {
     func testTheRendererUploadsTheFileByteForByte() throws {
         let device = try MetalTestEnvironment.requireDevice(needsReadback: true)
         let library = try device.makeDefaultLibrary(bundle: ImmersiveMapResourceBundle.bundle())
-        let renderer = try TextRenderer(device: device, library: library, resourceBundle: ImmersiveMapResourceBundle.bundle())
+        let renderer = TextRenderer(device: MetalDevice(device: device, library: library), resource: { (try? ImmersiveMapResourceBundle.location())?.url(forResource: $0, withExtension: $1) })
         let pixelsURL = try XCTUnwrap(ImmersiveMapResourceBundle.bundle().url(forResource: "atlas", withExtension: "bgra"))
         let file = try Data(contentsOf: pixelsURL)
 
-        let texture = try XCTUnwrap(renderer.texture)
+        let texture = renderer.texture.metalTexture
         XCTAssertEqual(texture.pixelFormat, .bgra8Unorm)
         XCTAssertEqual(texture.storageMode, .private, "The atlas keeps no CPU copy")
         XCTAssertEqual(file.count, texture.width * texture.height * 4)

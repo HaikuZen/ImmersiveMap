@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// Encodes the ground shadow mask pass of the flat presentation: a fullscreen
@@ -13,12 +14,13 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
     let name: String = "GroundShadowMask"
 
     private let pipeline: GroundShadowMaskPipeline
-    private let depthDisabledState: MTLDepthStencilState
-    private let shadowMapTextureProvider: () -> MTLTexture?
+    private let depthDisabledState: any GPUDepthStencilState
+    /// The render core's shadow map, still a Metal texture.
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
 
     init(pipeline: GroundShadowMaskPipeline,
-         depthDisabledState: MTLDepthStencilState,
-         shadowMapTextureProvider: @escaping () -> MTLTexture?) {
+         depthDisabledState: any GPUDepthStencilState,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)?) {
         self.pipeline = pipeline
         self.depthDisabledState = depthDisabledState
         self.shadowMapTextureProvider = shadowMapTextureProvider
@@ -28,7 +30,7 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .groundShadowMask,
               frameContext.renderSurfaceMode == .flat,
               let shadowState = ShadowPassGateResolver.resolve(frameContext: frameContext),
@@ -36,22 +38,20 @@ final class GroundShadowMaskRenderSubsystem: RenderSubsystem {
             return
         }
 
-        pipeline.select(renderEncoder: encoder)
-        encoder.setDepthStencilState(depthDisabledState)
-        encoder.setCullMode(.none)
         // The pass rasterizes at the mask's own size; the shader maps its
         // pixel back through that size, so the rays land on the same ground
         // points the drawable's pixels would.
         let maskSize = GroundShadowMaskPipeline.maskSize(for: frameContext.drawSize)
-        var maskUniform = GroundShadowMaskUniform(
+        let maskUniform = GroundShadowMaskUniform(
             projectionView: frameContext.cameraMatrices.projectionView,
             viewportSize: SIMD2<Float>(Float(maskSize.width), Float(maskSize.height))
         )
-        var shadowUniform = shadowState.shadowUniform
-        encoder.setFragmentBytes(&maskUniform, length: MemoryLayout<GroundShadowMaskUniform>.stride, index: 0)
-        encoder.setFragmentBytes(&shadowUniform, length: MemoryLayout<ShadowUniform>.stride, index: 1)
-        encoder.setFragmentTexture(shadowMapTexture, index: 0)
-        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        GroundShadowMaskDrawing.encodeMask(encoder: encoder,
+                        pipeline: pipeline,
+                        depthDisabledState: depthDisabledState,
+                        maskUniform: maskUniform,
+                        shadowUniform: shadowState.shadowUniform,
+                        shadowMap: shadowMapTexture)
     }
 
     func handleMemoryWarning() {}

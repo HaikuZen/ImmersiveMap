@@ -1,61 +1,47 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import MetalKit
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// Turns a parsed tile into GPU state. Every buffer of the tile lives in one
 /// backing allocation whose byte layout is the canonical `TileArenaSchema`
 /// slot sequence, so a freshly parsed tile and a disk-cached arena image
 /// produce identical arenas: the parse path writes the plan into the buffer,
-/// the cache path copies (or MTLIO-loads) the stored blob, and both rebuild
-/// the same `TileBufferView`s from the span table. The reader verifies every
-/// span take against the schema slot it expects, so a traversal that drifts
-/// from the schema fails instead of binding bytes to the wrong destination.
-/// `@unchecked Sendable`: both stored properties are immutable references to
-/// thread-safe Metal objects, and concurrent tile loads already call
-/// `makeTile` from independent tasks through the render store.
+/// the cache path copies (or, through the backend's file loader, loads) the
+/// stored blob, and both rebuild the same `TileBufferView`s from the span
+/// table. The reader verifies every span take against the schema slot it
+/// expects, so a traversal that drifts from the schema fails instead of
+/// binding bytes to the wrong destination.
+/// `@unchecked Sendable`: both stored properties are immutable, the device
+/// is safe to use from any thread and the loader is `@Sendable`, and
+/// concurrent tile loads already call `makeTile` from independent tasks
+/// through the render store.
 final class MetalTileFactory: @unchecked Sendable {
-    private let metalDevice: MTLDevice
-#if !targetEnvironment(simulator)
-    /// Resolved at init on Metal 3 devices (see `MetalIOCommandQueues`): tile
-    /// loads materialize concurrently from their own tasks, so lazy creation
-    /// would race. The simulator SDK has no MTLIO surface at all.
-    private let ioCommandQueue: MTLIOCommandQueue?
-#endif
+    /// A backend's way to load a `.file` geometry blob straight into the
+    /// tile's buffer (Metal's IO queue, `metalFileBlobLoader(device:)`):
+    /// true when the whole blob arrived, false when the file could not be
+    /// opened or the load ended in error, nil when the load did not answer
+    /// in time, which fails transiently.
+    typealias FileBlobLoader = @Sendable (_ url: URL,
+                                          _ format: PreparedTileFileBlobFormat,
+                                          _ buffer: any GPUBuffer,
+                                          _ byteCount: Int) async -> Bool?
 
-    init(metalDevice: MTLDevice) {
-        self.metalDevice = metalDevice
-#if !targetEnvironment(simulator)
-        self.ioCommandQueue = MTLIOPreparedTileGeometryTransport.isSupported(metalDevice: metalDevice)
-            ? MetalIOCommandQueues.shared(for: metalDevice)
-            : nil
-#endif
+    private let device: any GPUDevice
+    private let fileBlobLoader: FileBlobLoader?
+
+    init(device: any GPUDevice, fileBlobLoader: FileBlobLoader? = nil) {
+        self.device = device
+        self.fileBlobLoader = fileBlobLoader
     }
 
-#if !targetEnvironment(simulator)
-    /// How long one MTLIO load may take before the materialize gives up on
-    /// it. A tile's container is a few megabytes at most and a healthy load
-    /// ends in tens of milliseconds, so this is reached only by a request
-    /// the driver never answers. The load then fails transiently: the pair
-    /// on disk stays, the tile takes the network stage this once, and the
-    /// next hit tries the queue again. Nothing is remembered across loads,
-    /// because one slow answer (a saturated disk, a paused process) says
-    /// nothing about the next.
-    static let fileBlobLoadTimeout: TimeInterval = 15
-#endif
-
-    /// Whether this factory can DMA-load `.file` geometry blobs: Metal 3
-    /// support and a successfully created IO command queue. The render store
-    /// derives the geometry transport from this one answer, so a
-    /// queue-creation failure degrades the whole session to the inline
-    /// transport before any file entry exists, instead of saving entries no
-    /// hit could ever load.
+    /// Whether this factory can load `.file` geometry blobs: the backend
+    /// handed it a loader. The render store selects the transport that
+    /// writes file entries with the loader (`TileFileGeometry`), so a
+    /// session that cannot load them never writes them.
     var loadsFileBlobs: Bool {
-#if targetEnvironment(simulator)
-        return false
-#else
-        return ioCommandQueue != nil
-#endif
+        fileBlobLoader != nil
     }
 
     /// nil when the backing allocation fails (memory pressure) or the arena
@@ -69,9 +55,9 @@ final class MetalTileFactory: @unchecked Sendable {
                   plan providedPlan: TileArenaImagePlan? = nil) -> MetalTile? {
         let plan = providedPlan ?? TileArenaImageMath.plan(for: preparedTile)
 
-        var backingBuffer: MTLBuffer?
+        var backingBuffer: (any GPUBuffer)?
         if plan.totalByteCount > 0 {
-            guard let buffer = metalDevice.makeBuffer(length: plan.totalByteCount) else {
+            guard let buffer = device.makeBuffer(length: plan.totalByteCount, storage: .shared) else {
                 return nil
             }
             TileArenaImageMath.writeBlob(plan: plan, into: buffer.contents())
@@ -111,13 +97,13 @@ final class MetalTileFactory: @unchecked Sendable {
     }
 
     /// Materializes a disk-cached arena image: allocates the arena, fills it
-    /// from the blob (CPU copy for inline blobs, `MTLIOCommandQueue` load for
-    /// file blobs), verifies the file blob against the checksum stored in the
-    /// metadata, and rebuilds the buffer views from the span table.
+    /// from the blob (CPU copy for inline blobs, the backend's file loader
+    /// for file blobs), verifies the file blob against the checksum stored in
+    /// the metadata, and rebuilds the buffer views from the span table.
     func makeTile(fromImage image: PreparedTileArenaImage) async -> ArenaImageMaterializeResult {
-        var backingBuffer: MTLBuffer?
+        var backingBuffer: (any GPUBuffer)?
         if image.arenaByteCount > 0 {
-            guard let buffer = metalDevice.makeBuffer(length: image.arenaByteCount) else {
+            guard let buffer = device.makeBuffer(length: image.arenaByteCount, storage: .shared) else {
                 return .allocationFailed
             }
             switch image.blob {
@@ -129,32 +115,20 @@ final class MetalTileFactory: @unchecked Sendable {
                     buffer.contents().copyMemory(from: bytes.baseAddress!, byteCount: bytes.count)
                 }
             case .file(let url, let format, let checksum):
-#if targetEnvironment(simulator)
-                // The simulator writes and reads inline entries only (its own
-                // cache namespace); a file blob here is foreign data.
-                _ = url
-                _ = format
-                _ = checksum
-                return .imageUnreadable
-#else
-                guard let queue = ioCommandQueue else {
-                    // Unreachable through production wiring: the store selects
-                    // the file transport from `loadsFileBlobs`, so a session
-                    // without a queue never sees file entries. Kept transient
-                    // so an exotic caller cannot delete a healthy entry.
-                    return .allocationFailed
+                guard let fileBlobLoader else {
+                    // A session without a loader writes inline entries only
+                    // (the simulator, a Mac without Metal 3 and the browser,
+                    // each with its own cache namespace): a file blob here is
+                    // foreign data it could never load.
+                    return .imageUnreadable
                 }
-                // A load the queue never answers fails transiently: the
-                // entry is left alone (it is healthy as far as anyone
-                // knows) and the tile takes the network stage instead of
-                // holding its disk slot on a continuation.
-                guard let loaded = await loadFileBlob(from: url,
-                                                      format: format,
-                                                      into: buffer,
-                                                      byteCount: image.arenaByteCount,
-                                                      queue: queue) else {
+                // A load that never answers fails transiently: the entry is
+                // left alone (it is healthy as far as anyone knows) and the
+                // tile takes the network stage instead of holding its disk
+                // slot on a continuation.
+                guard let loaded = await fileBlobLoader(url, format, buffer, image.arenaByteCount) else {
 #if DEBUG
-                    print("MTLIO load of \(image.tile) did not complete within \(Self.fileBlobLoadTimeout) s")
+                    print("The file load of \(image.tile) did not answer in time")
 #endif
                     return .allocationFailed
                 }
@@ -174,7 +148,6 @@ final class MetalTileFactory: @unchecked Sendable {
                 guard loadedChecksum == checksum else {
                     return .imageUnreadable
                 }
-#endif
             }
             backingBuffer = buffer
         } else if case .inline(let blob) = image.blob, blob.isEmpty == false {
@@ -226,7 +199,7 @@ final class MetalTileFactory: @unchecked Sendable {
     /// a take out of schema order): cached tables are untrusted input, and
     /// the parse path shares the check as its final defense.
     private static func buildTileBuffers(spans: [TileArenaSpan],
-                                         backingBuffer: MTLBuffer?,
+                                         backingBuffer: (any GPUBuffer)?,
                                          groundStyleRuns: [GroundStyleRun],
                                          roadEdgeLineIndexStarts: [UInt32],
                                          buildingRanges: [TileBuildingRange],
@@ -237,9 +210,12 @@ final class MetalTileFactory: @unchecked Sendable {
                                          roadLabels: PreparedTileArenaImage.RoadLabelsMeta,
                                          surfaceLabels: [SurfaceLabelRecord]) -> TileBuffers? {
         let expectedSlots = TileArenaSchema.slots(text: TileArenaSchema.runCounts(of: textLabels))
+        // The tile's one allocation, shared by every view and the tile
+        // itself.
+        let gpuBackingBuffer = backingBuffer
         var cursor = SpanCursor(spans: spans,
                                 expectedSlots: expectedSlots,
-                                backingBuffer: backingBuffer)
+                                gpuBackingBuffer: gpuBackingBuffer)
 
         var ground = takeGeometryLayer(.ground, cursor: &cursor)
         ground = TileBuffers.GeometryLayer(vertices: ground.vertices,
@@ -247,7 +223,7 @@ final class MetalTileFactory: @unchecked Sendable {
                                            styles: ground.styles,
                                            styleZoomFade: ground.styleZoomFade,
                                            lineStyles: ground.lineStyles,
-                                           indexType: ground.indexType,
+                                           indexType: ground.gpuIndexType,
                                            styleRuns: groundStyleRuns)
         // The stored boundaries are in the arena's layer order, the order
         // the layers are taken in here.
@@ -277,7 +253,7 @@ final class MetalTileFactory: @unchecked Sendable {
         let extruded = TileBuffers.Extruded(vertices: extrudedVertices,
                                             indices: extrudedIndices.view,
                                             styles: cursor.takeView(.extrudedStyles),
-                                            indexType: extrudedIndices.indexType,
+                                            gpuIndexType: extrudedIndices.indexType,
                                             buildingRanges: buildingRanges,
                                             buildingAnchors: buildingAnchors,
                                             quarterIndexStarts: quarterIndexStarts)
@@ -312,7 +288,7 @@ final class MetalTileFactory: @unchecked Sendable {
               }) else {
             return nil
         }
-        return TileBuffers(backingBuffer: backingBuffer,
+        return TileBuffers(gpuBackingBuffer: gpuBackingBuffer,
                            ground: ground,
                            roads: roads,
                            bridgeOverlay: bridgeOverlay,
@@ -387,7 +363,7 @@ final class MetalTileFactory: @unchecked Sendable {
                                          styles: layer.styles,
                                          styleZoomFade: layer.styleZoomFade,
                                          lineStyles: layer.lineStyles,
-                                         indexType: layer.indexType,
+                                         indexType: layer.gpuIndexType,
                                          roadStyles: RoadLayerStyles(styles: layer.styles,
                                                                      styleZoomFades: layer.styleZoomFade,
                                                                      lineStyles: layer.lineStyles),
@@ -423,16 +399,18 @@ final class MetalTileFactory: @unchecked Sendable {
     private struct SpanCursor {
         private let spans: [TileArenaSpan]
         private let expectedSlots: [TileArenaSlot]
-        private let backingBuffer: MTLBuffer?
+        /// The tile's allocation, the one buffer of all its views
+        /// (`TileBufferView.gpuBuffer`).
+        private let gpuBackingBuffer: (any GPUBuffer)?
         private var index = 0
         private var failed = false
 
         init(spans: [TileArenaSpan],
              expectedSlots: [TileArenaSlot],
-             backingBuffer: MTLBuffer?) {
+             gpuBackingBuffer: (any GPUBuffer)?) {
             self.spans = spans
             self.expectedSlots = expectedSlots
-            self.backingBuffer = backingBuffer
+            self.gpuBackingBuffer = gpuBackingBuffer
         }
 
         var isConsistent: Bool {
@@ -451,7 +429,7 @@ final class MetalTileFactory: @unchecked Sendable {
             return makeView(from: span, elementStride: elementStride)
         }
 
-        mutating func takeIndexView(_ slot: TileArenaSlot) -> (view: TileBufferView?, indexType: MTLIndexType) {
+        mutating func takeIndexView(_ slot: TileArenaSlot) -> (view: TileBufferView?, indexType: GPUIndexType) {
             guard let span = takeSpan(claiming: slot) else {
                 return (nil, .uint32)
             }
@@ -487,61 +465,15 @@ final class MetalTileFactory: @unchecked Sendable {
             }
             // The stride check pins byteCount to the slot's element type, so a
             // corrupt element count cannot make a draw read past its span.
-            guard let backingBuffer,
+            guard let gpuBackingBuffer,
                   span.byteOffset >= 0,
                   span.byteCount == span.elementCount * elementStride,
                   span.byteOffset % TileArenaImageMath.spanAlignment == 0,
-                  span.byteCount <= backingBuffer.length - span.byteOffset else {
+                  span.byteCount <= gpuBackingBuffer.length - span.byteOffset else {
                 failed = true
                 return nil
             }
-            return TileBufferView(buffer: backingBuffer, offset: span.byteOffset, count: span.elementCount)
+            return TileBufferView(gpuBuffer: gpuBackingBuffer, offset: span.byteOffset, count: span.elementCount)
         }
     }
-
-    // MARK: - MTLIO blob load
-
-#if !targetEnvironment(simulator)
-    /// Whether the load completed with the whole blob, false when the file
-    /// could not be opened or the load ended in error, nil when the queue
-    /// did not answer within `fileBlobLoadTimeout`. The completion handler
-    /// is the only thing that resumes this await, and a load awaited without
-    /// a deadline would hold its tile's disk slot for the rest of the
-    /// process if the handler never ran; the loader's stage watchdog is the
-    /// second line behind this one.
-    private func loadFileBlob(from url: URL,
-                              format: PreparedTileFileBlobFormat,
-                              into buffer: MTLBuffer,
-                              byteCount: Int,
-                              queue: MTLIOCommandQueue) async -> Bool? {
-        let fileHandle: MTLIOFileHandle?
-        switch format {
-        case .raw:
-            fileHandle = try? metalDevice.makeIOFileHandle(url: url)
-        case .lzfseContainer:
-            fileHandle = try? metalDevice.makeIOFileHandle(url: url, compressionMethod: .lzfse)
-        }
-        guard let fileHandle else {
-            return false
-        }
-        let ioCommandBuffer = queue.makeCommandBuffer()
-        ioCommandBuffer.load(buffer,
-                             offset: 0,
-                             size: byteCount,
-                             sourceHandle: fileHandle,
-                             sourceHandleOffset: 0)
-        let loaded: Bool? = await CallbackTimeout.await(seconds: Self.fileBlobLoadTimeout) { complete in
-            ioCommandBuffer.addCompletedHandler { completedBuffer in
-                complete(completedBuffer.status == .complete)
-            }
-            ioCommandBuffer.commit()
-        }
-        if loaded == nil {
-            // Best effort: a late answer is ignored either way, and the
-            // buffer it would write is retained by the command buffer.
-            ioCommandBuffer.tryCancel()
-        }
-        return loaded
-    }
-#endif
 }

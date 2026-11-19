@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// The occlusion of the sky by the terrain, computed from a terrain tile's

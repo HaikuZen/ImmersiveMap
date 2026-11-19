@@ -1,11 +1,12 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
-import MetalKit
+import ImmersiveMapGPU
 import os
+import PortableFoundation
+#if canImport(QuartzCore)
 import QuartzCore
+#endif
 
 /// The `Render` folder: the frame engine and nothing feature-specific. It
 /// owns the frame loop, the render graph and its passes, the frame context
@@ -17,11 +18,11 @@ import QuartzCore
 /// through `RenderSubsystem`. No networking or disk cache policy, no style
 /// or label policy, no views, gestures or host-app lifecycle.
 ///
-/// Owns the map's Metal frame pipeline: resources, subsystem graph, frame attachments, and the render-loop workflow.
+/// Owns the map's frame pipeline, on any GPU backend: resources, subsystem graph, frame attachments, and the render-loop workflow.
 final class RenderFrameEngine {
     // MARK: - Dependencies
 
-    private let persistentContext: RenderPersistentContext
+    let persistentContext: RenderPersistentContext
 
     #if DEBUG
     var persistentContextForTesting: RenderPersistentContext {
@@ -94,9 +95,10 @@ final class RenderFrameEngine {
     /// `@MainActor`: renderer creation resolves the process-wide
     /// ``SharedRenderResources``, and every production and test creation path
     /// already runs on the main actor.
+    /// The engine over a platform's host (`RenderHost`): Apple's builds it
+    /// from the view's layer (`init(layer:...)`, `RenderFrameEngine+Metal.swift`).
     @MainActor
-    init(layer: CAMetalLayer,
-         pinSource: PinRenderSource,
+    init(host: RenderHost,
          annotationSource: AnnotationRenderSource,
          sceneModelSource: SceneModelRenderSource,
          layerSource: LayerRenderSource = FixedLayerRenderSource(),
@@ -108,19 +110,18 @@ final class RenderFrameEngine {
          eventSink: RenderFrameEventSink,
          tileTraceRecorder: TileTraceRecorder,
          baseLabelTraceRecorder: BaseLabelTraceRecorder,
-         clock: RenderFrameClock = RenderFrameWallClock()) throws {
-        let persistentContext = try RenderPersistentContext(layer: layer,
-                                                            pinSource: pinSource,
-                                                            annotationSource: annotationSource,
-                                                            sceneModelSource: sceneModelSource,
-                                                            layerSource: layerSource,
-                                                            styleRuntime: styleRuntime,
-                                                            config: settings,
-                                                            eventSink: eventSink,
-                                                            tileTraceRecorder: tileTraceRecorder,
-                                                            baseLabelTraceRecorder: baseLabelTraceRecorder)
-        let attachments = FrameAttachmentStore(metalDevice: persistentContext.metalContext.device,
-                                               renderSampleCount: persistentContext.metalContext.renderSampleCount)
+         clock: RenderFrameClock = RenderFrameWallClock()) {
+        let persistentContext = RenderPersistentContext(host: host,
+                                                        annotationSource: annotationSource,
+                                                        sceneModelSource: sceneModelSource,
+                                                        layerSource: layerSource,
+                                                        styleRuntime: styleRuntime,
+                                                        config: settings,
+                                                        eventSink: eventSink,
+                                                        tileTraceRecorder: tileTraceRecorder,
+                                                        baseLabelTraceRecorder: baseLabelTraceRecorder)
+        let attachments = FrameAttachmentStore(device: persistentContext.gpuDevice,
+                                               renderSampleCount: persistentContext.renderSampleCount)
 
         let renderGraph = RenderGraphFactory.makeDefaultGraph(context: persistentContext,
                                                               settings: settings,
@@ -166,24 +167,26 @@ final class RenderFrameEngine {
 
     // MARK: - Rendering
 
-    /// Renders one live frame into the drawable the display link delivered
-    /// with its update. The drawable arrives pre-acquired and already sized,
-    /// so the frame is measured against the texture it actually renders into
-    /// and never blocks in `nextDrawable()` mid-encode.
+    /// Renders one frame into `target`: the platform's drawable, presented
+    /// through the target, or an offscreen texture, presented nowhere.
+    /// `onGPUComplete` fires on the backend's completion thread only when
+    /// this call returned `true`. False when every frame slot is in flight
+    /// or the frame was not scheduled.
     @discardableResult
-    func render(to layer: CAMetalLayer, drawable: any CAMetalDrawable) -> Bool {
-        updatePresentationSyncMode(layer: layer)
+    func render(into target: FrameRenderTarget,
+                drawSize: CGSize,
+                pixelsPerPoint: CGFloat,
+                onGPUComplete: (@Sendable (Bool) -> Void)? = nil) -> Bool {
         guard let frameSlotIndex = inFlightFramePool.tryAcquire() else {
             recordSkippedFrame(reason: .inFlightSlotsExhausted)
             return false
         }
 
-        let didSchedule = renderFrame(drawSize: CGSize(width: drawable.texture.width,
-                                                       height: drawable.texture.height),
-                                      pixelsPerPoint: layer.contentsScale,
+        let didSchedule = renderFrame(drawSize: drawSize,
+                                      pixelsPerPoint: pixelsPerPoint,
                                       frameSlotIndex: frameSlotIndex,
-                                      acquireTarget: { FrameRenderTarget(drawable: drawable) },
-                                      onGPUComplete: nil)
+                                      acquireTarget: { target },
+                                      onGPUComplete: onGPUComplete)
         if didSchedule == false {
             inFlightFramePool.release(slot: frameSlotIndex)
             #if DEBUG
@@ -195,42 +198,6 @@ final class RenderFrameEngine {
             debugScheduledFrameCount += 1
         }
         #endif
-        return didSchedule
-    }
-
-    /// SwiftUI annotations are platform views above the Metal layer: their frames
-    /// commit with the main-thread CATransaction, while a free-running drawable
-    /// presents on its own once the GPU finishes, typically one vsync apart, so
-    /// markers visibly detach from their geo points while the camera moves.
-    /// While markers exist, the drawable must present inside the transaction
-    /// (see `presentFrame`) so map and markers reach the screen in the same
-    /// commit; without markers the cheaper free-running present stays.
-    private func updatePresentationSyncMode(layer: CAMetalLayer) {
-        let needsTransactionSync = persistentContext.annotationSource
-            .currentAnnotationProjectionInput.entries.isEmpty == false
-        if layer.presentsWithTransaction != needsTransactionSync {
-            layer.presentsWithTransaction = needsTransactionSync
-        }
-    }
-
-    /// Renders one frame into a caller-supplied offscreen texture. Used by the
-    /// offline video export; nothing is presented. `onGPUComplete` fires on the
-    /// Metal completion thread only when this call returned `true`.
-    @discardableResult
-    func render(offscreen request: RenderFrameOffscreenRequest) -> Bool {
-        guard let frameSlotIndex = inFlightFramePool.tryAcquire() else {
-            recordSkippedFrame(reason: .inFlightSlotsExhausted)
-            return false
-        }
-
-        let didSchedule = renderFrame(drawSize: request.drawSize,
-                                      pixelsPerPoint: request.pixelsPerPoint,
-                                      frameSlotIndex: frameSlotIndex,
-                                      acquireTarget: { FrameRenderTarget(texture: request.texture) },
-                                      onGPUComplete: request.onGPUComplete)
-        if didSchedule == false {
-            inFlightFramePool.release(slot: frameSlotIndex)
-        }
         return didSchedule
     }
 
@@ -379,8 +346,8 @@ final class RenderFrameEngine {
         // The terrain tiles' edges welded to their neighbours' since the
         // last frame, written before this frame's command buffer, on the
         // same queue (`GroundReliefFrameState.beginFrame`).
-        groundRelief?.beginFrame(commandQueue: persistentContext.metalContext.commandQueue)
-        guard let commandBuffer = persistentContext.metalContext.makeCommandBuffer() else {
+        groundRelief?.beginFrame(commandQueue: persistentContext.gpuCommandQueue)
+        guard let commandBuffer = persistentContext.gpuCommandQueue.makeCommandBuffer() else {
             diagnostics.recordSkipReason(.missingCommandBuffer)
             currentDiagnostics = diagnostics
             return nil
@@ -506,7 +473,7 @@ final class RenderFrameEngine {
                             viewport: cameraFrameState.viewport,
                             cameraMatrices: cameraMatrices,
                             cameraEye: cameraEye,
-                            commandBuffer: commandBuffer,
+                            gpuCommandBuffer: commandBuffer,
                             services: services,
                             mapCameraState: cameraFrameState.mapCameraState,
                             animatedZoom: animatedZoomValue,
@@ -527,7 +494,7 @@ final class RenderFrameEngine {
         resourceRegistry.setPipeline(persistentContext.tilePipeline.pipelineState, named: .tilePipeline)
         resourceRegistry.setPipeline(persistentContext.extrudedTilePipeline.pipelineState, named: .extrudedTilePipeline)
         resourceRegistry.setTexture(persistentContext.textRenderer.texture, named: .labelGlyphAtlas)
-        resourceRegistry.setTexture(persistentContext.poiSpriteAtlas.texture, named: .poiSpriteAtlas)
+        resourceRegistry.setTexture(persistentContext.poiSpriteTexture, named: .poiSpriteAtlas)
     }
 
     private func prepareGPU(frameContext: FrameContext) {
@@ -583,7 +550,7 @@ final class RenderFrameEngine {
                               target: FrameRenderTarget?,
                               frameSlotIndex: Int,
                               onGPUComplete: (@Sendable (Bool) -> Void)?) -> Bool {
-        guard let commandBuffer = frameContext.commandBuffer,
+        guard let commandBuffer = frameContext.gpuCommandBuffer,
               let target else {
             return false
         }
@@ -591,28 +558,16 @@ final class RenderFrameEngine {
         let selectionPickData = frameContext.sharedState.selectionPickData
         // The handler runs on a Metal thread, so it takes the engine's
         // thread-safe parts and never the engine itself.
-        commandBuffer.addCompletedHandler { [lastCompletedGPUFrameDuration, inFlightFramePool, eventSink] completedBuffer in
-            // Read the timestamps before entering the lock: withLock takes a
-            // @Sendable closure, and MTLCommandBuffer is not Sendable.
-            let gpuFrameDuration = completedBuffer.gpuEndTime - completedBuffer.gpuStartTime
-            lastCompletedGPUFrameDuration.withLock { $0 = gpuFrameDuration }
+        commandBuffer.addCompletedHandler(reporting: { [lastCompletedGPUFrameDuration, inFlightFramePool, eventSink] completion in
+            if let gpuFrameDuration = completion.gpuDuration {
+                lastCompletedGPUFrameDuration.withLock { $0 = gpuFrameDuration }
+            }
             inFlightFramePool.release(slot: frameSlotIndex)
             eventSink.updateSelectionPickData(selectionPickData)
-            onGPUComplete?(completedBuffer.error == nil)
-        }
-        if let drawable = target.drawable {
-            if drawable.layer.presentsWithTransaction {
-                // Markers are on screen: commit, wait until the buffer is
-                // scheduled, then present, so the drawable rides the current
-                // CATransaction together with the marker view frames set right
-                // after `presentFrame` (Apple's transaction-synced pattern).
-                commandBuffer.commit()
-                commandBuffer.waitUntilScheduled()
-                drawable.present()
-            } else {
-                commandBuffer.present(drawable)
-                commandBuffer.commit()
-            }
+            onGPUComplete?(completion.succeeded)
+        })
+        if let present = target.present {
+            present(commandBuffer)
         } else {
             commandBuffer.commit()
         }

@@ -1,8 +1,11 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
+// Outside Apple's platforms `URLSession` is in a module of its own.
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import ImageIO
 
 public enum PinImageLoaderError: Error, Equatable {
@@ -11,8 +14,19 @@ public enum PinImageLoaderError: Error, Equatable {
     case cannotDecodeImage
 }
 
+extension PinImage {
+    /// The picture a pin shows while its remote picture loads, when it was
+    /// given no placeholder of its own.
+    public static let defaultPlaceholder = PinImage(cgImage: PinImageLoader.defaultPlaceholderCGImage)
+}
+
 public enum PinImageLoader {
     public static let defaultPlaceholderCGImage: CGImage = makeDefaultPlaceholderCGImage()
+
+    /// Loads and decodes a pin's remote picture.
+    public static func load(from url: URL) async throws -> PinImage {
+        PinImage(cgImage: try await loadCGImage(from: url))
+    }
 
     public static func loadCGImage(from url: URL) async throws -> CGImage {
         let (data, response) = try await URLSession.shared.data(from: url)

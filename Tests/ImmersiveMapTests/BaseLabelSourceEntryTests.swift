@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapGPUTestSupport
 import MetalKit
 import XCTest
 
@@ -50,7 +51,7 @@ final class BaseLabelSourceEntryTests: XCTestCase {
         let metalTile = MetalTile(tile: ownerKey.tile,
                                   tileBuffers: try makeTileBuffers(textLabels: makeTextLabelSet(keys: [10, 11, 12])))
         let tileIndexAllocator = VisibleTileIndexAllocator(indexedTiles: [ownerKey])
-        let cache = BaseLabelCache(metalDevice: device)
+        let cache = BaseLabelCache(device: RecordingGPUDevice())
 
         cache.rebuild(sourceEntries: [
             BaseLabelSourceEntry(ownerKey: ownerKey,
@@ -70,7 +71,7 @@ final class BaseLabelSourceEntryTests: XCTestCase {
         let ownerKey = VisibleTile(x: 8, y: 8, z: 4)
         let metalTile = MetalTile(tile: ownerKey.tile,
                                   tileBuffers: try makeTileBuffers(textLabels: makeTextLabelSet(keys: [10, 11])))
-        let cache = BaseLabelCache(metalDevice: device)
+        let cache = BaseLabelCache(device: RecordingGPUDevice())
         cache.rebuild(sourceEntries: [
             BaseLabelSourceEntry(ownerKey: ownerKey,
                                  metalTile: metalTile,
@@ -98,7 +99,7 @@ final class BaseLabelSourceEntryTests: XCTestCase {
             PlaceTile(metalTile: first, placeIn: VisibleTile(x: 8, y: 8, z: 4)),
             PlaceTile(metalTile: second, placeIn: VisibleTile(x: 9, y: 8, z: 4))
         ])
-        let cache = BaseLabelCache(metalDevice: device)
+        let cache = BaseLabelCache(device: RecordingGPUDevice())
         cache.rebuild(sourceEntries: entries,
                       tileIndexAllocator: VisibleTileIndexAllocator(indexedTiles: entries.map(\.ownerKey)))
 
@@ -123,7 +124,7 @@ final class BaseLabelSourceEntryTests: XCTestCase {
             PlaceTile(metalTile: standIn, placeIn: VisibleTile(x: 9653, y: 12318, z: 15)),
             PlaceTile(metalTile: exactTile, placeIn: VisibleTile(x: 9652, y: 12318, z: 15))
         ])
-        let cache = BaseLabelCache(metalDevice: device)
+        let cache = BaseLabelCache(device: RecordingGPUDevice())
         cache.rebuild(sourceEntries: entries,
                       tileIndexAllocator: VisibleTileIndexAllocator(indexedTiles: entries.map(\.ownerKey)))
 
@@ -151,7 +152,7 @@ final class BaseLabelSourceEntryTests: XCTestCase {
             PlaceTile(metalTile: standIn, placeIn: VisibleTile(x: 9653, y: 12318, z: 15))
         ])
         let allocator = VisibleTileIndexAllocator(indexedTiles: both.map(\.ownerKey))
-        let cache = BaseLabelCache(metalDevice: device)
+        let cache = BaseLabelCache(device: RecordingGPUDevice())
 
         cache.rebuild(sourceEntries: both, tileIndexAllocator: allocator)
         XCTAssertEqual(cache.labelCopyOf, [-1, 0])
@@ -171,7 +172,7 @@ final class BaseLabelSourceEntryTests: XCTestCase {
             PlaceTile(metalTile: metalTile, placeIn: VisibleTile(x: 1, y: 1, z: 2, worldWrap: 0)),
             PlaceTile(metalTile: metalTile, placeIn: VisibleTile(x: 1, y: 1, z: 2, worldWrap: 1))
         ])
-        let cache = BaseLabelCache(metalDevice: device)
+        let cache = BaseLabelCache(device: RecordingGPUDevice())
         cache.rebuild(sourceEntries: entries,
                       tileIndexAllocator: VisibleTileIndexAllocator(indexedTiles: entries.map(\.ownerKey)))
 

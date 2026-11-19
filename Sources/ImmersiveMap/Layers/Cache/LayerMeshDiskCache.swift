@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The meshes of the layers, kept on disk as the GPU takes them
 /// (`LayerMeshFile`). A layer is built from its source once on a device:
@@ -44,14 +44,16 @@ final class LayerMeshDiskCache: @unchecked Sendable {
         hasher.combine(LayerMeshBuilder.maximumEdgeLength.bitPattern)
         switch identity {
         case .file(let sourceURL):
+            // The size as the platform's Foundation gives it
+            // (`FileManager.byteCount(fromAttributes:)`).
             guard let attributes = try? FileManager.default.attributesOfItem(atPath: sourceURL.path),
-                  let size = attributes[.size] as? NSNumber,
+                  let size = FileManager.byteCount(fromAttributes: attributes),
                   let modified = attributes[.modificationDate] as? Date else {
                 return nil
             }
             hasher.combine("file")
             hasher.combine(sourceURL.standardizedFileURL.path)
-            hasher.combine(size.uint64Value)
+            hasher.combine(UInt64(size))
             hasher.combine(modified.timeIntervalSinceReferenceDate.bitPattern)
         case .named(let name):
             hasher.combine("named")
@@ -96,7 +98,9 @@ final class LayerMeshDiskCache: @unchecked Sendable {
         defer { lock.unlock() }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try data.write(to: directory.appendingPathComponent(name), options: .atomic)
+            // Atomic where the platform can, in place on WASI, which has no
+            // temporary files (`Data.writeReplacing(to:)`).
+            try data.writeReplacing(to: directory.appendingPathComponent(name))
         } catch {
             return
         }
@@ -109,16 +113,13 @@ final class LayerMeshDiskCache: @unchecked Sendable {
 
     /// The entries, the one used longest ago first.
     func entries() -> [(url: URL, size: Int, used: Date)] {
-        let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey]
-        let urls = (try? FileManager.default.contentsOfDirectory(at: directory,
-                                                                 includingPropertiesForKeys: Array(keys))) ?? []
-        return urls.compactMap { url -> (url: URL, size: Int, used: Date)? in
-            guard url.pathExtension == Self.fileExtension,
-                  let values = try? url.resourceValues(forKeys: keys),
-                  let size = values.fileSize, let used = values.contentModificationDate else {
+        // The portable listing (`FileManager.regularFiles(in:recursive:)`):
+        // FoundationEssentials has no resource keys.
+        FileManager.default.regularFiles(in: directory, recursive: false).compactMap { file -> (url: URL, size: Int, used: Date)? in
+            guard file.url.pathExtension == Self.fileExtension, let used = file.modificationDate else {
                 return nil
             }
-            return (url, size, used)
+            return (file.url, Int(clamping: file.byteCount), used)
         }
         .sorted { $0.used < $1.used }
     }

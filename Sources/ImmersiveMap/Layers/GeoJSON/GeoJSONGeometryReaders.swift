@@ -1,13 +1,13 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A Point: one point of the layer.
 struct GeoJSONPointReader: GeoJSONGeometryReader {
     let type = "Point"
 
-    func read(coordinates: Any,
+    func read(coordinates: JSONValue,
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
@@ -21,7 +21,7 @@ struct GeoJSONPointReader: GeoJSONGeometryReader {
 struct GeoJSONMultiPointReader: GeoJSONGeometryReader {
     let type = "MultiPoint"
 
-    func read(coordinates: Any,
+    func read(coordinates: JSONValue,
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
@@ -38,7 +38,7 @@ struct GeoJSONMultiPointReader: GeoJSONGeometryReader {
 struct GeoJSONLineStringReader: GeoJSONGeometryReader {
     let type = "LineString"
 
-    func read(coordinates: Any,
+    func read(coordinates: JSONValue,
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
@@ -52,7 +52,7 @@ struct GeoJSONLineStringReader: GeoJSONGeometryReader {
 struct GeoJSONMultiLineStringReader: GeoJSONGeometryReader {
     let type = "MultiLineString"
 
-    func read(coordinates: Any,
+    func read(coordinates: JSONValue,
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
@@ -70,7 +70,7 @@ struct GeoJSONMultiLineStringReader: GeoJSONGeometryReader {
 struct GeoJSONPolygonReader: GeoJSONGeometryReader {
     let type = "Polygon"
 
-    func read(coordinates: Any,
+    func read(coordinates: JSONValue,
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {
@@ -83,7 +83,7 @@ struct GeoJSONPolygonReader: GeoJSONGeometryReader {
 struct GeoJSONMultiPolygonReader: GeoJSONGeometryReader {
     let type = "MultiPolygon"
 
-    func read(coordinates: Any,
+    func read(coordinates: JSONValue,
               style: ImmersiveMapGeoJSON.SimpleStyle,
               path: String,
               into context: inout GeoJSONReadContext) throws {

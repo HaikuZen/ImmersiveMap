@@ -1,0 +1,610 @@
+// Copyright (c) 2025-2026 Artem Bobkin.
+// SPDX-License-Identifier: MIT
+
+// The map for a page: `ImmersiveMap.create(container, options)` fills the
+// element with a canvas the engine draws into (the ImmersiveMapWebMap
+// module through the page's WebGPU device, map.mjs), takes the pointer, the
+// wheel and two-finger touch as camera moves, draws only when something
+// changed, keeps the page's marker elements over the points they mark, and
+// keeps the archives' ranges it read in the browser's storage for the next
+// load (rangeCache.mjs), credits the map's data in a badge in the corner,
+// as the Apple views do, and parses the tiles in Web Workers off the page's
+// thread (tileWorker.mjs).
+// The types are in ImmersiveMap.d.ts. The module, the shader bundle and the
+// resources are what Web/map/build.sh writes, found in `build/` beside this
+// file unless `assets` names another folder.
+
+import { chooseFeatures } from '../ImmersiveMapWebGPU.js';
+import { startMap, fetchResources } from './map.mjs';
+import { ArchiveRangeCache, openBrowserStore } from './rangeCache.mjs';
+import { drawPoiAtlas } from './poiIcons.mjs';
+import { makePinPictures } from './pinPictures.mjs';
+
+/// How a drag and the wheel move the camera.
+const input = {
+    /// A wheel notch (100 pixels) is a fifth of a level.
+    wheelPixelsPerLevel: 500,
+    /// A line of a wheel that scrolls by lines, in pixels.
+    wheelLinePixels: 33,
+    /// A drag across the whole width turns the camera half a turn, one
+    /// across the whole height tilts it a quarter of one.
+    orbitYawPerWidth: Math.PI,
+    orbitPitchPerHeight: Math.PI * 0.5,
+    /// A drag's velocity at release is measured over its last moves within
+    /// this many milliseconds, and is none when the pointer has not moved
+    /// for `releaseStillTime` (it stopped before lifting).
+    releaseVelocityWindow: 100,
+    releaseStillTime: 50,
+    /// A press that moves less than this many points before it lifts is a
+    /// tap, which may land on a pin.
+    tapSlop: 6,
+};
+
+/// The `attribution` option's object, checked before the module reads it.
+function checkAttribution(attribution) {
+    if (typeof attribution !== 'object' || attribution === null) return;
+    const { credits, link, showsEngineCredit } = attribution;
+    if (credits !== undefined) {
+        if (!Array.isArray(credits)) throw new TypeError('attribution.credits must be a list');
+        for (const credit of credits) {
+            if (typeof credit?.text !== 'string') throw new TypeError('Every attribution credit needs its text');
+            for (const key of ['minZoom', 'maxZoom']) {
+                if (credit[key] !== undefined && !Number.isFinite(credit[key]) && credit[key] !== Infinity) {
+                    throw new TypeError(`An attribution credit's ${key} must be a number`);
+                }
+            }
+            if ((credit.minZoom ?? 0) >= (credit.maxZoom ?? Infinity)) {
+                throw new TypeError(`The credit "${credit.text}" shows at no zoom`);
+            }
+        }
+    }
+    if (link !== undefined && link !== null && typeof link !== 'string') throw new TypeError('attribution.link must be a URL');
+    if (showsEngineCredit !== undefined && typeof showsEngineCredit !== 'boolean') {
+        throw new TypeError('attribution.showsEngineCredit must be true or false');
+    }
+}
+
+/// A key only `create` holds, so the constructor is not called directly.
+const creating = Symbol('ImmersiveMap.create');
+
+export class ImmersiveMap {
+    /// Makes the map in the element, which it fills: a canvas and a layer
+    /// of markers over it. Rejects when the browser has no WebGPU or the
+    /// module does not load.
+    static async create(container, options = {}) {
+        if (!(container instanceof HTMLElement)) throw new TypeError('ImmersiveMap needs an element to fill');
+        checkAttribution(options.attribution);
+        if (!navigator.gpu) throw new Error('This browser has no WebGPU.');
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) throw new Error('No WebGPU adapter.');
+        const device = await adapter.requestDevice({ requiredFeatures: chooseFeatures(adapter) });
+        try {
+            return await new ImmersiveMap(creating, container, device, options).#start(options);
+        } catch (error) {
+            device.destroy();
+            throw error;
+        }
+    }
+
+    #container;
+    #device;
+    #canvas;
+    #markerLayer;
+    #badge = null;
+    #shownCredits = null;
+    #map = null;
+    #options;
+    #markers = new Map();
+    #nextMarkerID = 1;
+    #pins = new Map();
+    #nextPinID = 1;
+    #pinPictures = null;
+    /// The module's pictures by the page's source (an element, an
+    /// `ImageData`), with the pins that show each: pins of one source share
+    /// one picture.
+    #pictures = new Map();
+    #pixelsPerPoint = 1;
+    #frameRequest = null;
+    #idleTick = null;
+    #listeners = new AbortController();
+    #workers = [];
+    #resizeObserver = null;
+    #destroyed = false;
+
+    constructor(key, container, device, options) {
+        if (key !== creating) throw new TypeError('Make an ImmersiveMap with ImmersiveMap.create');
+        this.#container = container;
+        this.#device = device;
+        this.#options = {
+            idleTickInterval: 250,
+            interactive: true,
+            onError: (message) => console.error(message),
+            onWarning: (message) => console.warn(message),
+            onDownloadFailure: () => {},
+            onPinTap: () => {},
+            attribution: true,
+            ...options,
+        };
+        device.addEventListener('uncapturederror', (event) => this.#options.onError(`WebGPU: ${event.error.message}`));
+        device.lost.then((info) => {
+            if (!this.#destroyed) this.#options.onError(`The WebGPU device was lost: ${info.message}`);
+        });
+
+        if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
+        this.#canvas = document.createElement('canvas');
+        Object.assign(this.#canvas.style, { display: 'block', width: '100%', height: '100%', touchAction: 'none' });
+        // The markers inherit `pointer-events: none` from their layer, so a
+        // drag over one moves the map. A marker meant to be clicked sets
+        // `pointer-events: auto` on its element.
+        this.#markerLayer = document.createElement('div');
+        Object.assign(this.#markerLayer.style, { position: 'absolute', inset: '0', overflow: 'hidden', pointerEvents: 'none' });
+        container.append(this.#canvas, this.#markerLayer);
+        if (this.#options.attribution === false) {
+            console.warn('ImmersiveMap: the attribution badge is hidden, but map data licenses (ODbL for '
+                + 'OpenStreetMap data) require visible attribution near the map. Show the credits elsewhere on the page.');
+        } else {
+            this.#badge = document.createElement('div');
+            // The Apple badge's look: one line, semibold, white in a dark
+            // halo, no plate, in the bottom trailing corner.
+            Object.assign(this.#badge.style, {
+                position: 'absolute', insetInlineEnd: '0', bottom: '0', padding: '7px 10px',
+                font: '600 12px/1.2 system-ui, -apple-system, sans-serif', color: '#fff',
+                textShadow: '0 0 3.5px rgba(0, 0, 0, 0.95), 0 0 2px rgba(0, 0, 0, 0.95)',
+                whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
+            });
+            container.append(this.#badge);
+        }
+    }
+
+    async #start({ assets, archive = '', multisample = true, camera, tileCache = true, tileWorkers }) {
+        const base = new URL(String(assets ?? new URL('./build/', import.meta.url)), document.baseURI);
+        if (!base.pathname.endsWith('/')) base.pathname += '/';
+        const context = this.#canvas.getContext('webgpu');
+        // The engine's pipelines draw bgra8unorm, which every canvas takes.
+        context.configure({ device: this.#device, format: 'bgra8unorm', alphaMode: 'opaque' });
+
+        const [shaders, module, resources] = await Promise.all([
+            fetch(new URL('shaders.json', base)).then((response) => {
+                if (!response.ok) throw new Error(`The shader bundle did not load (HTTP ${response.status})`);
+                return response.json();
+            }),
+            WebAssembly.compileStreaming(fetch(new URL('ImmersiveMapWebMap.wasm', base))),
+            fetchResources(new URL('resources', base).href),
+        ]);
+        // The archives' ranges kept in the browser's storage, where it has
+        // storage the page can write.
+        const store = tileCache === false ? null : await openBrowserStore();
+        const rangeCache = store && new ArchiveRangeCache(store, {
+            maxBytes: tileCache?.maxBytes,
+            warn: (message) => this.#options.onWarning(message),
+        });
+        // The tile workers: one fewer than the cores, at most four, as each
+        // holds a copy of the module.
+        const workerCount = Math.max(0, Math.floor(tileWorkers
+            ?? Math.min(4, Math.max(1, (navigator.hardwareConcurrency || 2) - 1))));
+        this.#workers = Array.from({ length: workerCount },
+                                   () => new Worker(new URL('./tileWorker.mjs', import.meta.url), { type: 'module' }));
+        this.#map = await startMap({
+            device: this.#device,
+            module,
+            shaders,
+            resources,
+            canvasTexture: () => context.getCurrentTexture(),
+            archiveURL: archive,
+            multisample,
+            warn: (message) => this.#options.onWarning(message),
+            wake: () => this.#wake(),
+            downloadFailed: (downloads) => this.#options.onDownloadFailure({ ...downloads }),
+            rangeCache,
+            tileWorkers: this.#workers.map((worker) => ({
+                send: (message, transfer) => worker.postMessage(message, transfer),
+                listen: (handler) => { worker.onmessage = (event) => handler(event.data); },
+            })),
+            // Maki's icons (poiIcons.mjs), where Apple's platforms draw SF
+            // Symbols.
+            drawPoiIcons: drawPoiAtlas,
+            // The pins' counters, shapes and placeholder, drawn with a 2D
+            // canvas where Apple's platforms draw them with Core Graphics.
+            pinPictures: (this.#pinPictures = makePinPictures()),
+            attribution: typeof this.#options.attribution === 'object' ? this.#options.attribution : null,
+        });
+        if (camera) this.lookAt(camera);
+        if (this.#options.interactive) this.#listen();
+        this.#resizeObserver = new ResizeObserver(() => this.#wake());
+        this.#resizeObserver.observe(this.#canvas);
+        this.#wake();
+        return this;
+    }
+
+    // MARK: - Camera
+
+    /// Where the camera is: `{ latitude, longitude, zoom, bearing, pitch }`,
+    /// the bearing and the pitch in radians.
+    get camera() {
+        return this.#map?.camera() ?? null;
+    }
+
+    /// Puts the camera over the point at the zoom, looking straight down.
+    lookAt({ latitude, longitude, zoom }) {
+        this.#map?.look(latitude, longitude, zoom ?? this.camera?.zoom ?? 2);
+    }
+
+    /// Moves the map as a drag of the points does, with no glide after.
+    panBy(dx, dy) {
+        this.#map?.pan(dx, dy);
+        this.#map?.endPan(0, 0);
+    }
+
+    /// Zooms by the levels, positive in.
+    zoomBy(levels) {
+        this.#map?.zoom(levels);
+    }
+
+    /// Turns the camera about the map's centre and tilts it, in radians.
+    orbitBy(yaw, pitch = 0) {
+        this.#map?.orbit(yaw, pitch);
+    }
+
+    // MARK: - Markers
+
+    /// Keeps the element over the point, its `anchor` (`[x, y]`, from 0 to
+    /// 1 across its box, the centre by default) on it. The element is put
+    /// in the map's marker layer, faded near the globe's horizon and hidden
+    /// beyond it. Returns the marker, to move or remove.
+    addMarker({ latitude, longitude, element, anchor = [0.5, 0.5] }) {
+        if (!(element instanceof HTMLElement)) throw new TypeError('A marker needs an element');
+        const id = this.#nextMarkerID;
+        this.#nextMarkerID = this.#nextMarkerID >= 0xFFFFFFFF ? 1 : this.#nextMarkerID + 1;
+        const map = this;
+        const entry = { element, anchor };
+        Object.assign(element.style, { position: 'absolute', left: '0', top: '0', visibility: 'hidden', willChange: 'transform' });
+        this.#markerLayer.append(element);
+        this.#markers.set(id, entry);
+        this.#map?.setMarker(id, latitude, longitude);
+        return {
+            element,
+            /// Moves the marker to the point.
+            setPosition({ latitude, longitude }) {
+                if (map.#markers.has(id)) map.#map?.setMarker(id, latitude, longitude);
+            },
+            /// Takes the marker and its element away.
+            remove() {
+                if (!map.#markers.delete(id)) return;
+                element.remove();
+                map.#map?.removeMarker(id);
+            },
+        };
+    }
+
+    // MARK: - Pins
+
+    /// A pin, drawn by the map itself (in the map's own frame, unlike a
+    /// marker): its `image` is a URL to load (the `placeholder`, or the
+    /// map's own, shown until then) or a picture of the page's (an image
+    /// element, a canvas, an `ImageBitmap`, an `ImageData`), pins of one
+    /// picture sharing it. `badge` is a counter's number, `borderColor`
+    /// `[r, g, b, a]` from 0 to 1 (the map's own by default), `scale`
+    /// sizes the pin, `priority` draws it over pins of less, `selected`
+    /// draws it as selected. `onPinTap` hears a tap on it. Returns the
+    /// pin, to change, move or remove.
+    addPin({ latitude, longitude, image, placeholder = null, badge = 0, borderColor = null,
+             scale = 1, priority = 0, selected = false, data = undefined }) {
+        if (image === undefined || image === null) throw new TypeError('A pin needs an image');
+        const id = this.#nextPinID;
+        this.#nextPinID = this.#nextPinID >= 0xFFFFFFFF ? 1 : this.#nextPinID + 1;
+        const map = this;
+        const state = { latitude, longitude, image, placeholder, badge, borderColor, scale, priority, selected, pictures: [] };
+        const pin = {
+            id,
+            data,
+            /// Moves the pin to the point.
+            setPosition({ latitude, longitude }) {
+                if (!map.#pins.has(id)) return;
+                Object.assign(state, { latitude, longitude });
+                map.#placePin(id, state);
+            },
+            /// Changes what was given to `addPin`: the image, the counter,
+            /// the look, the selection.
+            update(changes) {
+                if (!map.#pins.has(id)) return;
+                Object.assign(state, changes);
+                map.#placePin(id, state);
+            },
+            /// Takes the pin away.
+            remove() {
+                if (!map.#pins.delete(id)) return;
+                map.#map?.removePin(id);
+                map.#releasePictures(state.pictures);
+                state.pictures = [];
+            },
+        };
+        this.#pins.set(id, { pin, state });
+        this.#placePin(id, state);
+        return pin;
+    }
+
+    /// The pin as the module holds it, its pictures taken anew.
+    #placePin(id, state) {
+        if (!this.#map) return;
+        const isURL = typeof state.image === 'string' || state.image instanceof URL;
+        const sources = [isURL ? state.placeholder : state.image].filter((source) => source);
+        const pictures = sources.map((source) => this.#picture(source));
+        this.#releasePictures(state.pictures);
+        state.pictures = pictures;
+        this.#map.setPin(id, {
+            latitude: state.latitude,
+            longitude: state.longitude,
+            picture: pictures[0] ?? 0,
+            url: isURL ? String(state.image) : '',
+            badge: state.badge,
+            border: state.borderColor,
+            scale: state.scale,
+            priority: state.priority,
+            selected: state.selected,
+        });
+    }
+
+    /// The module's picture of the source, shared by the pins that show it.
+    #picture(source) {
+        let entry = this.#pictures.get(source);
+        if (!entry) {
+            const pixels = typeof ImageData === 'function' && source instanceof ImageData
+                ? { width: source.width, height: source.height, rgba: source.data }
+                : this.#pinPictures?.pixels(source);
+            if (!pixels) throw new TypeError('This page cannot read a pin\'s picture without a 2D canvas: give an ImageData');
+            entry = { id: this.#map.addPicture(pixels), users: 0 };
+            this.#pictures.set(source, entry);
+        }
+        entry.users += 1;
+        return entry.id;
+    }
+
+    #releasePictures(ids) {
+        for (const id of ids) {
+            for (const [source, entry] of this.#pictures) {
+                if (entry.id !== id) continue;
+                entry.users -= 1;
+                if (entry.users <= 0) {
+                    this.#pictures.delete(source);
+                    this.#map?.releasePicture(id);
+                }
+                break;
+            }
+        }
+    }
+
+    /// The pin drawn at the point, in points from the canvas's top left
+    /// corner, on the last frame, or null.
+    pinAt(x, y) {
+        const id = this.#map?.pinAt(x, y, this.#pixelsPerPoint);
+        return id === null || id === undefined ? null : (this.#pins.get(id)?.pin ?? null);
+    }
+
+    #placeMarkers() {
+        const shown = new Set();
+        for (const { id, x, y, alpha } of this.#map.markers()) {
+            const entry = this.#markers.get(id);
+            if (!entry) continue;
+            shown.add(id);
+            const [anchorX, anchorY] = entry.anchor;
+            entry.element.style.visibility = 'visible';
+            entry.element.style.opacity = String(alpha);
+            entry.element.style.transform = `translate(${x}px, ${y}px) translate(${-anchorX * 100}%, ${-anchorY * 100}%)`;
+        }
+        for (const [id, entry] of this.#markers) {
+            if (!shown.has(id)) entry.element.style.visibility = 'hidden';
+        }
+    }
+
+    /// The credits on screen at the camera's zoom, joined as the Apple
+    /// badge joins them, the line a link where the attribution has one.
+    /// Rewritten only when they change.
+    #showAttribution() {
+        if (!this.#badge) return;
+        const { credits, link } = this.#map.attribution();
+        const line = credits.join(' \u00b7 ');
+        if (line === this.#shownCredits) return;
+        this.#shownCredits = line;
+        this.#badge.replaceChildren();
+        if (link) {
+            const anchor = Object.assign(document.createElement('a'), {
+                href: link, target: '_blank', rel: 'noopener', textContent: line,
+            });
+            Object.assign(anchor.style, { color: 'inherit', textDecoration: 'none', pointerEvents: 'auto' });
+            this.#badge.append(anchor);
+        } else {
+            this.#badge.textContent = line;
+        }
+    }
+
+    // MARK: - State
+
+    /// The tile archive's requests: `{ answered, cached, failed,
+    /// firstFailure }`, `cached` the ones answered from the browser's
+    /// storage.
+    get downloads() {
+        return this.#map ? { ...this.#map.downloads } : { answered: 0, cached: 0, failed: 0, firstFailure: null };
+    }
+
+    /// How long the module's calls held the page's thread, in milliseconds
+    /// (map.mjs, `timings`): `frames`, `answers` and the WebGPU
+    /// `submissions` inside them, each `{ calls, total, longest,
+    /// overBudget }`.
+    get timings() {
+        return this.#map ? structuredClone(this.#map.timings) : null;
+    }
+
+    /// The workers that parse the tiles and what became of the tiles they
+    /// prepared: `{ workers, accepted, refused, failed }`. A refused or
+    /// failed tile was parsed on the page's thread after all.
+    get tileWorkers() {
+        return this.#map?.tileWorkers() ?? null;
+    }
+
+    /// Stops drawing, lets go of the input and the GPU device, and takes the
+    /// canvas and the markers out of the element.
+    destroy() {
+        if (this.#destroyed) return;
+        this.#destroyed = true;
+        if (this.#frameRequest !== null) cancelAnimationFrame(this.#frameRequest);
+        if (this.#idleTick !== null) clearTimeout(this.#idleTick);
+        this.#listeners.abort();
+        for (const worker of this.#workers) worker.terminate();
+        this.#workers = [];
+        this.#resizeObserver?.disconnect();
+        this.#canvas.remove();
+        this.#markerLayer.remove();
+        this.#badge?.remove();
+        this.#markers.clear();
+        this.#pins.clear();
+        this.#pictures.clear();
+        this.#map = null;
+        this.#device.destroy();
+    }
+
+    // MARK: - Frames
+
+    /// Asks for an animation frame, at once: the map may have changed.
+    #wake() {
+        if (this.#destroyed || !this.#map) return;
+        if (this.#idleTick !== null) {
+            clearTimeout(this.#idleTick);
+            this.#idleTick = null;
+        }
+        this.#frameRequest ??= requestAnimationFrame(() => this.#frame());
+    }
+
+    /// Draws when the map needs it, and keeps asking for animation frames
+    /// while it does. A still map is asked again a few times a second, so
+    /// the module's timers (a download's retry) still run.
+    #frame() {
+        this.#frameRequest = null;
+        if (this.#destroyed) return;
+        const scale = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.round(this.#canvas.clientWidth * scale));
+        const height = Math.max(1, Math.round(this.#canvas.clientHeight * scale));
+        if (this.#canvas.width !== width || this.#canvas.height !== height) {
+            this.#canvas.width = width;
+            this.#canvas.height = height;
+        }
+        this.#pixelsPerPoint = scale;
+        const { needsFrame, drew } = this.#map.frame(width, height, scale);
+        if (drew) {
+            this.#placeMarkers();
+            this.#showAttribution();
+        }
+        if (needsFrame) {
+            this.#wake();
+        } else if (this.#idleTick === null) {
+            this.#idleTick = setTimeout(() => {
+                this.#idleTick = null;
+                this.#wake();
+            }, this.#options.idleTickInterval);
+        }
+    }
+
+    // MARK: - Input
+
+    /// One pointer drags the map, or turns and tilts it with the secondary
+    /// button or Shift, and a fast release of a drag lets the globe glide on.
+    /// Two pointers (a pinch) zoom and drag it. The wheel zooms. All in points
+    /// (CSS pixels).
+    #listen() {
+        const canvas = this.#canvas;
+        const signal = this.#listeners.signal;
+        const pointers = new Map();
+        let orbiting = false;
+        let panning = false;
+        // The one-finger drag's recent moves, `{ time, x, y }`, for its
+        // velocity at release.
+        let moves = [];
+        const endPan = (vx = 0, vy = 0) => {
+            if (panning) this.#map?.endPan(vx, vy);
+            panning = false;
+            moves = [];
+        };
+        /// The drag's velocity at the time, in points a second.
+        const releaseVelocity = (time) => {
+            const last = moves.at(-1);
+            if (!last || time - last.time > input.releaseStillTime) return [0, 0];
+            const first = moves.find((move) => last.time - move.time <= input.releaseVelocityWindow);
+            const seconds = (last.time - first.time) / 1000;
+            if (seconds <= 0) return [0, 0];
+            return [(last.x - first.x) / seconds, (last.y - first.y) / seconds];
+        };
+        const pinch = () => {
+            const [a, b] = [...pointers.values()];
+            return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, distance: Math.hypot(a.x - b.x, a.y - b.y) };
+        };
+        let lastPinch = null;
+
+        canvas.addEventListener('contextmenu', (event) => event.preventDefault(), { signal });
+        // A press of one pointer that has not moved further than a tap's
+        // slop: where it went down.
+        let press = null;
+        canvas.addEventListener('pointerdown', (event) => {
+            canvas.setPointerCapture(event.pointerId);
+            pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            press = pointers.size === 1 ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
+            if (pointers.size === 1) {
+                orbiting = event.button === 2 || event.shiftKey;
+            } else if (pointers.size === 2) {
+                // A second finger ends the one-finger drag and starts a pinch.
+                endPan();
+                orbiting = false;
+                lastPinch = pinch();
+            }
+        }, { signal });
+        canvas.addEventListener('pointermove', (event) => {
+            const pointer = pointers.get(event.pointerId);
+            if (!pointer || !this.#map) return;
+            const dx = event.clientX - pointer.x;
+            const dy = event.clientY - pointer.y;
+            if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > input.tapSlop) press = null;
+            pointer.x = event.clientX;
+            pointer.y = event.clientY;
+            if (pointers.size === 1) {
+                if (orbiting) {
+                    this.#map.orbit((dx / canvas.clientWidth) * input.orbitYawPerWidth,
+                                    (dy / canvas.clientHeight) * input.orbitPitchPerHeight);
+                } else {
+                    panning = true;
+                    this.#map.pan(dx, dy);
+                    moves.push({ time: event.timeStamp, x: event.clientX, y: event.clientY });
+                    while (moves.length > 1 && event.timeStamp - moves[0].time > input.releaseVelocityWindow) moves.shift();
+                }
+            } else if (pointers.size === 2 && lastPinch) {
+                const now = pinch();
+                if (lastPinch.distance > 0 && now.distance > 0) this.#map.zoom(Math.log2(now.distance / lastPinch.distance));
+                panning = true;
+                this.#map.pan(now.x - lastPinch.x, now.y - lastPinch.y);
+                lastPinch = now;
+            }
+        }, { signal });
+        const lift = (event) => {
+            const wasDragging = pointers.size === 1 && !orbiting;
+            if (!pointers.delete(event.pointerId)) return;
+            if (press?.id === event.pointerId && event.type === 'pointerup') {
+                const bounds = canvas.getBoundingClientRect();
+                const pin = this.pinAt(event.clientX - bounds.left, event.clientY - bounds.top);
+                if (pin) this.#options.onPinTap(pin, { x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+            }
+            press = null;
+            // Only a one-finger drag glides on, not the end of a pinch.
+            endPan(...(wasDragging && event.type === 'pointerup' ? releaseVelocity(event.timeStamp) : [0, 0]));
+            lastPinch = null;
+            // The finger left on the screen after a pinch starts a drag of
+            // its own.
+            orbiting = false;
+        };
+        canvas.addEventListener('pointerup', lift, { signal });
+        canvas.addEventListener('pointercancel', lift, { signal });
+        canvas.addEventListener('wheel', (event) => {
+            event.preventDefault();
+            const pixels = event.deltaMode === 1 ? event.deltaY * input.wheelLinePixels
+                : event.deltaMode === 2 ? event.deltaY * canvas.clientHeight
+                : event.deltaY;
+            this.#map?.zoom(-pixels / input.wheelPixelsPerLevel);
+        }, { signal });
+    }
+}

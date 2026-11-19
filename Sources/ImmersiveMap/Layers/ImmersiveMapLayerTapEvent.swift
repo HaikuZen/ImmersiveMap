@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// Tap event on a shape of a layer of the app's data.
 /// Delivered on every tap that lands on a shape the map shows, regardless

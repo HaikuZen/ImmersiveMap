@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 extension ImmersiveMapSelection.Kind {
     /// A shape of the layer with `id` (`ImmersiveMapLayer.id`), named by

@@ -60,8 +60,9 @@ final class SceneModelAssetLoaderTests: XCTestCase {
         XCTAssertEqual(mesh.materials.count, 1)
         XCTAssertEqual(mesh.materials[0].count, mesh.meshes[0].submeshes.count)
         XCTAssertGreaterThan(mesh.meshes[0].submeshes.count, 0)
-        XCTAssertEqual(mesh.meshes[0].vertexBuffers.count, 1,
-                       "The canonical layout interleaves everything into one buffer")
+        XCTAssertGreaterThanOrEqual(mesh.meshes[0].vertexBuffer.length - mesh.meshes[0].vertexBufferOffset,
+                                    8 * SceneModelVertexLayout.stride,
+                                    "The canonical layout interleaves the cube's vertices into one buffer")
 
         XCTAssertEqual(mesh.localBounds.maxExtent, 2, accuracy: 1e-4)
         XCTAssertEqual(mesh.localBounds.radius, Float(3.0).squareRoot(), accuracy: 1e-3)
@@ -128,14 +129,7 @@ final class SceneModelMeshStoreTests: XCTestCase {
         }
     }
 
-    private func makeDeviceOrSkip() throws -> MTLDevice {
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            throw XCTSkip("Metal device is unavailable")
-        }
-        return device
-    }
-
-    /// Built inside the loader closure: SceneModelMesh holds Metal objects and
+    /// Built inside the loader closure: SceneModelMesh holds GPU objects and
     /// is not Sendable, so it must not be captured across the closure boundary.
     private static func makeEmptyMesh() -> SceneModelMesh {
         SceneModelMesh(meshes: [],
@@ -159,11 +153,9 @@ final class SceneModelMeshStoreTests: XCTestCase {
     }
 
     func testSuccessfulLoadBecomesReadyAndInvalidatesFrame() async throws {
-        let device = try makeDeviceOrSkip()
         let sink = RecordingEventSink()
         let counter = LoadCounter()
-        let store = SceneModelMeshStore(device: device,
-                                        loadAsset: { _, _ in
+        let store = SceneModelMeshStore(loadAsset: { _ in
                                             _ = counter.increment()
                                             return Self.makeEmptyMesh()
                                         })
@@ -181,10 +173,8 @@ final class SceneModelMeshStoreTests: XCTestCase {
     }
 
     func testFailedLoadRecordsAttemptAndWaitsForCooldown() async throws {
-        let device = try makeDeviceOrSkip()
         let counter = LoadCounter()
-        let store = SceneModelMeshStore(device: device,
-                                        loadAsset: { url, _ in
+        let store = SceneModelMeshStore(loadAsset: { url in
                                             _ = counter.increment()
                                             throw SceneModelAssetLoadError.unreadableAsset(url)
                                         })

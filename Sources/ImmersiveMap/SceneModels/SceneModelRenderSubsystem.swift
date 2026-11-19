@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
@@ -10,15 +11,15 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
     private let sceneModelSource: SceneModelRenderSource
     private let meshStore: SceneModelMeshStore
     private let pipeline: SceneModelPipeline
-    private let extrudedDepthState: MTLDepthStencilState
+    private let extrudedDepthState: any GPUDepthStencilState
     /// World-pass draws: scene depth plus the surface mask bit, so the
     /// horizon's haze passes the models by.
-    private let surfaceMaskState: MTLDepthStencilState
+    private let surfaceMaskState: any GPUDepthStencilState
     /// The ground cut's draws for the models that cut into the ground.
     private let groundCutStates: SceneModelGroundCutStates
-    private let depthDisabledState: MTLDepthStencilState
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture
+    private let depthDisabledState: any GPUDepthStencilState
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: any GPUTexture
     private let presentationStateStore = SceneModelPresentationStateStore()
     private var drawItems: [SceneModelDrawItem] = []
     private var shadowCasterItems: [SceneModelDrawItem] = []
@@ -26,12 +27,12 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
     init(sceneModelSource: SceneModelRenderSource,
          meshStore: SceneModelMeshStore,
          pipeline: SceneModelPipeline,
-         extrudedDepthState: MTLDepthStencilState,
-         surfaceMaskState: MTLDepthStencilState,
+         extrudedDepthState: any GPUDepthStencilState,
+         surfaceMaskState: any GPUDepthStencilState,
          groundCutStates: SceneModelGroundCutStates,
-         depthDisabledState: MTLDepthStencilState,
-         shadowMapTextureProvider: @escaping () -> MTLTexture?,
-         shadowFallbackTexture: MTLTexture) {
+         depthDisabledState: any GPUDepthStencilState,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)?,
+         shadowFallbackTexture: any GPUTexture) {
         self.sceneModelSource = sceneModelSource
         self.meshStore = meshStore
         self.pipeline = pipeline
@@ -158,7 +159,7 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         switch layer {
         case .sceneModels:
             guard drawItems.isEmpty == false else { return }
@@ -168,7 +169,10 @@ final class SceneModelRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPr
             GroundFogUniform.bind(GroundFogUniform.resolveForBuildings(frameContext: frameContext), encoder: encoder)
             SceneModelDrawer.draw(renderEncoder: encoder,
                                   cameraUniform: frameContext.cameraUniform,
-                                  shadowBinding: shadowBinding,
+                                  shadowUniform: shadowBinding.uniform,
+                                  // The render core's shadow map or its fallback,
+                                  // both in the shadow map's format.
+                                  shadowMap: shadowBinding.texture,
                                   items: drawItems,
                                   pipeline: pipeline,
                                   surfaceMaskState: surfaceMaskState,

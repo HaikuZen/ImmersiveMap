@@ -1,98 +1,291 @@
 // swift-tools-version: 6.1
 
+import Foundation
 import PackageDescription
 
-let package = Package(
-    name: "ImmersiveMap",
-    platforms: [
-        .iOS(.v18),
-        .macOS(.v15)
-    ],
-    products: [
-        .library(
+// The engine draws with Metal and its views are SwiftUI, so the products
+// exist on Apple's platforms only. The targets under them that know nothing
+// of either (the tile formats, the geometry tools) build everywhere, and off
+// Apple's platforms the package is those targets and their tests, with two
+// more that stand in for modules only Apple's SDKs have: `simd` and `os`.
+//
+// A manifest cannot ask which platform it is built for, only which one it is
+// read on, so a Linux machine gets the portable package by itself and a Mac
+// building for another platform (WebAssembly, say) asks for it with
+// IMMERSIVE_MAP_PORTABLE=1.
+#if canImport(Darwin)
+let readOnApplePlatform = true
+#else
+let readOnApplePlatform = false
+#endif
+let portable = !readOnApplePlatform || Context.environment["IMMERSIVE_MAP_PORTABLE"] == "1"
+
+// A build that ships to a browser must not link the platform's Foundation
+// (the reason and the cost are in PortableFoundation.swift). It is asked for
+// with IMMERSIVE_MAP_SLIM=1, and the XCTest targets, which cannot be built
+// without Foundation, are left out of it. `PortableFoundationTests` stays:
+// it is what tests the slim build's own geometry types.
+let slim = portable && Context.environment["IMMERSIVE_MAP_SLIM"] == "1"
+
+// The targets every platform builds.
+var targets: [Target] = [
+    // What a portable target imports in place of Foundation: Foundation on
+    // Apple's platforms, FoundationEssentials and the C library elsewhere
+    // (the reason is in the file).
+    .target(
+        name: "PortableFoundation",
+        swiftSettings: slim ? [.define("PORTABLE_FOUNDATION_OWN_GEOMETRY")] : []
+    ),
+    // A PNG decoder for the platforms without ImageIO (terrain tiles off
+    // Apple's platforms), over PMTiles' inflate.
+    .target(
+        name: "PortableImage",
+        dependencies: ["PMTiles", "PortableFoundation"]
+    ),
+    // The GPU the engine draws with, as protocols and values a backend
+    // conforms to (Metal on Apple's platforms, WebGPU elsewhere), shaped
+    // after what the engine does with Metal. Nothing uses it yet: the
+    // features move onto it one folder at a time.
+    .target(
+        name: "ImmersiveMapGPU"
+    ),
+    // The GPU interface over WebGPU, as a stream of commands its host runs
+    // (the browser's decoder, Web/), so the module calls the host once a
+    // submission. Plain Swift: every platform builds it.
+    .target(
+        name: "ImmersiveMapWebGPU",
+        dependencies: ["ImmersiveMapGPU"]
+    ),
+    // The backend in a page: the import the stream goes to the page's host
+    // through and the export the host calls back (`@_extern(wasm)`,
+    // `@_expose(wasm)`). Linked by a browser program alone, as a module
+    // that imports from the page loads nowhere else (the tests' WasmKit).
+    .target(
+        name: "ImmersiveMapWebGPUBrowser",
+        dependencies: ["ImmersiveMapGPU", "ImmersiveMapWebGPU"],
+        swiftSettings: [.enableExperimentalFeature("Extern", .when(platforms: [.wasi]))]
+    ),
+    // A GPU that draws nothing and logs the calls, for the tests of the
+    // features' drawing on any platform.
+    .target(
+        name: "ImmersiveMapGPUTestSupport",
+        dependencies: ["ImmersiveMapGPU"]
+    ),
+    // The ear-clipping triangulator, a port of mapbox/earcut. Its own
+    // module so the algorithm depends on nothing in the engine and the
+    // engine reaches it through one entry point at `package` access,
+    // so nothing of it leaks to an app that links the product.
+    .target(
+        name: "Earcut"
+    ),
+    // The Mapbox Vector Tile decoder: the wire format, the decoded model
+    // and the tile-space geometry it produces. Its own module for the same
+    // reason, everything at `package` access. `TestSupport` is the
+    // test-side encoder and fixture tiles both test targets share; it is
+    // a regular target because test targets cannot share sources.
+    .target(
+        name: "Mvt",
+        dependencies: ["PortableFoundation"]
+    ),
+    .target(
+        name: "MvtTestSupport",
+        dependencies: ["Mvt", "PortableFoundation"]
+    ),
+    // The PMTiles v3 reader: the format (the header, the directories,
+    // the Hilbert tile id and the gzip step, pure functions over bytes)
+    // and the HTTP range client that reads an archive with them. Its own
+    // module for the same reason as `Earcut`: a tool that knows nothing
+    // of the engine, reached at `package` access. Its writer alone
+    // (`PMTilesWriter`) is public and the module a product, for the
+    // baker of a model archive, which is another package. The test
+    // support target is the independent archive writer both test
+    // targets share.
+    .target(
+        name: "PMTiles",
+        dependencies: ["PortableFoundation"]
+    ),
+    .target(
+        name: "PMTilesTestSupport",
+        dependencies: ["PMTiles", "PortableFoundation"]
+    ),
+    // The ground flattener: stacked painted rings in, one layer of
+    // triangles that do not overlap out, cut to a grid for a heightmap.
+    // Its own module for the same reason as `Earcut`: pure geometry that
+    // knows nothing of the engine, reached at `package` access.
+    .target(
+        name: "TileFlattening",
+        dependencies: ["PortableFoundation"]
+    ),
+    // The model tile as bytes: the decoder the engine reads a tile with
+    // and the writer a baker makes one with, on `PortableFoundation` and
+    // simd alone (Foundation itself on Apple's platforms, which
+    // `PortableFoundation` re-exports). A product, so its API is public:
+    // the baker is another package. The test support target is the
+    // independent writer of fixture tiles both test targets share.
+    .target(
+        name: "ModelTileFormat",
+        dependencies: portable ? ["PortableFoundation", "simd"] : ["PortableFoundation"]
+    ),
+    .target(
+        name: "ModelTileFormatTestSupport",
+        dependencies: portable ? ["PortableFoundation", "simd"] : ["PortableFoundation"]
+    ),
+    .testTarget(
+        name: "ModelTileFormatTests",
+        dependencies: ["ModelTileFormat", "ModelTileFormatTestSupport"]
+    ),
+    .testTarget(
+        name: "EarcutTests",
+        dependencies: ["Earcut"],
+        resources: [.copy("Fixtures")]
+    ),
+    .testTarget(
+        name: "MvtTests",
+        dependencies: ["Mvt", "MvtTestSupport"]
+    ),
+    .testTarget(
+        name: "TileFlatteningTests",
+        dependencies: ["TileFlattening"]
+    ),
+    .testTarget(
+        name: "PMTilesTests",
+        dependencies: ["PMTiles", "PMTilesTestSupport"]
+    ),
+    .testTarget(
+        name: "PortableFoundationTests",
+        dependencies: ["PortableFoundation"]
+    ),
+    // PortableFoundation's stand-ins against Foundation's own answers, where
+    // there is a Foundation to ask (not in a slim build).
+    .testTarget(
+        name: "ImmersiveMapGPUTests",
+        dependencies: ["ImmersiveMapGPU", "ImmersiveMapGPUTestSupport"]
+    ),
+    // The WebGPU backend's command stream, read back by a decoder of the
+    // tests' own. Swift Testing, so the slim build runs it too.
+    .testTarget(
+        name: "ImmersiveMapWebGPUTests",
+        dependencies: ["ImmersiveMapGPU", "ImmersiveMapWebGPU"]
+    ),
+    // The engine's tests that need no Metal, no Apple framework and no
+    // picture (the drawing recorded by ImmersiveMapGPUTestSupport, the text
+    // layout), run on every platform the engine builds for.
+    //
+    // On WebAssembly the test binary gets an 8 MiB stack: a debug build's
+    // frames are large, and a whole tile's parse (OffThreadTilePreparationTests)
+    // runs deeper than the default stack, which WasmKit reports as an out of
+    // bounds memory access in the runtime's metadata lookup. The release
+    // module a page loads parses the same tile in the default one.
+    .testTarget(
+        name: "ImmersiveMapPortableTests",
+        dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapWebGPU", "MvtTestSupport"],
+        // Only in the portable package: an app's dependency must carry no
+        // unsafe flags, and Apple's platforms read the other one.
+        linkerSettings: portable ? [.unsafeFlags(["-Xlinker", "-z", "-Xlinker", "stack-size=8388608"], .when(platforms: [.wasi]))] : []
+    ),
+    // Holds PortableEngineExclusions.txt to the engine's own imports.
+    .testTarget(
+        name: "PortableEngineLayoutTests"
+    ),
+    .testTarget(
+        name: "PortableImageTests",
+        dependencies: ["PortableImage"]
+    ),
+    .testTarget(
+        name: "PortableFoundationParityTests",
+        dependencies: ["PortableFoundation"]
+    ),
+    // The vector, matrix and quaternion functions the engine takes from
+    // `simd`, by known answers. On Apple's platforms the tests run against
+    // Apple's module and off them against the stand-in, so the two are held
+    // to the same answers.
+    .testTarget(
+        name: "SimdTests",
+        dependencies: portable ? ["simd"] : []
+    ),
+    // The same for `os`: the lock, the logger and the signposter.
+    .testTarget(
+        name: "OSTests",
+        dependencies: portable ? ["os"] : []
+    )
+]
+
+if slim {
+    targets.removeAll { $0.isTest && ["PortableFoundationTests", "PortableImageTests", "ImmersiveMapGPUTests", "ImmersiveMapWebGPUTests"].contains($0.name) == false }
+}
+
+// The engine's files that build on Apple's platforms alone, listed in
+// PortableEngineExclusions.txt (what goes in it is said there). Pinned, not
+// read from the imports here, so a shared file that gains an Apple import
+// fails `PortableEngineLayoutTests` instead of leaving the portable build
+// without a word.
+func portableEngineExclusions() -> [String] {
+    let list = URL(fileURLWithPath: Context.packageDirectory).appendingPathComponent("PortableEngineExclusions.txt")
+    guard let text = try? String(contentsOf: list, encoding: .utf8) else {
+        fatalError("PortableEngineExclusions.txt is missing")
+    }
+    return text.split(separator: "\n")
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+        .filter { $0.isEmpty == false && $0.hasPrefix("#") == false }
+}
+
+// The engine in the portable package: its files that build everywhere.
+if portable {
+    targets += [
+        .target(
             name: "ImmersiveMap",
-            targets: ["ImmersiveMap"]
-        ),
-        // The debug panel, apart from the engine: linked by a development
-        // app and the tests, never by a shipping app, which carries nothing
-        // of it.
-        .library(
-            name: "ImmersiveMapDebug",
-            targets: ["ImmersiveMapDebug"]
-        ),
-        // The model tile's format, read and written. The engine links it,
-        // and so does the baker of a model archive, which lives in the
-        // project the models are made in: the layout, its version and its
-        // reference are in one place for both.
-        .library(
-            name: "ModelTileFormat",
-            targets: ["ModelTileFormat"]
-        ),
-        // The PMTiles module, for its writer (`PMTilesWriter`), the one
-        // public thing in it: the same baker writes its archive with it,
-        // on the header, the tile id and the limits the reader goes by.
-        .library(
-            name: "PMTiles",
-            targets: ["PMTiles"]
+            dependencies: ["Earcut", "ImmersiveMapGPU", "ModelTileFormat", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening", "simd", "os"],
+            exclude: portableEngineExclusions()
         )
-    ],
-    targets: [
-        // The ear-clipping triangulator, a port of mapbox/earcut. Its own
-        // module so the algorithm depends on nothing in the engine and the
-        // engine reaches it through one entry point at `package` access,
-        // so nothing of it leaks to an app that links the product.
-        .target(
-            name: "Earcut"
+    ]
+}
+
+if portable {
+    targets += [
+        // The browser probe (Web/probe/): the WebGPU backend drawing the
+        // probe scene through the page's host. A WebAssembly reactor, whose
+        // exports the page calls. Builds empty off WebAssembly.
+        .executableTarget(
+            name: "ImmersiveMapWebProbe",
+            dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapWebGPU", "ImmersiveMapWebGPUBrowser"],
+            swiftSettings: [.enableExperimentalFeature("Extern", .when(platforms: [.wasi]))],
+            linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor"], .when(platforms: [.wasi]))]
         ),
-        // The Mapbox Vector Tile decoder: the wire format, the decoded model
-        // and the tile-space geometry it produces. Its own module for the same
-        // reason, everything at `package` access. `TestSupport` is the
-        // test-side encoder and fixture tiles both test targets share; it is
-        // a regular target because test targets cannot share sources.
-        .target(
-            name: "Mvt"
+        // The map in a browser (Web/map/): the engine over the WebGPU
+        // backend, the page's host and the page's `fetch`. A WebAssembly
+        // reactor like the probe. Builds empty off WebAssembly.
+        .executableTarget(
+            name: "ImmersiveMapWebMap",
+            dependencies: ["ImmersiveMap", "ImmersiveMapGPU", "ImmersiveMapWebGPU", "ImmersiveMapWebGPUBrowser", "PMTiles", "PortableFoundation"],
+            swiftSettings: [.enableExperimentalFeature("Extern", .when(platforms: [.wasi]))],
+            linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor"], .when(platforms: [.wasi]))]
         ),
+        // The stand-in for Apple's `simd` module, under its name, so the
+        // sources that write `import simd` compile unchanged.
         .target(
-            name: "MvtTestSupport",
-            dependencies: ["Mvt"]
+            name: "simd"
         ),
-        // The PMTiles v3 reader: the format (the header, the directories,
-        // the Hilbert tile id and the gzip step, pure functions over bytes)
-        // and the HTTP range client that reads an archive with them. Its own
-        // module for the same reason as `Earcut`: a tool that knows nothing
-        // of the engine, reached at `package` access. Its writer alone
-        // (`PMTilesWriter`) is public and the module a product, for the
-        // baker of a model archive, which is another package. The test
-        // support target is the independent archive writer both test
-        // targets share.
+        // The same for Apple's `os` module: the logger, the signposter and
+        // the unfair lock.
         .target(
-            name: "PMTiles"
+            name: "os"
+        )
+    ]
+} else {
+    targets += [
+        // The GPU interface (`ImmersiveMapGPU`) over Metal: thin wrappers that
+        // forward each call to the Metal object they hold.
+        .target(
+            name: "ImmersiveMapMetal",
+            dependencies: ["ImmersiveMapGPU"]
         ),
-        .target(
-            name: "PMTilesTestSupport",
-            dependencies: ["PMTiles"]
-        ),
-        // The ground flattener: stacked painted rings in, one layer of
-        // triangles that do not overlap out, cut to a grid for a heightmap.
-        // Its own module for the same reason as `Earcut`: pure geometry that
-        // knows nothing of the engine, reached at `package` access.
-        .target(
-            name: "TileFlattening"
-        ),
-        // The model tile as bytes: the decoder the engine reads a tile
-        // with and the writer a baker makes one with, on Foundation and
-        // simd alone. A product, so its API is public: the baker is another
-        // package. The test support target is the independent writer of
-        // fixture tiles both test targets share.
-        .target(
-            name: "ModelTileFormat"
-        ),
-        .target(
-            name: "ModelTileFormatTestSupport"
+        .testTarget(
+            name: "ImmersiveMapMetalTests",
+            dependencies: ["ImmersiveMapGPU", "ImmersiveMapMetal"]
         ),
         .target(
             name: "ImmersiveMap",
-            dependencies: ["Earcut", "Mvt", "PMTiles", "TileFlattening", "ModelTileFormat"],
+            dependencies: ["Earcut", "ImmersiveMapGPU", "ImmersiveMapMetal", "ModelTileFormat", "Mvt", "PMTiles", "PortableFoundation", "PortableImage", "TileFlattening"],
             // The shaders and their headers: not resources, so no build
             // system makes a library of its own from them. `MetalLibraryPlugin`
             // compiles every .metal file of the target into the one
@@ -144,31 +337,47 @@ let package = Package(
             dependencies: ["ImmersiveMap"]
         ),
         .testTarget(
-            name: "EarcutTests",
-            dependencies: ["Earcut"],
-            resources: [.copy("Fixtures")]
-        ),
-        .testTarget(
-            name: "MvtTests",
-            dependencies: ["Mvt", "MvtTestSupport"]
-        ),
-        .testTarget(
-            name: "TileFlatteningTests",
-            dependencies: ["TileFlattening"]
-        ),
-        .testTarget(
-            name: "PMTilesTests",
-            dependencies: ["PMTiles", "PMTilesTestSupport"]
-        ),
-        .testTarget(
-            name: "ModelTileFormatTests",
-            dependencies: ["ModelTileFormat", "ModelTileFormatTestSupport"]
-        ),
-        .testTarget(
             name: "ImmersiveMapTests",
-            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "Mvt", "MvtTestSupport", "PMTilesTestSupport",
+            dependencies: ["ImmersiveMap", "ImmersiveMapDebug", "ImmersiveMapGPU", "ImmersiveMapGPUTestSupport", "ImmersiveMapMetal", "Mvt", "MvtTestSupport", "PMTilesTestSupport",
                            "ModelTileFormat", "ModelTileFormatTestSupport"]
         )
+    ]
+}
+
+let package = Package(
+    name: "ImmersiveMap",
+    platforms: [
+        .iOS(.v18),
+        .macOS(.v15)
     ],
+    products: portable ? [] : [
+        .library(
+            name: "ImmersiveMap",
+            targets: ["ImmersiveMap"]
+        ),
+        // The debug panel, apart from the engine: linked by a development
+        // app and the tests, never by a shipping app, which carries nothing
+        // of it.
+        .library(
+            name: "ImmersiveMapDebug",
+            targets: ["ImmersiveMapDebug"]
+        ),
+        // The model tile's format, read and written. The engine links it,
+        // and so does the baker of a model archive, which lives in the
+        // project the models are made in: the layout, its version and its
+        // reference are in one place for both.
+        .library(
+            name: "ModelTileFormat",
+            targets: ["ModelTileFormat"]
+        ),
+        // The PMTiles module, for its writer (`PMTilesWriter`), the one
+        // public thing in it: the same baker writes its archive with it,
+        // on the header, the tile id and the limits the reader goes by.
+        .library(
+            name: "PMTiles",
+            targets: ["PMTiles"]
+        )
+    ],
+    targets: targets,
     swiftLanguageModes: [.v6]
 )

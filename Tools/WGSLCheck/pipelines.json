@@ -1,0 +1,3590 @@
+{
+  "pipelines" : [
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x4",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x4",
+              "offset" : 16,
+              "shaderLocation" : 1
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "polygonFragmentShader"
+      },
+      "label" : "DebugPolygons",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "polygonVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 12,
+          "attributes" : [
+            {
+              "format" : "sint16x4",
+              "offset" : 4,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 0,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "uint8",
+              "offset" : 3,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "uint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth16unorm",
+      "label" : "ExtrudedTileCasters",
+      "sampleCount" : 1,
+      "targets" : [
+
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileExtrudedShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 12,
+          "attributes" : [
+            {
+              "format" : "sint16x4",
+              "offset" : 4,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 0,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "uint8",
+              "offset" : 3,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "uint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth16unorm",
+      "label" : "ExtrudedTileCastersRelief",
+      "sampleCount" : 1,
+      "targets" : [
+
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileExtrudedShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 12,
+          "attributes" : [
+            {
+              "format" : "sint16x4",
+              "offset" : 4,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 0,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "uint8",
+              "offset" : 3,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "uint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileExtrudedFragmentShader"
+      },
+      "label" : "ExtrudedTiles",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileExtrudedVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 12,
+          "attributes" : [
+            {
+              "format" : "sint16x4",
+              "offset" : 4,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 0,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "uint8",
+              "offset" : 3,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "uint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileExtrudedFragmentShader"
+      },
+      "label" : "ExtrudedTilesRelief",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileExtrudedVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "fxaaFragmentShader"
+      },
+      "label" : "FXAA",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "postProcessingVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 8,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "globeCapFragmentShader"
+      },
+      "label" : "GlobeCap",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "globeCapVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "groundShadowMaskFragmentShader"
+      },
+      "label" : "GroundShadowMask",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "format" : "r8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "groundShadowMaskVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 8,
+          "attributes" : [
+            {
+              "format" : "float32",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32",
+              "offset" : 4,
+              "shaderLocation" : 1
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "horizonBandFragmentShader"
+      },
+      "label" : "HorizonGroundPipeline",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "horizonBandVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 8,
+          "attributes" : [
+            {
+              "format" : "float32",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32",
+              "offset" : 4,
+              "shaderLocation" : 1
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "horizonBandFragmentShader"
+      },
+      "label" : "HorizonSkyPipeline",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "horizonBandVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint32",
+              "offset" : 16,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "textFragment"
+      },
+      "label" : "Labels",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "labelTextVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "unorm16x4",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "uint8",
+              "offset" : 13,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "unorm16x4",
+              "offset" : 4,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth16unorm",
+      "label" : "ModelTileCasters",
+      "sampleCount" : 1,
+      "targets" : [
+
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "modelTileShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "unorm16x4",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "uint8",
+              "offset" : 13,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "unorm16x4",
+              "offset" : 4,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "modelTileFragmentShader"
+      },
+      "label" : "ModelTiles",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "modelTileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "unorm16x4",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "uint8",
+              "offset" : 13,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "unorm16x4",
+              "offset" : 4,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "modelTileFragmentShader"
+      },
+      "label" : "ModelTilesClippedBelowGround",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "modelTileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinBeamFragment"
+      },
+      "label" : "PinBeams",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinBeamVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinCountBadgeFragment"
+      },
+      "label" : "PinCountBadges",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinCountBadgeVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinFragment"
+      },
+      "label" : "Pins",
+      "sampleCount" : 1,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "pinVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementDepthReset",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "placementDepthResetVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilFlat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilFlatRelief",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilSphereMorph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "PlacementStencilSpherePure",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint32",
+              "offset" : 16,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "poiSpriteFragment"
+      },
+      "label" : "PoiIcons",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "poiSpriteVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileRasterBakeFragmentShader"
+      },
+      "label" : "RasterTileBake",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "rgba8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileRasterBakeVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterFlatFragmentShader"
+      },
+      "label" : "RasterTileFlat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileRasterFlatFragmentShader"
+      },
+      "label" : "RasterTileFlatRelief",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "tileRasterFlatVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth16unorm",
+      "label" : "RasterTileReliefShadow",
+      "sampleCount" : 1,
+      "targets" : [
+
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "tileRasterReliefShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereFragmentShader"
+      },
+      "label" : "RasterTileSphereMorph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSphereFragmentShader"
+      },
+      "label" : "RasterTileSpherePure",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "tileRasterSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint32",
+              "offset" : 16,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "roadTextFragment"
+      },
+      "label" : "RoadLabels",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "roadLabelTextVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint32",
+              "offset" : 16,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 3
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "routeShieldFragment"
+      },
+      "label" : "RouteShields",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "poiSpriteVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth16unorm",
+      "label" : "SceneModelCasters",
+      "sampleCount" : 1,
+      "targets" : [
+
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "label" : "SceneModelGroundFootprint",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : false
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelGroundFootprintVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "sceneModelFragmentShader"
+      },
+      "label" : "SceneModels",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x3",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "sceneModelFragmentShader"
+      },
+      "label" : "SceneModelsClippedBelowGround",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "sceneModelVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "starfieldQuadFragmentShader"
+      },
+      "label" : "StarfieldQuads",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "starfieldQuadVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x4",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 16,
+              "shaderLocation" : 1
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "textFragment"
+      },
+      "label" : "Text",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "textVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileFragmentShader"
+      },
+      "label" : "TileFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "4" : 0,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileFragmentShader"
+      },
+      "label" : "TileLines",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "4" : 0,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileFragmentShader"
+      },
+      "label" : "TileOpaqueFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileFragmentShader"
+      },
+      "label" : "TileReliefFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "4" : 0,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileFragmentShader"
+      },
+      "label" : "TileReliefLines",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "4" : 0,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileFragmentShader"
+      },
+      "label" : "TileReliefOpaqueFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "4" : 0,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "4" : 1,
+          "5" : 1,
+          "6" : 1
+        },
+        "entryPoint" : "tileRoadFragmentShader"
+      },
+      "label" : "TileReliefRoadBlended",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "4" : 1,
+          "5" : 1,
+          "6" : 1
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "4" : 1,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileRoadFragmentShader"
+      },
+      "label" : "TileReliefRoadOpaque",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "4" : 1,
+          "5" : 0,
+          "6" : 1
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "4" : 1,
+          "5" : 1,
+          "6" : 0
+        },
+        "entryPoint" : "tileRoadFragmentShader"
+      },
+      "label" : "TileRoadBlended",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "4" : 1,
+          "5" : 1,
+          "6" : 0
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "4" : 1,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileRoadFragmentShader"
+      },
+      "label" : "TileRoadOpaque",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "4" : 1,
+          "5" : 0,
+          "6" : 0
+        },
+        "entryPoint" : "tileVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereMorph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereMorphFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereMorphOpaqueFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 1
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereMorphRibbonCore",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 2
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereMorphRibbonFeather",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereMorphRibbons",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereMorphVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereOpaqueFills",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 0,
+          "2" : 0
+        },
+        "entryPoint" : "tileSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "2" : 1
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereRibbonCore",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "2" : 2
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereRibbonFeather",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 16,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "uint8",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "sint8",
+              "offset" : 9,
+              "shaderLocation" : 2
+            },
+            {
+              "format" : "sint16",
+              "offset" : 10,
+              "shaderLocation" : 3
+            },
+            {
+              "format" : "snorm8x2",
+              "offset" : 12,
+              "shaderLocation" : 4
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSphereFragmentShader"
+      },
+      "label" : "TileSphereRibbons",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0,
+          "1" : 1,
+          "2" : 0
+        },
+        "entryPoint" : "tileSpherePureVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "treeShadowFragmentShader"
+      },
+      "label" : "TreeShadows",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one",
+              "operation" : "add",
+              "srcFactor" : "zero"
+            },
+            "color" : {
+              "dstFactor" : "zero",
+              "operation" : "add",
+              "srcFactor" : "dst"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "treeShadowVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 20,
+          "attributes" : [
+            {
+              "format" : "float32x3",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "snorm8x4",
+              "offset" : 12,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "unorm8x4",
+              "offset" : 16,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "treeFragmentShader"
+      },
+      "label" : "Trees",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "treeVertexShader"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerFillFragment"
+      },
+      "label" : "layerFillVertex flat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerFillVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerFillFragment"
+      },
+      "label" : "layerFillVertex morph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerFillVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerFillFragment"
+      },
+      "label" : "layerFillVertex sphere",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerFillVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerLineFragment"
+      },
+      "label" : "layerLineVertex flat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerLineVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerLineFragment"
+      },
+      "label" : "layerLineVertex morph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerLineVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerLineFragment"
+      },
+      "label" : "layerLineVertex sphere",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerLineVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerPointFragment"
+      },
+      "label" : "layerPointVertex flat",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 0
+        },
+        "entryPoint" : "layerPointVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerPointFragment"
+      },
+      "label" : "layerPointVertex morph",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 2
+        },
+        "entryPoint" : "layerPointVertex"
+      }
+    },
+    {
+      "buffers" : [
+
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerPointFragment"
+      },
+      "label" : "layerPointVertex sphere",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+          "0" : 1
+        },
+        "entryPoint" : "layerPointVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFragment"
+      },
+      "label" : "surfaceLabelFlatVertex",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFlatVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFragment"
+      },
+      "label" : "surfaceLabelMorphVertex",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelMorphVertex"
+      }
+    },
+    {
+      "buffers" : [
+        {
+          "arrayStride" : 32,
+          "attributes" : [
+            {
+              "format" : "float32x2",
+              "offset" : 0,
+              "shaderLocation" : 0
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 8,
+              "shaderLocation" : 1
+            },
+            {
+              "format" : "float32x2",
+              "offset" : 24,
+              "shaderLocation" : 2
+            }
+          ]
+        }
+      ],
+      "depthStencilFormat" : "depth32float-stencil8",
+      "fragment" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelFragment"
+      },
+      "label" : "surfaceLabelSphereVertex",
+      "sampleCount" : 4,
+      "targets" : [
+        {
+          "blend" : {
+            "alpha" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "one"
+            },
+            "color" : {
+              "dstFactor" : "one-minus-src-alpha",
+              "operation" : "add",
+              "srcFactor" : "src-alpha"
+            }
+          },
+          "format" : "bgra8unorm",
+          "writesColor" : true
+        }
+      ],
+      "topology" : "triangle-list",
+      "vertex" : {
+        "constants" : {
+
+        },
+        "entryPoint" : "surfaceLabelSphereVertex"
+      }
+    }
+  ]
+}

@@ -1,15 +1,15 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 enum RenderGraphFactory {
     static func makeDefaultGraph(context: RenderPersistentContext,
                                  settings: ImmersiveMapSettings,
                                  debugOverlayControls: DebugOverlayControlState,
-                                 postProcessingInputTextureProvider: @escaping () -> MTLTexture?,
-                                 shadowMapTextureProvider: @escaping () -> MTLTexture?,
-                                 groundShadowMaskTextureProvider: @escaping () -> MTLTexture?) -> RenderGraph {
+                                 postProcessingInputTextureProvider: @escaping () -> (any GPUTexture)?,
+                                 shadowMapTextureProvider: @escaping () -> (any GPUTexture)?,
+                                 groundShadowMaskTextureProvider: @escaping () -> (any GPUTexture)?) -> RenderGraph {
         let tileWorkingSetSubsystem = TileWorkingSetSubsystem(tileRenderStore: context.tileRenderStore,
                                                               tileTraceRecorder: context.tileTraceRecorder,
                                                               terrainDemand: context.groundRelief?.store,
@@ -18,23 +18,21 @@ enum RenderGraphFactory {
         let baseLabelSubsystem = BaseLabelPrepareSubsystem(baseLabelCache: context.baseLabelCache,
                                                            roadLabelCache: context.roadLabelCache,
                                                            baseLabelTraceRecorder: context.baseLabelTraceRecorder,
-                                                           metalDevice: context.metalContext.device,
+                                                           device: context.gpuDevice,
                                                            settings: settings.labels,
                                                            debugOverlayControls: debugOverlayControls)
         let baseLabelDrawSubsystem = BaseLabelDrawSubsystem(textRenderer: context.textRenderer,
-                                                            poiSpriteAtlas: context.poiSpriteAtlas,
+                                                            poiSpriteTexture: context.poiSpriteTexture,
                                                             labelDepthState: context.labelDepthState,
-                                                            depthDisabledState: context.depthDisabledState,
-                                                            metalDevice: context.metalContext.device)
+                                                            depthDisabledState: context.depthDisabledState)
         let roadLabelDrawSubsystem = RoadLabelDrawSubsystem(textRenderer: context.textRenderer,
                                                             labelDepthState: context.labelDepthState,
                                                             depthDisabledState: context.depthDisabledState,
                                                             fallbackDepthTexture: context.sceneDepthFallbackTexture,
-                                                            hidesBehindBuildingsFromZoom: settings.labels.road.hidesBehindBuildingsFromZoom,
-                                                            metalDevice: context.metalContext.device)
-        let pinSubsystem = PinRenderSubsystem(pinsRenderer: context.pinsRenderer,
-                                                    pinSource: context.pinSource,
-                                                    depthDisabledState: context.depthDisabledState)
+                                                            hidesBehindBuildingsFromZoom: settings.labels.road.hidesBehindBuildingsFromZoom)
+        // The host's own layer (the pins, on Apple's platforms), if it has
+        // one.
+        let pinSubsystem = context.makePinSubsystem?()
         let annotationSubsystem = AnnotationRenderSubsystem(annotationSource: context.annotationSource)
         let sceneModelSubsystem = SceneModelRenderSubsystem(sceneModelSource: context.sceneModelSource,
                                                             meshStore: context.sceneModelMeshStore,
@@ -68,7 +66,7 @@ enum RenderGraphFactory {
         let groundShadowMaskSubsystem = GroundShadowMaskRenderSubsystem(pipeline: context.groundShadowMaskPipeline,
                                                                         depthDisabledState: context.depthDisabledState,
                                                                         shadowMapTextureProvider: shadowMapTextureProvider)
-        let placementStencilSubsystem = PlacementStencilRenderSubsystem(device: context.metalContext.device,
+        let placementStencilSubsystem = PlacementStencilRenderSubsystem(device: context.gpuDevice,
                                                                         pipeline: context.placementStencilPipeline,
                                                                         placementStencilWriteState: context.placementStencilWriteState,
                                                                         placementDepthWriteState: context.placementDepthWriteState,
@@ -76,7 +74,7 @@ enum RenderGraphFactory {
                                                                         placementDepthResetState: context.placementDepthResetState,
                                                                         depthDisabledState: context.depthDisabledState,
                                                                         groundFlattening: settings.tiles.groundFlattening)
-        let rasterTileSubsystem = RasterTileRenderSubsystem(device: context.metalContext.device,
+        let rasterTileSubsystem = RasterTileRenderSubsystem(device: context.gpuDevice,
                                                             pipeline: context.rasterTilePipeline,
                                                             settings: settings.tiles.rasterization,
                                                             groundOwnerState: context.groundOwnerState,
@@ -88,7 +86,8 @@ enum RenderGraphFactory {
                                                             shadowMapTextureProvider: shadowMapTextureProvider,
                                                             shadowFallbackTexture: context.shadowFallbackTexture,
                                                             groundFlattening: settings.tiles.groundFlattening)
-        let buildingExtrusionSubsystem = BuildingExtrusionRenderSubsystem(extrudedTilePipeline: context.extrudedTilePipeline,
+        let buildingExtrusionSubsystem = BuildingExtrusionRenderSubsystem(device: context.gpuDevice,
+                                                                          extrudedTilePipeline: context.extrudedTilePipeline,
                                                                           extrudedDepthState: context.extrudedDepthState,
                                                                           extrudedStencilTestState: context.extrudedStencilTestState,
                                                                           depthDisabledState: context.depthDisabledState,
@@ -108,7 +107,7 @@ enum RenderGraphFactory {
                                                   store: context.layerMeshStore,
                                                   pipeline: context.layerPipeline,
                                                   depthDisabledState: context.depthDisabledState)
-        let reliefShadowCasterSubsystem = GroundReliefShadowCasterSubsystem(device: context.metalContext.device,
+        let reliefShadowCasterSubsystem = GroundReliefShadowCasterSubsystem(device: context.gpuDevice,
                                                                             pipeline: context.rasterTilePipeline,
                                                                             depthState: context.extrudedDepthState,
                                                                             groundFlattening: settings.tiles.groundFlattening)
@@ -153,7 +152,7 @@ enum RenderGraphFactory {
             baseLabelSubsystem,
             baseLabelDrawSubsystem,
             roadLabelDrawSubsystem,
-            pinSubsystem,
+        ] + (pinSubsystem.map { [$0] } ?? []) + [
             annotationSubsystem,
             groundShadowMaskSubsystem,
             // Before the ground of either surface: the planner's decision
@@ -186,7 +185,7 @@ enum RenderGraphFactory {
         let availabilityProviders: [any RenderPassAvailabilityProvider] = [
             baseLabelDrawSubsystem,
             roadLabelDrawSubsystem,
-            pinSubsystem,
+        ] + (pinSubsystem.map { [$0] } ?? []) + [
             sceneModelSubsystem,
             modelTileSubsystem,
             layerSubsystem,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Earcut
-import Foundation
+import PortableFoundation
 import simd
 
 /// A zone's fill vertex: the position in its chunk's render units and the
@@ -10,6 +10,9 @@ import simd
 struct LayerFillVertex: Equatable {
     var position: SIMD2<Float>
     var color: SIMD4<UInt8>
+    /// The stride's last four bytes, named, so a layer's buffer carries
+    /// zeros there and not whatever the stack held.
+    var _padding: UInt32 = 0
 }
 
 /// One segment of a line: its ends in its chunk's render units, the line's

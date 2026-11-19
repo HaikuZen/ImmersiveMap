@@ -7,12 +7,13 @@
 ///     .preparedTileDiskCacheSize(.megabytes(512))
 ///
 /// A gigabyte here is 1024 megabytes and a megabyte 1024 kilobytes, as
-/// memory and caches are counted. A negative size is zero.
+/// memory and caches are counted. A negative size is zero. Counted in
+/// `Int64`, since a cache passes 2 GiB and `Int` is 32 bits on WebAssembly.
 public struct ImmersiveMapByteCount: Hashable, Comparable, Sendable {
     /// The size in bytes.
-    public let bytes: Int
+    public let bytes: Int64
 
-    public static func bytes(_ count: Int) -> ImmersiveMapByteCount {
+    public static func bytes(_ count: Int64) -> ImmersiveMapByteCount {
         ImmersiveMapByteCount(bytes: max(count, 0))
     }
 
@@ -32,9 +33,9 @@ public struct ImmersiveMapByteCount: Hashable, Comparable, Sendable {
         lhs.bytes < rhs.bytes
     }
 
-    private static func scaled(_ count: Double, by unit: Int) -> ImmersiveMapByteCount {
+    private static func scaled(_ count: Double, by unit: Int64) -> ImmersiveMapByteCount {
         let bytes = (count * Double(unit)).rounded()
         guard bytes.isFinite, bytes > 0 else { return ImmersiveMapByteCount(bytes: 0) }
-        return ImmersiveMapByteCount(bytes: bytes < Double(Int.max) ? Int(bytes) : Int.max)
+        return ImmersiveMapByteCount(bytes: bytes < Double(Int64.max) ? Int64(bytes) : Int64.max)
     }
 }

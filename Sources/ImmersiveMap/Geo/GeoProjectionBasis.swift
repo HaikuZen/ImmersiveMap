@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// Cacheable trigonometry of a geocoordinate projection: sin/cos/log are computed

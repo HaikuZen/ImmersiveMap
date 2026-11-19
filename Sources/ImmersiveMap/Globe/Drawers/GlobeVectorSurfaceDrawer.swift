@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The globe counterpart of `FlatMapSurfaceDrawer`: every placement's ground
@@ -29,7 +29,7 @@ import simd
 /// within one tile. The morph keeps the single blended draw.
 enum GlobeVectorSurfaceDrawer {
 
-    static func draw(renderEncoder: MTLRenderCommandEncoder,
+    static func draw(renderEncoder: any GPURenderEncoder,
                      cameraUniform: CameraUniform,
                      globe: GlobeUniform,
                      cameraZoom: Double,
@@ -38,10 +38,10 @@ enum GlobeVectorSurfaceDrawer {
                      renderMapSize: Double,
                      placeTilesContext: PlaceTilesContext,
                      pipeline: TilePipeline,
-                     opaqueDepthState: MTLDepthStencilState,
-                     ribbonOwnerDepthState: MTLDepthStencilState,
-                     translucentDepthState: MTLDepthStencilState,
-                     depthDisabledState: MTLDepthStencilState,
+                     opaqueDepthState: any GPUDepthStencilState,
+                     ribbonOwnerDepthState: any GPUDepthStencilState,
+                     translucentDepthState: any GPUDepthStencilState,
+                     depthDisabledState: any GPUDepthStencilState,
                      isWireframeEnabled: Bool,
                      pureSphere: Bool,
                      globeFrame: GlobeFrameConstantsUniform,
@@ -63,34 +63,27 @@ enum GlobeVectorSurfaceDrawer {
             renderEncoder.setTriangleFillMode(.lines)
         }
 
-        var cameraUniformValue = cameraUniform
-        var globeValue = globe
         // Every style's zoom fade is evaluated against the camera zoom in
         // the shader, so the globe and the plane fade alike.
         let overviewFadeUniform = TileOverviewFadeUniform(
             pixelsPerPoint: pixelsPerPoint,
             cameraZoom: Float(cameraZoom)
         )
-        var overviewFadeValue = overviewFadeUniform
-        renderEncoder.setVertexBytes(&cameraUniformValue, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        renderEncoder.setVertexBytes(&globeValue, length: MemoryLayout<GlobeUniform>.stride, index: 8)
+        renderEncoder.setVertexValue(cameraUniform, index: 1)
+        renderEncoder.setVertexValue(globe, index: 8)
         // The globe's look of the ground, handed over to the plane's with
         // the air: the fills' vertex stages read it for a fill's sphere
         // colour (TileSphere.metal, vertex buffer 12), the ribbons'
         // fragment for a stroke's sphere colour and veil (buffer 8).
-        var handoverValue = handoverUniform
-        renderEncoder.setVertexBytes(&handoverValue, length: MemoryLayout<TileSphereHandoverUniform>.stride, index: 12)
-        renderEncoder.setFragmentBytes(&handoverValue, length: MemoryLayout<TileSphereHandoverUniform>.stride, index: 8)
-        var globeFrameValue = globeFrame
-        renderEncoder.setVertexBytes(&globeFrameValue,
-                                     length: MemoryLayout<GlobeFrameConstantsUniform>.stride,
-                                     index: 10)
-        renderEncoder.setFragmentBytes(&overviewFadeValue, length: MemoryLayout<TileOverviewFadeUniform>.stride, index: 0)
+        renderEncoder.setVertexValue(handoverUniform, index: 12)
+        renderEncoder.setFragmentValue(handoverUniform, index: 8)
+        renderEncoder.setVertexValue(globeFrame, index: 10)
+        renderEncoder.setFragmentValue(overviewFadeUniform, index: 0)
         // The sun on the globe, for every fragment of the surface.
         GlobeLightUniform.bind(globeLight, encoder: renderEncoder)
         // The vertex stages fold the zoom fade into the colour's alpha, so
         // they read the same uniform (TileSphere.metal, buffer 11).
-        renderEncoder.setVertexBytes(&overviewFadeValue, length: MemoryLayout<TileOverviewFadeUniform>.stride, index: 11)
+        renderEncoder.setVertexValue(overviewFadeUniform, index: 11)
 
         // Both worlds draw the same layered class passes; the morph only
         // swaps in the pipeline variants that carry the unroll and the fog.
@@ -256,7 +249,7 @@ enum GlobeVectorSurfaceDrawer {
     /// coarser source's overflow (see kTileSphereLayerDepthStep).
     /// `worthBinding` runs first so a source with nothing for the pass
     /// encodes no binds.
-    private static func forEachSource(renderEncoder: MTLRenderCommandEncoder,
+    private static func forEachSource(renderEncoder: any GPURenderEncoder,
                                       sources: [MetalTile],
                                       renderMapSize: Double,
                                       pixelsPerPoint: Float,
@@ -277,30 +270,29 @@ enum GlobeVectorSurfaceDrawer {
             // The tile-priority stencil reference, the source's zoom: every
             // pass tests equal to it, against the planner's marks
             // (TileSourceStencilPriority).
-            renderEncoder.setStencilReferenceValue(TileSourceStencilPriority.reference(sourceZoom: tile.z))
-            renderEncoder.setVertexBuffer(vertices.buffer, offset: vertices.offset, index: 0)
-            renderEncoder.setVertexBuffer(styles.buffer, offset: styles.offset, index: 2)
-            renderEncoder.setVertexBuffer(styleZoomFade.buffer, offset: styleZoomFade.offset, index: 4)
-            renderEncoder.setVertexBuffer(lineStyles.buffer, offset: lineStyles.offset, index: 5)
+            renderEncoder.setStencilReference(TileSourceStencilPriority.reference(sourceZoom: tile.z))
+            renderEncoder.setVertexBuffer(vertices.gpuBuffer, offset: vertices.offset, index: 0)
+            renderEncoder.setVertexBuffer(styles.gpuBuffer, offset: styles.offset, index: 2)
+            renderEncoder.setVertexBuffer(styleZoomFade.gpuBuffer, offset: styleZoomFade.offset, index: 4)
+            renderEncoder.setVertexBuffer(lineStyles.gpuBuffer, offset: lineStyles.offset, index: 5)
             // The ribbons fragment resolves the style by index (the fills
             // fragment never reads these slots).
-            renderEncoder.setFragmentBuffer(styles.buffer, offset: styles.offset, index: 5)
-            renderEncoder.setFragmentBuffer(styleZoomFade.buffer, offset: styleZoomFade.offset, index: 6)
-            renderEncoder.setFragmentBuffer(lineStyles.buffer, offset: lineStyles.offset, index: 7)
-            var surfaceTile = GlobeSurfaceTileUniform(tile: tile)
-            renderEncoder.setVertexBytes(&surfaceTile, length: MemoryLayout<GlobeSurfaceTileUniform>.stride, index: 9)
+            renderEncoder.setFragmentBuffer(styles.gpuBuffer, offset: styles.offset, index: 5)
+            renderEncoder.setFragmentBuffer(styleZoomFade.gpuBuffer, offset: styleZoomFade.offset, index: 6)
+            renderEncoder.setFragmentBuffer(lineStyles.gpuBuffer, offset: lineStyles.offset, index: 7)
+            renderEncoder.setVertexValue(GlobeSurfaceTileUniform(tile: tile), index: 9)
 
             // The dash anchor of the flat path, with the source tile's world
             // size on the equator: the pattern holds still under camera
             // motion and matches the plane at the surface swap.
             let sourceTileWorldSize = Float(renderMapSize / Double(1 << tile.z))
-            var lineDashUniform = LineDashUniform(
+            let lineDashUniform = LineDashUniform(
                 unitsPerPoint: GlobeLineDashScale.coarseTileDashScale(sourceTileZoom: tile.z)
                     * pixelsPerPoint
                     * LineDashNominalScale.unitsPerPixel(sourceTileWorldSize: sourceTileWorldSize,
                                                          drawableHeightPx: drawableHeightPx)
             )
-            renderEncoder.setFragmentBytes(&lineDashUniform, length: MemoryLayout<LineDashUniform>.stride, index: 4)
+            renderEncoder.setFragmentValue(lineDashUniform, index: 4)
 
             body(buffers, indices)
         }
@@ -326,7 +318,7 @@ enum GlobeVectorSurfaceDrawer {
         case highestRankFirst
     }
 
-    private static func drawRuns(renderEncoder: MTLRenderCommandEncoder,
+    private static func drawRuns(renderEncoder: any GPURenderEncoder,
                                  buffers: TileBuffers.GeometryLayer,
                                  indices: TileBufferView,
                                  drawsAllWithoutRuns: Bool = false,
@@ -335,21 +327,21 @@ enum GlobeVectorSurfaceDrawer {
         let runs = buffers.styleRuns
         guard runs.isEmpty == false else {
             guard drawsAllWithoutRuns else { return }
-            renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                indexCount: indices.count,
-                                                indexType: buffers.indexType,
-                                                indexBuffer: indices.buffer,
-                                                indexBufferOffset: indices.offset)
+            renderEncoder.drawIndexed(.triangle,
+                                      indexCount: indices.count,
+                                      indexType: buffers.gpuIndexType,
+                                      indexBuffer: indices.gpuBuffer,
+                                      indexBufferOffset: indices.offset)
             return
         }
-        let indexByteWidth = buffers.indexType == .uint16 ? 2 : 4
+        let indexByteWidth = buffers.gpuIndexType.byteCount
         if order == .highestRankFirst {
             for run in runs.reversed() where run.indexCount > 0 && predicate(run) {
-                renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                    indexCount: Int(run.indexCount),
-                                                    indexType: buffers.indexType,
-                                                    indexBuffer: indices.buffer,
-                                                    indexBufferOffset: indices.offset + Int(run.indexStart) * indexByteWidth)
+                renderEncoder.drawIndexed(.triangle,
+                                          indexCount: Int(run.indexCount),
+                                          indexType: buffers.gpuIndexType,
+                                          indexBuffer: indices.gpuBuffer,
+                                          indexBufferOffset: indices.offset + Int(run.indexStart) * indexByteWidth)
             }
             return
         }
@@ -357,11 +349,11 @@ enum GlobeVectorSurfaceDrawer {
         var spanCount = 0
         func flush() {
             guard spanCount > 0 else { return }
-            renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                indexCount: spanCount,
-                                                indexType: buffers.indexType,
-                                                indexBuffer: indices.buffer,
-                                                indexBufferOffset: indices.offset + spanStart * indexByteWidth)
+            renderEncoder.drawIndexed(.triangle,
+                                      indexCount: spanCount,
+                                      indexType: buffers.gpuIndexType,
+                                      indexBuffer: indices.gpuBuffer,
+                                      indexBufferOffset: indices.offset + spanStart * indexByteWidth)
             spanCount = 0
         }
         for run in runs {

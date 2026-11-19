@@ -552,7 +552,15 @@ final class ImmersiveMapNeedsTileTests: XCTestCase {
         XCTAssertTrue(saveStarted)
         XCTAssertEqual(reporter.snapshot().tiles.first { $0.tile == landed }?.detail, "ready")
         pipeline.completeDownload(waiting, result: .success(Data([2]), etag: nil))
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        // The download is taken in before the clock moves: the tile left the
+        // network stage and waits for the one CPU slot, which the save holds.
+        var waitsForTheSlot = false
+        for _ in 0 ..< 500 {
+            waitsForTheSlot = loader.isWaitingForCPUSlotForTesting(waiting)
+            if waitsForTheSlot { break }
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(waitsForTheSlot, "The download is in and the tile waits for the CPU slot")
         XCTAssertFalse(pipeline.hasPrepared(waiting), "The save still holds the one CPU slot")
 
         // The save outlives the deadline: the slot is owed, nothing failed.

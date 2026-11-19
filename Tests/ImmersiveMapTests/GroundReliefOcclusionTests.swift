@@ -166,7 +166,7 @@ final class GroundReliefOcclusionTests: XCTestCase {
         ground.setOcclusion(ImmersiveMapTerrainOcclusion.none, debugView: false)
         XCTAssertNil(ground.frame.relief(for: tile, terrain: tile)?.occlusion)
         XCTAssertEqual(ground.frame.occlusionUniform.x, 0)
-        XCTAssertNotNil(ground.frame.occlusionFallbackTexture, "A draw samples one texel of none")
+        XCTAssertNotNil(ground.frame.gpuOcclusionFallbackTexture, "A draw samples one texel of none")
         // Back to the style's: computed once more.
         ground.setOcclusion(nil, debugView: false)
         XCTAssertTrue(waitUntil { ground.frame.relief(for: tile, terrain: tile)?.occlusion?.width == 32 })

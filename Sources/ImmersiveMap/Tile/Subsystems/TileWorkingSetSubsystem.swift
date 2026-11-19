@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 /// Keeps the tiles' working set in step with the frame's coverage. The
@@ -374,7 +374,7 @@ final class TileWorkingSetSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer _: RenderLayer, encoder _: MTLRenderCommandEncoder, frameContext _: FrameContext) {}
+    func encode(layer _: RenderLayer, encoder _: any GPURenderEncoder, frameContext _: FrameContext) {}
 
     func handleMemoryWarning() {
         tileRenderStore.handleMemoryWarning()

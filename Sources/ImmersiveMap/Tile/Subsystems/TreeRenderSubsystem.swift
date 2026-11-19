@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// Draws the trees of the flat map's woods and parks: the engine's tree
 /// model (`TreeModelStore`), instanced over each tile's trees
@@ -30,11 +31,11 @@ final class TreeRenderSubsystem: RenderSubsystem {
     private let palette: ImmersiveMapTreePalette
     /// World-pass trees: scene depth plus the tile-priority stencil test,
     /// raising the surface mask bit where a tree stands, as a building.
-    private let stencilTestState: MTLDepthStencilState
+    private let stencilTestState: any GPUDepthStencilState
     /// The shadow discs: the ground's depth test, so a disc stays off a
     /// building standing nearer than the ground it lies on, no writes.
-    private let groundDepthState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let groundDepthState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     private let settings: ImmersiveMapSettings.TreeSettings
     private let riseSeconds: TimeInterval
     private var rise = ExtrusionRise<VisibleTile>()
@@ -44,9 +45,9 @@ final class TreeRenderSubsystem: RenderSubsystem {
     init(modelStore: TreeModelStore,
          pipeline: TreePipeline,
          palette: ImmersiveMapTreePalette,
-         stencilTestState: MTLDepthStencilState,
-         groundDepthState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
+         stencilTestState: any GPUDepthStencilState,
+         groundDepthState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
          settings: ImmersiveMapSettings.TreeSettings,
          riseSeconds: TimeInterval) {
         self.modelStore = modelStore
@@ -104,7 +105,7 @@ final class TreeRenderSubsystem: RenderSubsystem {
         return fine.tile.findParentTile(atZoom: coarse.z) == coarse.tile
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard frameContext.renderSurfaceMode == .flat,
               items.isEmpty == false,
               let mesh = modelStore.mesh else {

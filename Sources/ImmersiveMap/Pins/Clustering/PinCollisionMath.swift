@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// Stateless math for Zenly-style pin placement: smoothing factor,

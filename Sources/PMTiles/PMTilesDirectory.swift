@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// One directory entry. `runLength == 0` marks a pointer to a leaf directory
 /// (offset and length relative to the leaf directories section). Otherwise

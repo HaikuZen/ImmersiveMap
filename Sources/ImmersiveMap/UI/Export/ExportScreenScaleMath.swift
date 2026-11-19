@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// Picks the pixels-per-point an offscreen export renders at.
 ///

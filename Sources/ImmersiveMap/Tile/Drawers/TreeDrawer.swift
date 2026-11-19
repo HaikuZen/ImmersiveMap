@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 enum TreeDrawer {
@@ -46,7 +46,7 @@ enum TreeDrawer {
     /// `level`, opaque with depth test and depth write, straight into the
     /// world pass as the buildings are, in the colours of `palette`.
     /// `lightDirection` points towards the light.
-    static func draw(renderEncoder: MTLRenderCommandEncoder,
+    static func draw(renderEncoder: any GPURenderEncoder,
                      cameraUniform: CameraUniform,
                      items: [Item],
                      mesh: TreeModelMesh,
@@ -55,33 +55,34 @@ enum TreeDrawer {
                      flatRenderState: FlatRenderState,
                      lightDirection: SIMD3<Float>,
                      pipeline: TreePipeline,
-                     stencilTestState: MTLDepthStencilState,
-                     depthDisabledState: MTLDepthStencilState) {
+                     stencilTestState: any GPUDepthStencilState,
+                     depthDisabledState: any GPUDepthStencilState) {
         guard items.isEmpty == false else { return }
         let levelOfDetail = mesh.contents.levels[min(max(level, 0), mesh.contents.levels.count - 1)]
-        var cameraUniformValue = cameraUniform
-        var frameUniform = TreeFrameUniform(mesh: mesh, palette: palette, lightDirection: lightDirection)
+        let frameUniform = TreeFrameUniform(mesh: mesh, palette: palette, lightDirection: lightDirection)
 
         // The model's triangles are wound counter-clockwise seen from
         // outside; the ground is declared the same in this encoder.
         renderEncoder.setFrontFacing(.counterClockwise)
         renderEncoder.setCullMode(.back)
-        renderEncoder.setRenderPipelineState(pipeline.pipelineState)
+        renderEncoder.setPipeline(pipeline.pipelineState)
         renderEncoder.setDepthStencilState(stencilTestState)
         renderEncoder.setVertexBuffer(mesh.buffer, offset: levelOfDetail.vertexOffset, index: 0)
-        renderEncoder.setVertexBytes(&cameraUniformValue, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        renderEncoder.setVertexBytes(&frameUniform, length: MemoryLayout<TreeFrameUniform>.stride, index: 7)
-        renderEncoder.setFragmentBytes(&frameUniform, length: MemoryLayout<TreeFrameUniform>.stride, index: 7)
+        renderEncoder.setVertexValue(cameraUniform, index: 1)
+        renderEncoder.setVertexValue(frameUniform, index: 7)
+        renderEncoder.setFragmentValue(frameUniform, index: 7)
 
-        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, tile, instanceCount in
-            renderEncoder.setStencilReferenceValue(TileSourceStencilPriority.reference(sourceZoom: tile.z)
+        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, tile, instances in
+            renderEncoder.setStencilReference(TileSourceStencilPriority.reference(sourceZoom: tile.z)
                                                    | TileSourceStencilPriority.surfaceMaskBit)
-            renderEncoder.drawIndexedPrimitives(type: .triangle,
-                                                indexCount: levelOfDetail.indexCount,
-                                                indexType: .uint16,
-                                                indexBuffer: mesh.buffer,
-                                                indexBufferOffset: levelOfDetail.indexOffset,
-                                                instanceCount: instanceCount)
+            renderEncoder.drawIndexed(.triangle,
+                                      indexCount: levelOfDetail.indexCount,
+                                      indexType: .uint16,
+                                      indexBuffer: mesh.buffer,
+                                      indexBufferOffset: levelOfDetail.indexOffset,
+                                      instanceCount: instances.count,
+                                      baseVertex: 0,
+                                      baseInstance: instances.lowerBound)
         }
 
         renderEncoder.setCullMode(.none)
@@ -92,7 +93,7 @@ enum TreeDrawer {
     /// after the roads: `shadowUniform` gives the darkening and the tint
     /// the shadow map gives every other shadow, `groundDepthState` keeps
     /// a disc off the buildings standing nearer than its ground.
-    static func drawShadows(renderEncoder: MTLRenderCommandEncoder,
+    static func drawShadows(renderEncoder: any GPURenderEncoder,
                             cameraUniform: CameraUniform,
                             shadowUniform: ShadowUniform,
                             items: [Item],
@@ -101,38 +102,38 @@ enum TreeDrawer {
                             flatRenderState: FlatRenderState,
                             lightDirection: SIMD3<Float>,
                             pipeline: TreePipeline,
-                            groundDepthState: MTLDepthStencilState,
-                            depthDisabledState: MTLDepthStencilState) {
+                            groundDepthState: any GPUDepthStencilState,
+                            depthDisabledState: any GPUDepthStencilState) {
         guard items.isEmpty == false, shadowUniform.strength > 0 else { return }
-        var cameraUniformValue = cameraUniform
-        var frameUniform = TreeFrameUniform(mesh: mesh, palette: palette, lightDirection: lightDirection)
-        var shadowUniformValue = shadowUniform
+        let frameUniform = TreeFrameUniform(mesh: mesh, palette: palette, lightDirection: lightDirection)
 
         renderEncoder.setCullMode(.none)
-        renderEncoder.setRenderPipelineState(pipeline.shadowPipelineState)
+        renderEncoder.setPipeline(pipeline.shadowPipelineState)
         renderEncoder.setDepthStencilState(groundDepthState)
-        renderEncoder.setVertexBytes(&cameraUniformValue, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        renderEncoder.setVertexBytes(&frameUniform, length: MemoryLayout<TreeFrameUniform>.stride, index: 7)
-        renderEncoder.setFragmentBytes(&shadowUniformValue, length: MemoryLayout<ShadowUniform>.stride, index: 5)
+        renderEncoder.setVertexValue(cameraUniform, index: 1)
+        renderEncoder.setVertexValue(frameUniform, index: 7)
+        renderEncoder.setFragmentValue(shadowUniform, index: 5)
 
-        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, _, instanceCount in
-            renderEncoder.drawPrimitives(type: .triangle,
-                                         vertexStart: 0,
-                                         vertexCount: 6,
-                                         instanceCount: instanceCount)
+        forEachTile(items: items, mesh: mesh, flatRenderState: flatRenderState, renderEncoder: renderEncoder) { _, _, _, instances in
+            renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count,
+                               baseInstance: instances.lowerBound)
         }
 
         renderEncoder.setDepthStencilState(depthDisabledState)
     }
 
-    /// Binds each item's tile (its matrix at vertex buffer 3) and, for
-    /// each of its instance ranges, the trees of the range at vertex buffer
-    /// 4, and hands it to `draw` with the range's count.
+    /// Binds each item's tile (its matrix at vertex buffer 3) and its trees
+    /// at vertex buffer 4, at the span's own offset, and hands each of its
+    /// instance ranges to `draw`, which draws the range as the draw's first
+    /// instance and count. The shaders count the instance from the first
+    /// (`instance_id`, `instance_index`), and WebGPU binds a storage buffer
+    /// only at a multiple of 256, which a span is and a tree inside one
+    /// is not.
     private static func forEachTile(items: [Item],
                                     mesh: TreeModelMesh,
                                     flatRenderState: FlatRenderState,
-                                    renderEncoder: MTLRenderCommandEncoder,
-                                    _ draw: (Item, TileBufferView, Tile, Int) -> Void) {
+                                    renderEncoder: any GPURenderEncoder,
+                                    _ draw: (Item, TileBufferView, Tile, Range<Int>) -> Void) {
         for item in items where item.instanceRanges.isEmpty == false {
             let metalTile = item.placement.metalTile
             guard let trees = metalTile.tileBuffers.trees else { continue }
@@ -145,18 +146,16 @@ enum TreeDrawer {
                                                                              flatRenderPan: flatRenderState.pan,
                                                                              renderMapSize: flatRenderState.renderMapSize)
             let scale = originAndSize.z / Float(TileCoordinateSpace.tileExtent)
-            var tileUniform = TreeTileUniform(
+            let tileUniform = TreeTileUniform(
                 modelMatrix: Matrix.translationMatrix(x: originAndSize.x, y: originAndSize.y, z: 0)
                     * Matrix.scaleMatrix(sx: scale, sy: scale, sz: scale),
                 heightScale: item.riseScale / mesh.contents.heightMetres)
-            renderEncoder.setVertexBytes(&tileUniform, length: MemoryLayout<TreeTileUniform>.stride, index: 3)
+            renderEncoder.setVertexValue(tileUniform, index: 3)
+            renderEncoder.setVertexBuffer(trees.gpuBuffer, offset: trees.offset, index: 4)
             for range in item.instanceRanges {
                 let clamped = range.clamped(to: 0..<trees.count)
                 guard clamped.isEmpty == false else { continue }
-                renderEncoder.setVertexBuffer(trees.buffer,
-                                              offset: trees.offset + clamped.lowerBound * MemoryLayout<TreeInstance>.stride,
-                                              index: 4)
-                draw(item, trees, tile, clamped.count)
+                draw(item, trees, tile, clamped)
             }
         }
     }
@@ -168,6 +167,9 @@ enum TreeDrawer {
 struct TreeTileUniform {
     var modelMatrix: matrix_float4x4
     var heightScale: Float
+    /// The gap before `padding`, which a `SIMD3` aligns to 16, named: Swift would leave its bytes as whatever
+    /// the stack held, and they would go to the GPU with the constant data.
+    var _gap0: Float = 0, _gap1: Float = 0, _gap2: Float = 0
     var padding: SIMD3<Float> = .zero
 
     init(modelMatrix: matrix_float4x4, heightScale: Float) {

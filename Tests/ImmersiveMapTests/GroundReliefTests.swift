@@ -4,6 +4,7 @@
 import CoreGraphics
 import ImageIO
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 @testable import ImmersiveMapDebug
 import Metal
 import simd
@@ -963,7 +964,7 @@ final class GroundReliefTests: XCTestCase {
                 loaded.append(tile)
                 ground.store.request(tiles: loaded)
                 XCTAssertTrue(waitUntil { ground.frame.statusSnapshot().wantedResidentCount == loaded.count })
-                ground.store.applyPendingWelds(commandQueue: commandQueue)?.waitUntilCompleted()
+                ground.store.applyPendingWelds(commandQueue: MetalCommandQueue(commandQueue))?.waitUntilCompleted()
             }
             let westRelief = try XCTUnwrap(ground.frame.relief(for: west, terrainZoom: 8, orCoarser: false))
             let eastRelief = try XCTUnwrap(ground.frame.relief(for: east, terrainZoom: 8, orCoarser: false))
@@ -990,7 +991,7 @@ final class GroundReliefTests: XCTestCase {
         let tiles = [northWest, northEast, southWest, southEast]
         ground.store.request(tiles: tiles)
         XCTAssertTrue(waitUntil { ground.frame.statusSnapshot().wantedResidentCount == 4 })
-        ground.store.applyPendingWelds(commandQueue: commandQueue)?.waitUntilCompleted()
+        ground.store.applyPendingWelds(commandQueue: MetalCommandQueue(commandQueue))?.waitUntilCompleted()
         let reliefs = try tiles.map { try XCTUnwrap(ground.frame.relief(for: $0, terrainZoom: 8, orCoarser: false)) }
         XCTAssertEqual(reliefs[0].metres(atTileUV: SIMD2(1, 1)), 250, accuracy: 0.01)
         XCTAssertEqual(reliefs[1].metres(atTileUV: SIMD2(0, 1)), 250, accuracy: 0.01)
@@ -998,7 +999,7 @@ final class GroundReliefTests: XCTestCase {
         XCTAssertEqual(reliefs[3].metres(atTileUV: SIMD2(0, 0)), 250, accuracy: 0.01)
         XCTAssertEqual(reliefs[0].metres(atTileUV: SIMD2(0.5, 1)), 200, accuracy: 0.01, "The north-west and south-west edge")
         XCTAssertEqual(Self.textureMetres(reliefs[3].terrain, x: 0, y: 0), 250, accuracy: 0.01)
-        XCTAssertNil(ground.store.applyPendingWelds(commandQueue: commandQueue), "Nothing left to write")
+        XCTAssertNil(ground.store.applyPendingWelds(commandQueue: MetalCommandQueue(commandQueue)), "Nothing left to write")
     }
 
     /// North and south neighbours rise a metre by one amount, the frame's
@@ -1012,7 +1013,7 @@ final class GroundReliefTests: XCTestCase {
         let ground = try makeWeldStore(device: device, metresByTile: [north: 300, south: 500])
         ground.store.request(tiles: [north, south])
         XCTAssertTrue(waitUntil { ground.frame.statusSnapshot().wantedResidentCount == 2 })
-        ground.store.applyPendingWelds(commandQueue: commandQueue)?.waitUntilCompleted()
+        ground.store.applyPendingWelds(commandQueue: MetalCommandQueue(commandQueue))?.waitUntilCompleted()
         ground.setWorldScale(centerWorldMercator: SIMD2(0.39, 0.39), renderMapSize: 1_000_000)
         XCTAssertGreaterThan(ground.frame.worldUnitsPerMetre, 0)
         let northLift = try XCTUnwrap(GroundReliefTileLift(relief: ground.frame, tile: north, terrain: north))
@@ -1198,7 +1199,7 @@ func makeTestRelief(device: MTLDevice,
                     occlusion: ImmersiveMapTerrainOcclusion = ImmersiveMapTerrainOcclusion(),
                     fetch: @escaping @Sendable (URL) async throws -> GroundReliefURLTerrainSource.Fetched,
                     now: @escaping @Sendable () -> TimeInterval = { Date().timeIntervalSinceReferenceDate }) -> GroundReliefFrameState {
-    let store = GroundReliefStore(device: device,
+    let store = GroundReliefStore(device: reliefGPUDevice(device),
                                   settings: settings,
                                   source: GroundReliefURLTerrainSource(settings: settings, fetch: fetch),
                                   occlusionKey: GroundReliefOcclusion.Key(style: occlusion),
@@ -1208,4 +1209,13 @@ func makeTestRelief(device: MTLDevice,
                                   deepestTileZoom: deepestTileZoom,
                                   hillshade: hillshade,
                                   occlusion: occlusion)
+}
+
+/// A Metal device as the GPU interface for the terrain store, which makes
+/// buffers and textures alone and no pipeline, so any shader library does.
+func reliefGPUDevice(_ device: MTLDevice) -> MetalDevice {
+    guard let library = try? device.makeLibrary(source: "", options: nil) else {
+        preconditionFailure("A Metal device compiles an empty library")
+    }
+    return MetalDevice(device: device, library: library)
 }

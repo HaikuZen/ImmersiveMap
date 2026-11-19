@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+import ImmersiveMapGPU
+import ImmersiveMapMetal
 import Metal
 import MetalKit
 import ModelIO
@@ -15,13 +17,13 @@ enum SceneModelAssetLoadError: Error, Equatable {
 
 /// Synchronous Model I/O loading of a USDZ/OBJ asset into GPU-ready
 /// `SceneModelMesh` data. Runs on background tasks owned by `SceneModelMeshStore`.
+/// Apple's platforms only: MetalKit makes the buffers and the textures, and
+/// the mesh holds them as the GPU interface's (`MetalBuffer`, `MetalTexture`).
 enum SceneModelAssetLoader {
-    /// Canonical interleaved vertex layout shared with `SceneModelPipeline`
-    /// and pinned by `SceneModelGPUStructLayoutTests`:
-    /// position float3 @0, normal float3 @12, uv float2 @24, stride 32, buffer 0.
-    static let vertexStride = 32
-    static let normalOffset = 12
-    static let uvOffset = 24
+    /// The canonical interleaved vertex layout (`SceneModelVertexLayout`).
+    static let vertexStride = SceneModelVertexLayout.stride
+    static let normalOffset = SceneModelVertexLayout.normalOffset
+    static let uvOffset = SceneModelVertexLayout.uvOffset
 
     static func makeVertexDescriptor() -> MDLVertexDescriptor {
         let descriptor = MDLVertexDescriptor()
@@ -84,7 +86,26 @@ enum SceneModelAssetLoader {
             }
         }
 
-        return SceneModelMesh(meshes: converted.metalKitMeshes,
+        let parts = try converted.metalKitMeshes.map { mesh in
+            // The canonical layout interleaves everything into one buffer.
+            guard let vertexBuffer = mesh.vertexBuffers.first else {
+                throw SceneModelAssetLoadError.meshConversionFailed(url)
+            }
+            return SceneModelMesh.Part(vertexBuffer: MetalBuffer(vertexBuffer.buffer),
+                                       vertexBufferOffset: vertexBuffer.offset,
+                                       submeshes: try mesh.submeshes.map { submesh in
+                                           guard let topology = GPUPrimitiveTopology(metal: submesh.primitiveType) else {
+                                               throw SceneModelAssetLoadError.meshConversionFailed(url)
+                                           }
+                                           return SceneModelMesh.Submesh(topology: topology,
+                                                                         indexCount: submesh.indexCount,
+                                                                         indexType: submesh.indexType == .uint16 ? .uint16 : .uint32,
+                                                                         indexBuffer: MetalBuffer(submesh.indexBuffer.buffer),
+                                                                         indexBufferOffset: submesh.indexBuffer.offset)
+                                       })
+        }
+
+        return SceneModelMesh(meshes: parts,
                               localTransforms: localTransforms,
                               materials: materials,
                               localBounds: makeBounds(of: asset),
@@ -127,7 +148,11 @@ enum SceneModelAssetLoader {
                 .generateMipmaps: NSNumber(value: true),
                 .SRGB: NSNumber(value: false)
             ]
-            let texture = try? textureLoader.newTexture(texture: mdlTexture, options: options)
+            // A texture in a format the interface has no name for is left
+            // out, as one MetalKit could not load is.
+            let texture = (try? textureLoader.newTexture(texture: mdlTexture, options: options)).flatMap { texture in
+                GPUPixelFormat(metal: texture.pixelFormat).map { MetalTexture(texture, format: $0) }
+            }
             return SceneModelMesh.SubmeshMaterial(baseColorTexture: texture, baseColor: white)
         case .float3:
             let color = property.float3Value

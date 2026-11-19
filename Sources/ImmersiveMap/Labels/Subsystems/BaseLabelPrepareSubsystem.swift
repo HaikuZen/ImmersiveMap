@@ -6,8 +6,8 @@
 //  ImmersiveMap
 //
 
-import Foundation
-import Metal
+import PortableFoundation
+import ImmersiveMapGPU
 import simd
 
 /// The frame's label decisions on the CPU: which base and road labels show,
@@ -30,7 +30,6 @@ import simd
 /// draws.
 final class BaseLabelPrepareSubsystem: RenderSubsystem {
     let name: String = "BaseLabels"
-    private static let traceLocale = Locale(identifier: "en_US_POSIX")
 
     private let baseLabelCache: BaseLabelCache
     private let roadLabelCache: RoadLabelCache?
@@ -49,8 +48,8 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     private var projectedMaximumDistanceScale: Float?
     /// The distance the local detail was last resolved for.
     private var resolvedLocalDetailDistance: Float?
-    private let screenPositionsBufferStore: FrameSlottedDynamicMetalBuffer<ScreenPointOutput>
-    private let roadRuntimeMetaBufferStore: FrameSlottedDynamicMetalBuffer<LabelRuntimeMeta>
+    private let screenPositionsBufferStore: GPUFrameSlottedBuffer<ScreenPointOutput>
+    private let roadRuntimeMetaBufferStore: GPUFrameSlottedBuffer<LabelRuntimeMeta>
     private let fadeInSeconds: TimeInterval
     private let fadeOutSeconds: TimeInterval
     private let maxGlyphTurnRadians: Float
@@ -117,7 +116,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     init(baseLabelCache: BaseLabelCache,
          roadLabelCache: RoadLabelCache? = nil,
          baseLabelTraceRecorder: BaseLabelTraceRecorder = BaseLabelTraceRecorder(),
-         metalDevice: MTLDevice,
+         device: any GPUDevice,
          settings: ImmersiveMapSettings.LabelSettings = ImmersiveMapSettings.default.labels,
          debugOverlayControls: DebugOverlayControlState? = nil) {
         self.baseLabelCache = baseLabelCache
@@ -125,12 +124,10 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
         self.baseLabelTraceRecorder = baseLabelTraceRecorder
         self.debugOverlayControls = debugOverlayControls
         self.localDetailMaximumDistanceMeters = settings.base.localDetailMaximumDistanceMeters
-        self.screenPositionsBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                         slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                         options: [.storageModeShared])
-        self.roadRuntimeMetaBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                         slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                         options: [.storageModeShared])
+        self.screenPositionsBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                                         slotsCount: InFlightFramePool.inFlightFramesCount)
+        self.roadRuntimeMetaBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                                         slotsCount: InFlightFramePool.inFlightFramesCount)
         self.fadeInSeconds = settings.base.fadeInSeconds
         self.fadeOutSeconds = settings.base.fadeOutSeconds
         self.maxGlyphTurnRadians = settings.road.maxGlyphTurnRadians
@@ -283,7 +280,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
     /// The labels are drawn by `BaseLabelDrawSubsystem`.
-    func encode(layer _: RenderLayer, encoder _: MTLRenderCommandEncoder, frameContext _: FrameContext) {}
+    func encode(layer _: RenderLayer, encoder _: any GPURenderEncoder, frameContext _: FrameContext) {}
 
     func handleMemoryWarning() {
         reset()
@@ -772,7 +769,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     private func publishBaseLabelState(frameContext: FrameContext,
                                        hasActiveFadeAnimations: Bool) {
         let count = baseLabelCache.labelInputsCount
-        var screenPositionsBuffer: MTLBuffer?
+        var screenPositionsBuffer: (any GPUBuffer)?
         if count > 0 {
             let buffer = screenPositionsBufferStore.ensureCapacity(slot: frameContext.frameSlotIndex, count: count)
             let byteCount = min(baseScreenPoints.count, count) * MemoryLayout<ScreenPointOutput>.stride
@@ -1035,7 +1032,7 @@ final class BaseLabelPrepareSubsystem: RenderSubsystem {
     }
 
     private static func formatTraceFloat(_ value: Float) -> String {
-        String(format: "%.2f", locale: traceLocale, Double(value))
+        String(fixed: Double(value), fractionDigits: 2)
     }
 }
 

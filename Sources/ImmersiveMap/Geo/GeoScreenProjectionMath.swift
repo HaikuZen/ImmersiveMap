@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 import simd
 
 /// Unified CPU projector of a geo coordinate into a drawable screen point

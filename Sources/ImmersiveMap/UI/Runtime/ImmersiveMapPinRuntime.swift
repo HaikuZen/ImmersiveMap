@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Owns the pin controller attached to a single map view runtime.
 /// Bridges pin mutations to the selection/render runtimes and feeds pin data to the renderer.

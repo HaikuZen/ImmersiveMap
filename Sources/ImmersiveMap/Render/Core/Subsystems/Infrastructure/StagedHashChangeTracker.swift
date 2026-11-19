@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 /// Tracks hash changes across frame stages.
 /// `stage` records pending changes and `commitPending` confirms successful application.

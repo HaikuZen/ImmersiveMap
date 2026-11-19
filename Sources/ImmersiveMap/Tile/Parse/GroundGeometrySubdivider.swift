@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Splits the ground geometry of a coarse tile on a regular grid so it can
 /// be drawn straight onto the sphere.

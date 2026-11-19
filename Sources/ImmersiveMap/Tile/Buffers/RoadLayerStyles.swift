@@ -67,9 +67,9 @@ struct RoadLayerStyles {
             self.styles = []
             return
         }
-        let colors = styles.buffer.contents().advanced(by: styles.offset)
-        let fades = styleZoomFades.buffer.contents().advanced(by: styleZoomFades.offset)
-        let lines = lineStyles.buffer.contents().advanced(by: lineStyles.offset)
+        let colors = styles.gpuBuffer.contents().advanced(by: styles.offset)
+        let fades = styleZoomFades.gpuBuffer.contents().advanced(by: styleZoomFades.offset)
+        let lines = lineStyles.gpuBuffer.contents().advanced(by: lineStyles.offset)
         self.styles = (0 ..< styles.count).map { index in
             let color = colors.loadUnaligned(fromByteOffset: index * MemoryLayout<TilePolygonStyle>.stride,
                                              as: TilePolygonStyle.self)

@@ -1,39 +1,39 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Metal
-import QuartzCore
+import ImmersiveMapGPU
 
+/// The FXAA pass (FXAA.metal): one triangle over the frame, sampling the
+/// frame drawn before it and smoothing its edges.
 final class FXAAPipeline {
-    private struct Uniform {
+    /// Mirror of `FXAAUniform` in FXAA.metal.
+    struct Uniform {
         var inverseViewportSize: SIMD2<Float>
     }
 
-    private let pipelineState: MTLRenderPipelineState
+    private let pipelineState: any GPURenderPipeline
 
-    init(metalDevice: MTLDevice,
-         pixelFormat: MTLPixelFormat,
-         library: MTLLibrary) {
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.vertexFunction = library.makeFunction(name: "postProcessingVertexShader")
-        descriptor.fragmentFunction = library.makeFunction(name: "fxaaFragmentShader")
-        descriptor.colorAttachments[0].pixelFormat = pixelFormat
-        pipelineState = try! metalDevice.makeRenderPipelineState(descriptor: descriptor)
+    init(device: any GPUDevice, pixelFormat: GPUPixelFormat) {
+        var descriptor = GPURenderPipelineDescriptor(vertexFunction: GPUShaderFunction(name: "postProcessingVertexShader"),
+                                                     fragmentFunction: GPUShaderFunction(name: "fxaaFragmentShader"),
+                                                     colorTargets: [GPUColorTarget(format: pixelFormat)])
+        descriptor.label = "FXAA"
+        do {
+            pipelineState = try device.makeRenderPipeline(descriptor)
+        } catch {
+            fatalError("Failed to create the FXAA pipeline: \(error)")
+        }
     }
 
-    func draw(renderEncoder: MTLRenderCommandEncoder,
-              sourceTexture: MTLTexture,
-              drawSize: CGSize) {
-        let width = max(Float(drawSize.width), 1.0)
-        let height = max(Float(drawSize.height), 1.0)
-        var uniform = Uniform(inverseViewportSize: SIMD2<Float>(1.0 / width, 1.0 / height))
-
-        renderEncoder.setRenderPipelineState(pipelineState)
+    /// `width` and `height` are the frame's, in pixels.
+    func draw(renderEncoder: any GPURenderEncoder,
+              sourceTexture: any GPUTexture,
+              width: Float,
+              height: Float) {
+        let uniform = Uniform(inverseViewportSize: SIMD2<Float>(1.0 / max(width, 1.0), 1.0 / max(height, 1.0)))
+        renderEncoder.setPipeline(pipelineState)
         renderEncoder.setFragmentTexture(sourceTexture, index: 0)
-        renderEncoder.setFragmentBytes(&uniform,
-                                       length: MemoryLayout<Uniform>.stride,
-                                       index: 0)
-        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        renderEncoder.setFragmentValue(uniform, index: 0)
+        renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1, baseInstance: 0)
     }
 }

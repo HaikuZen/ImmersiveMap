@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 @testable import ImmersiveMap
+import ImmersiveMapMetal
 import Metal
 import XCTest
 
@@ -17,7 +18,7 @@ final class ExtrudedArenaBuildTests: XCTestCase {
         }
         let tile = Tile(x: 1, y: 2, z: 15)
         let prepared = Self.preparedTileWithBuilding(tile: tile)
-        let factory = MetalTileFactory(metalDevice: device)
+        let factory = MetalTileFactory(device: reliefGPUDevice(device))
 
         let plan = TileArenaImageMath.plan(for: prepared)
         XCTAssertNotNil(factory.makeTile(from: prepared, plan: plan),

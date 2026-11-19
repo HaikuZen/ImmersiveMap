@@ -1,8 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import MetalKit
+import PortableFoundation
 
 // Business purpose:
 // Tile loading orchestrator for the current map frame.
@@ -134,7 +133,7 @@ final class ImmersiveMapNeedsTile: @unchecked Sendable {
     private let retryWakeScheduler: (TimeInterval, DispatchWorkItem) -> Void
     
     // Production initializer: assembles the standard pipeline (disk + network + parse into TileRenderStore).
-    convenience init(tileRenderStore: TileRenderStore,
+    convenience init(tileRenderStore: any TileMaterializing,
                      config: ImmersiveMapSettings,
                      preparedTileCacheIdentity: PreparedTileCacheIdentity,
                      geometryTransport: any PreparedTileGeometryTransporting,
@@ -714,6 +713,32 @@ final class ImmersiveMapNeedsTile: @unchecked Sendable {
             if Task.isCancelled {
                 return
             }
+            // A host that parses off this thread (a web page's workers,
+            // `OffThreadTilePreparation`) hands back an entry materialized as
+            // a disk hit is. Nothing is saved: such a host keeps no prepared
+            // cache. An entry that does not come or does not materialize
+            // falls through to the parse below.
+            if let prepared = await loadPipeline.prepareOffThread(tile: tile, data: data) {
+                if Task.isCancelled {
+                    return
+                }
+                let outcome = await materializeDiskImage(prepared.image,
+                                                         expectedTile: tile,
+                                                         generation: generation)
+                if outcome == .materialized {
+                    OffThreadTilePreparation.note(.accepted)
+                    _ = markLoadSucceeded(tile: tile,
+                                          generation: generation,
+                                          source: "off_thread")
+                    return
+                }
+                if Task.isCancelled {
+                    return
+                }
+                // Not cancelled, so the entry itself failed: the loader
+                // parses the bytes after all.
+                OffThreadTilePreparation.note(.refused)
+            }
 
             guard let preparedFromNetwork = await prepareTile(data: data,
                                                               tile: tile,
@@ -1169,6 +1194,14 @@ final class ImmersiveMapNeedsTile: @unchecked Sendable {
 
     var tileLoadingStatusSnapshotForTesting: TileLoadingStatusSnapshot? {
         tileLoadingStatusReporter?.snapshot()
+    }
+
+    /// Whether `tile` is downloaded and waits for a CPU slot: the point a
+    /// test waits on before it moves the clock past the network stage's
+    /// deadline, where a fixed sleep leaves a slow machine's tile still in
+    /// the network stage.
+    func isWaitingForCPUSlotForTesting(_ tile: Tile) -> Bool {
+        stateQueue.sync { ongoingTasks[tile]?.stage == .cpuQueued }
     }
     #endif
 

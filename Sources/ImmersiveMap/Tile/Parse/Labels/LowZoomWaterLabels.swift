@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The ocean and sea names the parser adds to the coarse zooms itself, with
 /// their anchors and their spellings per language, and the projection that

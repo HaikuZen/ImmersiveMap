@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 final class TilePreparedDataBuilder {
     private let tileParser: TileMvtParser
@@ -67,3 +67,56 @@ final class TilePreparedDataBuilder {
                                       parseLayerTimings: parsedTile.parseLayerTimings)
     }
 }
+
+extension TilePreparedDataBuilder {
+    /// The builder a tile is parsed with under the settings, the style and
+    /// the text's metrics: the tile store's, and a worker's that parses off
+    /// the page's thread (`PortableTilePreparer`), so both bake one tile
+    /// alike.
+    convenience init(settings: ImmersiveMapSettings, styleRuntime: MapStyleRuntime, textLayout: TextLayout) {
+        let parseOptions = TileParseOptions(settings: settings)
+        let labelDecisions = TileLabelDecisions(style: styleRuntime.style,
+                                                glyphCoverage: textLayout.glyphCoverage,
+                                                language: settings.labels.language,
+                                                fallbackPolicy: settings.labels.fallbackPolicy)
+        self.init(tileParser: TileMvtParser(mapStyle: styleRuntime,
+                                            labelDecisions: labelDecisions,
+                                            options: parseOptions),
+                  textLabelsBuilder: TileTextLabelsBuilder(textLayout: textLayout),
+                  roadLabelsBuilder: TileRoadLabelsBuilder(textLayout: textLayout),
+                  surfaceLabelsBuilder: TileSurfaceLabelsBuilder(textLayout: textLayout))
+    }
+}
+
+extension PreparedTileCacheIdentity {
+    /// What a tile parsed under the settings, the style and the text's
+    /// metrics is stamped with (`TilePreparedDataBuilder.init(settings:styleRuntime:textLayout:)`):
+    /// an entry of another identity is not read back.
+    init(settings: ImmersiveMapSettings, styleRuntime: MapStyleRuntime, textLayout: TextLayout) {
+        let parseOptions = TileParseOptions(settings: settings)
+        self.init(
+            preparedFormatVersion: PreparedTileDiskCaching.preparedFormatVersion,
+            styleRevision: styleRuntime.preparedTileStyleRevision,
+            tileSourceRevision: PreparedTileCacheIdentity.tileSourceRevision(for: settings.tiles.network),
+            textRevision: textLayout.preparedTileTextRevision,
+            labelLanguage: settings.labels.language,
+            labelFallbackPolicy: settings.labels.fallbackPolicy,
+            capitalMaximumZoom: UInt32(max(0, settings.labels.settlementVisibility.capitalMaximumZoom)),
+            cityMaximumZoom: UInt32(max(0, settings.labels.settlementVisibility.cityMaximumZoom)),
+            smallSettlementMaximumZoom: UInt32(max(0, settings.labels.settlementVisibility.smallSettlementMaximumZoom)),
+            landmarkMinimumZoom: UInt32(max(0, settings.labels.landmarks.minimumZoom)),
+            addTestBorders: settings.tiles.parsing.addTestBorders,
+            labelsEnabled: settings.labels.isEnabled,
+            groundFlatteningFromTileZoom: parseOptions.groundFlatteningFromTileZoom,
+            groundFlatteningGrid: parseOptions.groundFlatteningGrid,
+            groundFlatteningGridByTileZoomKey: parseOptions.groundFlatteningGridByTileZoomKey,
+            groundReliefEnabled: parseOptions.groundReliefEnabled,
+            buildingMinimumSourceZoom: parseOptions.buildingMinimumSourceZoom,
+            buildingDeepestSourceZoom: parseOptions.buildingDeepestSourceZoom,
+            overviewTilesEnabled: settings.tiles.overview.isEnabled,
+            treeMinimumSourceZoom: parseOptions.treeMinimumSourceZoom,
+            treeMaximumPerTile: parseOptions.treeMaximumPerTile
+        )
+    }
+}
+

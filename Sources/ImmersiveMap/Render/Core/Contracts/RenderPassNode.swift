@@ -1,22 +1,12 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
-import QuartzCore
-
-enum RenderPassName: String, CaseIterable {
-    case shadowMap
-    case farShadowMap
-    case groundShadowMask
-    case world
-    case postProcessing
-    case overlay
-}
+import ImmersiveMapGPU
 
 protocol RenderPassDescriptorProvider: AnyObject {
     func makeRenderPassDescriptor(frameContext: FrameContext,
                                   attachments: FrameAttachmentStore,
-                                  target: FrameRenderTarget?) -> MTLRenderPassDescriptor?
+                                  target: FrameRenderTarget?) -> GPURenderPassDescriptor?
 }
 
 struct RenderPassNode {

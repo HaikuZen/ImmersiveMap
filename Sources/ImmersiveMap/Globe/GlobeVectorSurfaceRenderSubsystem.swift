@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The globe's ground: the placements' ground geometry projected onto the
@@ -15,17 +15,17 @@ final class GlobeVectorSurfaceRenderSubsystem: RenderSubsystem {
     let name: String = "GlobeVectorSurface"
 
     private let pipeline: TilePipeline
-    private let depthDisabledState: MTLDepthStencilState
-    private let opaqueDepthState: MTLDepthStencilState
-    private let ribbonOwnerDepthState: MTLDepthStencilState
-    private let translucentDepthState: MTLDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
+    private let opaqueDepthState: any GPUDepthStencilState
+    private let ribbonOwnerDepthState: any GPUDepthStencilState
+    private let translucentDepthState: any GPUDepthStencilState
     private let debugOverlayControls: DebugOverlayControlState
 
     init(pipeline: TilePipeline,
-         depthDisabledState: MTLDepthStencilState,
-         opaqueDepthState: MTLDepthStencilState,
-         ribbonOwnerDepthState: MTLDepthStencilState,
-         translucentDepthState: MTLDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
+         opaqueDepthState: any GPUDepthStencilState,
+         ribbonOwnerDepthState: any GPUDepthStencilState,
+         translucentDepthState: any GPUDepthStencilState,
          debugOverlayControls: DebugOverlayControlState) {
         self.pipeline = pipeline
         self.depthDisabledState = depthDisabledState
@@ -39,14 +39,13 @@ final class GlobeVectorSurfaceRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .globeVectorSurface,
               frameContext.renderSurfaceMode == .spherical else {
             return
         }
         let placeTilesContext = frameContext.sharedState.tilePlacementState.placeTilesContext
         guard placeTilesContext.tilePlacements.isEmpty == false else { return }
-
         let globe = frameContext.globeRenderUniform
         let pureSphere = GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
                                                             transition: globe.transition)

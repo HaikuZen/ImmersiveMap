@@ -1,0 +1,13 @@
+{
+  "name": "immersivemap-wgsl-check",
+  "private": true,
+  "description": "Compiles the engine's WGSL shaders with Dawn and stamps them with the Metal sources they were ported from.",
+  "type": "module",
+  "scripts": {
+    "check": "node check.mjs",
+    "stamp": "node stamp.mjs"
+  },
+  "dependencies": {
+    "webgpu": "0.6.2"
+  }
+}

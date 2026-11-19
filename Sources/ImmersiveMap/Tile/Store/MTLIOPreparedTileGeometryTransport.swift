@@ -40,8 +40,9 @@ struct MTLIOPreparedTileGeometryTransport: PreparedTileGeometryTransporting {
 
     /// The simulator lacks the MTLIO fast path and Intel Macs lack Metal 3;
     /// both fall back to the inline transport. The full capability decision
-    /// belongs to `MetalTileFactory.loadsFileBlobs`, which also covers IO
-    /// command queue creation; this static check only gates test scenarios.
+    /// belongs to `MetalTileFactory.metalFileBlobLoader(device:)`, which also
+    /// covers IO command queue creation; this static check gates that and
+    /// the test scenarios.
     static func isSupported(metalDevice: MTLDevice) -> Bool {
         #if targetEnvironment(simulator)
         return false

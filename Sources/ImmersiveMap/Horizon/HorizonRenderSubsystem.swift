@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// The air around the surface's edge, drawn last in the world pass on both
 /// surfaces: the globe's atmosphere and limb feather, on the unrolling
@@ -23,14 +23,14 @@ final class HorizonRenderSubsystem: RenderSubsystem {
     let name: String = "Horizon"
 
     private let horizonRenderer: HorizonRenderer
-    private let skyDepthState: MTLDepthStencilState
-    private let groundDepthState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    private let skyDepthState: any GPUDepthStencilState
+    private let groundDepthState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
 
     init(horizonRenderer: HorizonRenderer,
-         skyDepthState: MTLDepthStencilState,
-         groundDepthState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState) {
+         skyDepthState: any GPUDepthStencilState,
+         groundDepthState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState) {
         self.horizonRenderer = horizonRenderer
         self.skyDepthState = skyDepthState
         self.groundDepthState = groundDepthState
@@ -58,7 +58,7 @@ final class HorizonRenderSubsystem: RenderSubsystem {
                                      drawableHeightPx: Float(frameContext.drawSize.height))
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .horizon else { return }
         let haze = Self.resolveHaze(frameContext: frameContext)
         guard haze.drawsSky || haze.drawsGround else { return }
@@ -69,7 +69,7 @@ final class HorizonRenderSubsystem: RenderSubsystem {
             encoder.setDepthStencilState(groundDepthState)
             // The ground state tests the surface mask bit against zero: the
             // haze lands on the ground, never on a building or a model.
-            encoder.setStencilReferenceValue(0)
+            encoder.setStencilReference(0)
             horizonRenderer.draw(renderEncoder: encoder,
                                  uniform: uniform,
                                  groundSide: true)

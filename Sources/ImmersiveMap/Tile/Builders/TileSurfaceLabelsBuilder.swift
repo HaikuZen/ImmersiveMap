@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// Bakes the labels painted on the map (`LabelPlacement.surface`) into glyph
@@ -14,10 +14,17 @@ import simd
 /// placement's reference zoom, and grows with the zoom from there like the
 /// geometry around it.
 final class TileSurfaceLabelsBuilder {
-    private let textRenderer: TextRenderer
+    private let textLayout: TextLayout
 
-    init(textRenderer: TextRenderer) {
-        self.textRenderer = textRenderer
+    init(textLayout: TextLayout) {
+        self.textLayout = textLayout
+    }
+
+    /// A renderer's text layout: the builder measures and lays out with the
+    /// CPU half alone, which a host without the GPU makes on its own
+    /// (`PortableTilePreparer`).
+    convenience init(textRenderer: TextRenderer) {
+        self.init(textLayout: textRenderer.layout)
     }
 
     /// A name wraps at this many ems to at most `wrapLineCount` lines,
@@ -49,7 +56,7 @@ final class TileSurfaceLabelsBuilder {
             let wrap = LabelWrapOptions(maxWidth: style.sizePoints * Self.wrapWidthEms * spacingWidening,
                                         maxLines: Self.wrapLineCount,
                                         alignment: .center)
-            let metrics = textRenderer.collectLabelVertices(for: label.text,
+            let metrics = textLayout.collectLabelVertices(for: label.text,
                                                             labelIndex: simd_int1(records.count),
                                                             scale: style.sizePoints,
                                                             wrap: wrap,

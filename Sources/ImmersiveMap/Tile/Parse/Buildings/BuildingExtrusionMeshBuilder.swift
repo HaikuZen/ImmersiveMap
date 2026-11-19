@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import Earcut
-import Foundation
+import PortableFoundation
 import simd
 
 /// Turns one resolved building candidate into its mesh: a flat lid at the

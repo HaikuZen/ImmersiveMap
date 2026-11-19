@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Tracks active user-interaction sources of a single map view.
 /// Updates render-loop interaction activity and sends camera interaction notifications.

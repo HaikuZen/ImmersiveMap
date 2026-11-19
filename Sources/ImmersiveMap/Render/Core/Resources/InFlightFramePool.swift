@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 /// Its slots are read and written only under its lock, so a frame's slot
 /// is released from the command buffer's completion, on any thread.

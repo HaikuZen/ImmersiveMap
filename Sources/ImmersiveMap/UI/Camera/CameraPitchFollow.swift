@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Time-based follower for camera pitch: the gesture sets the target angle instantly, while the
 /// actual pitch converges to it exponentially each frame using a half-life. Removes tilt jerkiness

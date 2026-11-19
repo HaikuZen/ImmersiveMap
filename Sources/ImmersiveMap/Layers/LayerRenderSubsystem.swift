@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// The `Layers` folder: the layers of the app's own data drawn over the map
@@ -34,9 +34,9 @@ final class LayerRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvide
     private let source: LayerRenderSource
     private let store: LayerMeshStore
     private let pipeline: LayerPipeline
-    private let depthDisabledState: MTLDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
     /// The frame's layers that draw, each with whether the terrain hides it.
-    private var drawn: [(mesh: LayerMesh, hidesBehindTerrain: Bool)] = []
+    private var drawn: [LayerDrawing.DrawnLayer] = []
 
     /// The camera zoom under which the flat map can show more than one copy
     /// of the world across the view.
@@ -45,7 +45,7 @@ final class LayerRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvide
     init(source: LayerRenderSource,
          store: LayerMeshStore,
          pipeline: LayerPipeline,
-         depthDisabledState: MTLDepthStencilState) {
+         depthDisabledState: any GPUDepthStencilState) {
         self.source = source
         self.store = store
         self.pipeline = pipeline
@@ -101,7 +101,7 @@ final class LayerRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvide
         builder.appLayersEnabled = builder.appLayersEnabled || drawn.isEmpty == false
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .appLayers, drawn.isEmpty == false else { return }
         let surface: LayerPipeline.Surface
         switch frameContext.renderSurfaceMode {
@@ -112,92 +112,20 @@ final class LayerRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvide
             surface = GlobeSphereVertexPath.isPureSphere(renderSurfaceMode: frameContext.renderSurfaceMode,
                                                           transition: globe.transition) ? .sphere : .morph
         }
-
         encoder.pushDebugGroup("layers")
-        var cameraUniform = frameContext.cameraUniform
-        var globe = frameContext.globeRenderUniform
-        var globeFrame = GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: cameraUniform.matrix)
-        encoder.setVertexBytes(&cameraUniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        encoder.setVertexBytes(&globe, length: MemoryLayout<GlobeUniform>.stride, index: 8)
-        encoder.setVertexBytes(&globeFrame, length: MemoryLayout<GlobeFrameConstantsUniform>.stride, index: 10)
+        let cameraUniform = frameContext.cameraUniform
+        let globe = frameContext.globeRenderUniform
+        encoder.setVertexValue(cameraUniform, index: 1)
+        encoder.setVertexValue(globe, index: 8)
+        encoder.setVertexValue(GlobeFrameConstantsUniform.make(globe: globe, cameraMatrix: cameraUniform.matrix), index: 10)
         GlobeLightUniform.bind(GlobeLightUniform.resolve(frameContext: frameContext), encoder: encoder)
         GroundFogUniform.bind(GroundFogUniform.resolve(frameContext: frameContext), encoder: encoder)
-        encoder.setStencilReferenceValue(0)
-        // A zone's triangles are counter-clockwise in render space, as the
-        // ground's: culling the back faces removes the far side of the
-        // planet. A line's and a point's quads are cut there instead.
-        encoder.setFrontFacing(.counterClockwise)
-
-        let placements = chunkPlacements(frameContext: frameContext, surface: surface)
-        let states = pipeline.states(for: surface)
-        for (mesh, hidesBehindTerrain) in drawn {
-            // Each chunk with its draws of this frame, none for a chunk
-            // outside the view.
-            let chunks = mesh.chunks.compactMap { chunk -> (chunk: LayerMeshChunk, draws: [LayerDrawUniform])? in
-                let draws = placements(chunk)
-                return draws.isEmpty ? nil : (chunk, draws)
-            }
-            guard chunks.isEmpty == false else { continue }
-            encoder.setDepthStencilState(hidesBehindTerrain ? pipeline.behindTerrainState : pipeline.overGroundState)
-            if let vertices = mesh.fillVertices, let indices = mesh.fillIndices {
-                encoder.setCullMode(.back)
-                encoder.setRenderPipelineState(states.fill)
-                encoder.setVertexBuffer(vertices, offset: 0, index: 0)
-                for (chunk, draws) in chunks where chunk.fillIndexCount > 0 {
-                    for var draw in draws {
-                        encoder.setVertexBytes(&draw, length: MemoryLayout<LayerDrawUniform>.stride, index: 2)
-                        encoder.drawIndexedPrimitives(type: .triangle,
-                                                      indexCount: chunk.fillIndexCount,
-                                                      indexType: .uint32,
-                                                      indexBuffer: indices,
-                                                      indexBufferOffset: chunk.fillIndexStart * MemoryLayout<UInt32>.stride)
-                    }
-                }
-            }
-            encoder.setCullMode(.none)
-            if let segments = mesh.lineSegments {
-                encoder.setRenderPipelineState(states.line)
-                encoder.setVertexBuffer(segments, offset: 0, index: 0)
-                for (chunk, draws) in chunks where chunk.lineCount > 0 {
-                    for var draw in draws {
-                        encoder.setVertexBytes(&draw, length: MemoryLayout<LayerDrawUniform>.stride, index: 2)
-                        encoder.drawIndexedPrimitives(type: .triangle,
-                                                      indexCount: LayerPipeline.lineTemplate.count,
-                                                      indexType: .uint16,
-                                                      indexBuffer: pipeline.lineTemplateIndices,
-                                                      indexBufferOffset: 0,
-                                                      instanceCount: chunk.lineCount,
-                                                      baseVertex: 0,
-                                                      baseInstance: chunk.lineStart)
-                    }
-                }
-            }
-            if let discs = mesh.discs {
-                encoder.setRenderPipelineState(states.point)
-                encoder.setVertexBuffer(discs, offset: 0, index: 0)
-                // The lines of a single vertex with the lines, then the
-                // points over them.
-                for pass in 0 ..< 2 {
-                    for (chunk, draws) in chunks {
-                        let start = pass == 0 ? chunk.joinStart : chunk.pointStart
-                        let count = pass == 0 ? chunk.joinCount : chunk.pointCount
-                        guard count > 0 else { continue }
-                        for var draw in draws {
-                            encoder.setVertexBytes(&draw, length: MemoryLayout<LayerDrawUniform>.stride, index: 2)
-                            encoder.drawPrimitives(type: .triangle,
-                                                   vertexStart: 0,
-                                                   vertexCount: 6,
-                                                   instanceCount: count,
-                                                   baseInstance: start)
-                        }
-                    }
-                }
-            }
-        }
-
-        encoder.setCullMode(.none)
-        encoder.setFrontFacing(.clockwise)
-        encoder.setDepthStencilState(depthDisabledState)
+        LayerDrawing.drawLayers(drawn,
+                                pipeline: pipeline,
+                                surface: surface,
+                                placements: chunkPlacements(frameContext: frameContext, surface: surface),
+                                depthDisabledState: depthDisabledState,
+                                encoder: encoder)
         encoder.popDebugGroup()
     }
 

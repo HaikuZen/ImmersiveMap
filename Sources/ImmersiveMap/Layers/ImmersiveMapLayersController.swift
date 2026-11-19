@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Holds the app's own data a map draws, and is the app's handle to change
 /// it. The data is registered once, under a name, and the layers say which

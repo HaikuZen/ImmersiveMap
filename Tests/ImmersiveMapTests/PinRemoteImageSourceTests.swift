@@ -33,7 +33,7 @@ final class PinRemoteImageSourceTests: XCTestCase {
         let loadedImage = try Self.makeTestImage(width: 2, height: 1)
         let loadStarted = expectation(description: "remote image load started")
         let updatePublished = expectation(description: "remote image update published")
-        let loadContinuation = Mutex<CheckedContinuation<CGImage, Never>?>(nil)
+        let loadContinuation = Mutex<CheckedContinuation<PinImage, Never>?>(nil)
 
         let controller = ImmersiveMapPinsController(imageLoader: { requestedURL in
             XCTAssertEqual(requestedURL, url)
@@ -56,7 +56,7 @@ final class PinRemoteImageSourceTests: XCTestCase {
         controller.setChangeHandler({
             updatePublished.fulfill()
         }, owner: self)
-        loadContinuation.withLock { $0 }?.resume(returning: loadedImage)
+        loadContinuation.withLock { $0 }?.resume(returning: PinImage(cgImage: loadedImage))
 
         await fulfillment(of: [updatePublished], timeout: Self.expectationTimeout)
         let updatedSnapshot = try XCTUnwrap(controller.consumeSnapshot())

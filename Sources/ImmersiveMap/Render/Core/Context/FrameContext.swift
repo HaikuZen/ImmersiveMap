@@ -6,10 +6,8 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
-import Foundation
-import Metal
-import QuartzCore
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 struct FrameContext {
@@ -28,7 +26,9 @@ struct FrameContext {
     let mapCameraState: ImmersiveMapCameraState
     let resolvedPresentation: ResolvedPresentationState
     let visibleContent: VisibleContentState
-    let commandBuffer: MTLCommandBuffer?
+    /// The frame's command buffer. The features still on Metal read it as
+    /// Metal's (`FrameContext+Metal.swift`).
+    let gpuCommandBuffer: (any GPUCommandBuffer)?
     let services: FrameContextServices
     let sharedState: FrameContextSharedState
     let diagnostics: FrameDiagnostics
@@ -147,7 +147,7 @@ struct FrameContext {
          viewport: SIMD2<Float>,
          cameraMatrices: FrameCameraMatrices,
          cameraEye: SIMD3<Float>,
-         commandBuffer: MTLCommandBuffer?,
+         gpuCommandBuffer: (any GPUCommandBuffer)?,
          services: FrameContextServices,
          mapCameraState: ImmersiveMapCameraState = .default,
          animatedZoom: Double? = nil,
@@ -179,7 +179,7 @@ struct FrameContext {
         self.terrainSurroundings = terrainSurroundings
         self.resolvedPresentation = fallbackResolvedPresentation
         self.visibleContent = visibleContent
-        self.commandBuffer = commandBuffer
+        self.gpuCommandBuffer = gpuCommandBuffer
         self.services = services
         self.sharedState = sharedState
         self.shadowFrameState = shadowFrameState

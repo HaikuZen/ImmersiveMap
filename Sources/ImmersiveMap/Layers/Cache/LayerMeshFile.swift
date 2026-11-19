@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A layer's mesh as it is kept on disk (`LayerMeshDiskCache`): a header,
 /// the table of its chunks, and its five blocks exactly as the GPU takes

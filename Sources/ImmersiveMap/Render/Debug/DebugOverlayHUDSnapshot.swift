@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import simd
 
 package struct DebugOverlayCoordinateLines: Equatable {
@@ -96,7 +96,7 @@ package struct DebugOverlayHUDSnapshot: Equatable {
             return nil
         }
 
-        let coordinateLines = DebugOverlayRenderer.makeCoordinateTextLines(zoom: zoom,
+        let coordinateLines = DebugOverlayTextLines.makeCoordinateTextLines(zoom: zoom,
                                                                            latitude: latitude,
                                                                            longitude: longitude)
         let tileLoadingStatus = content.contains(.tiles) ? tileLoadingStatus : nil
@@ -104,7 +104,7 @@ package struct DebugOverlayHUDSnapshot: Equatable {
             coordinateLines: DebugOverlayCoordinateLines(zoom: coordinateLines.zoom,
                                                         latLon: coordinateLines.latLon),
             diagnosticsLines: content.contains(.stats)
-                ? DebugOverlayRenderer.makeOverlayDiagnosticsTextLines(cameraDebugLines: cameraDebugLines,
+                ? DebugOverlayTextLines.makeOverlayDiagnosticsTextLines(cameraDebugLines: cameraDebugLines,
                                                                        diagnostics: diagnostics)
                 : [],
             tileLoadingStatusLines: tileLoadingStatus?.lines ?? [],
@@ -248,6 +248,6 @@ package struct DebugOverlayHUDSnapshot: Equatable {
     }
 
     private static func format(_ value: Double) -> String {
-        value.formatted(.number.precision(.fractionLength(2)))
+        String(fixed: value, fractionDigits: 2)
     }
 }

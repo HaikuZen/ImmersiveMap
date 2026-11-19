@@ -1,13 +1,11 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
-import MetalKit
+import ImmersiveMapGPU
 import simd
 
 enum RendererDebugOverlayDrawer {
-    static func draw(renderEncoder: MTLRenderCommandEncoder,
+    static func draw(renderEncoder: any GPURenderEncoder,
                      frameContext: FrameContext,
                      polygonPipeline: PolygonsPipeline,
                      debugOverlayRenderer: DebugOverlayRenderer,

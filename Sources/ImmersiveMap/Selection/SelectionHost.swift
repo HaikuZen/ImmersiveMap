@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
+import PortableFoundation
 
 /// What the selection needs of the map view it serves: the view's scale,
 /// and a frame when the selection changed what the map shows. The view's

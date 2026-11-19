@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// Projects SwiftUI annotation coordinates into the frame's screen points with the
 /// same formulas as the render's vertex path (GeoScreenProjectionMath).
@@ -49,7 +49,7 @@ final class AnnotationRenderSubsystem: RenderSubsystem {
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer _: RenderLayer, encoder _: MTLRenderCommandEncoder, frameContext _: FrameContext) {}
+    func encode(layer _: RenderLayer, encoder _: any GPURenderEncoder, frameContext _: FrameContext) {}
 
     func handleMemoryWarning() {}
 

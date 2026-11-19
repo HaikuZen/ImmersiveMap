@@ -1,34 +1,34 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 /// A layer on the GPU: its buffers and the chunks that draw from them
 /// (`LayerMeshBuilder`). Immutable after creation, so it is shared between
 /// the build that makes it and the frames that draw it (`@unchecked
-/// Sendable`: Metal objects are safe to use from any thread, and nothing
-/// here changes).
+/// Sendable`: the GPU's buffers are safe to use from any thread, and
+/// nothing here changes).
 final class LayerMesh: @unchecked Sendable {
-    /// How long a load from a mesh's file may take before the file is read
-    /// the ordinary way instead.
-    static let fileLoadTimeout: TimeInterval = 5
+    /// Loads blocks of a mesh's file straight into their buffers, each
+    /// buffer the bytes of its range of the file: a platform's fast path
+    /// (Metal's IO queue, `metalFileLoader(device:)`). True when every
+    /// block arrived, false to have the file read the ordinary way.
+    typealias FileLoader = @Sendable (_ blocks: [(buffer: any GPUBuffer, range: Range<Int>)], _ fileURL: URL) async -> Bool
 
     let key: LayerMeshKey
-    let fillVertices: MTLBuffer?
-    let fillIndices: MTLBuffer?
-    let lineSegments: MTLBuffer?
-    let discs: MTLBuffer?
+    let fillVertices: (any GPUBuffer)?
+    let fillIndices: (any GPUBuffer)?
+    let lineSegments: (any GPUBuffer)?
+    let discs: (any GPUBuffer)?
     let chunks: [LayerMeshChunk]
 
     private static let labels = ["Layer fill vertices", "Layer fill indices", "Layer line segments", "Layer discs"]
 
-    init?(key: LayerMeshKey, data: LayerMeshData, device: MTLDevice) {
-        func buffer<Element>(_ values: [Element], label: String) -> MTLBuffer? {
-            guard values.isEmpty == false else { return nil }
-            let buffer = values.withUnsafeBytes { bytes in
-                device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
-            }
+    init?(key: LayerMeshKey, data: LayerMeshData, device: any GPUDevice) {
+        func buffer<Element>(_ values: [Element], label: String) -> (any GPUBuffer)? {
+            // None for no values (`makeBuffer(_:storage:)`).
+            let buffer = device.makeBuffer(values, storage: .shared)
             buffer?.label = label
             return buffer
         }
@@ -44,7 +44,7 @@ final class LayerMesh: @unchecked Sendable {
         guard complete else { return nil }
     }
 
-    private init(key: LayerMeshKey, chunks: [LayerMeshChunk], buffers: [MTLBuffer?]) {
+    private init(key: LayerMeshKey, chunks: [LayerMeshChunk], buffers: [(any GPUBuffer)?]) {
         self.key = key
         self.chunks = chunks
         fillVertices = buffers[0]
@@ -54,89 +54,41 @@ final class LayerMesh: @unchecked Sendable {
     }
 
     /// A mesh from its file on disk (`LayerMeshFile`): the blocks go
-    /// straight from the file into the buffers through the device's IO
-    /// queue, and are read the ordinary way where there is no such queue
-    /// (the simulator, a device without Metal 3) or it does not answer.
-    /// Nil for a file that is not a mesh of this version.
-    static func load(key: LayerMeshKey, fileURL: URL, device: MTLDevice) async -> LayerMesh? {
-        guard let handle = try? FileHandle(forReadingFrom: fileURL) else { return nil }
-        defer { try? handle.close() }
-        guard let fileSize = (try? handle.seekToEnd()).map(Int.init),
-              (try? handle.seek(toOffset: 0)) != nil,
-              let header = try? handle.read(upToCount: LayerMeshFile.headerSize),
-              let prefixSize = LayerMeshFile.prefixSize(ofHeader: header),
-              prefixSize <= fileSize,
-              (try? handle.seek(toOffset: 0)) != nil,
-              let prefix = try? handle.read(upToCount: prefixSize),
-              let contents = LayerMeshFile.decode(header: prefix, fileSize: fileSize) else {
+    /// straight from the file into the buffers through the platform's
+    /// loader where it has one (Metal's IO queue) and it answers, and are
+    /// copied from the file otherwise. The file is mapped, not read, so the
+    /// fast path does not pull it through memory. Nil for a file that is not
+    /// a mesh of this version.
+    static func load(key: LayerMeshKey, fileURL: URL, device: any GPUDevice, fileLoader: FileLoader?) async -> LayerMesh? {
+        guard let file = try? Data(contentsOf: fileURL, options: .alwaysMapped),
+              let prefixSize = LayerMeshFile.prefixSize(ofHeader: file.prefix(LayerMeshFile.headerSize)),
+              prefixSize <= file.count,
+              let contents = LayerMeshFile.decode(header: file.prefix(prefixSize), fileSize: file.count) else {
             return nil
         }
 
-        var buffers: [MTLBuffer?] = []
+        var buffers: [(any GPUBuffer)?] = []
+        var blocks: [(buffer: any GPUBuffer, range: Range<Int>)] = []
         for (range, label) in zip(contents.blocks, labels) {
             guard range.isEmpty == false else {
                 buffers.append(nil)
                 continue
             }
-            guard let buffer = device.makeBuffer(length: range.count, options: .storageModeShared) else { return nil }
+            guard range.upperBound <= file.count,
+                  let buffer = device.makeBuffer(length: range.count, storage: .shared) else { return nil }
             buffer.label = label
             buffers.append(buffer)
+            blocks.append((buffer, range))
         }
 
-        var loaded = false
-#if !targetEnvironment(simulator)
-        if let queue = MetalIOCommandQueues.shared(for: device) {
-            loaded = await load(contents.blocks, into: buffers, from: fileURL, device: device, queue: queue)
-        }
-#endif
+        let loaded = await fileLoader?(blocks, fileURL) ?? false
         if loaded == false {
-            for (range, buffer) in zip(contents.blocks, buffers) {
-                guard let buffer else { continue }
-                guard (try? handle.seek(toOffset: UInt64(range.lowerBound))) != nil,
-                      let bytes = try? handle.read(upToCount: range.count), bytes.count == range.count else {
-                    return nil
-                }
-                bytes.withUnsafeBytes { buffer.contents().copyMemory(from: $0.baseAddress!, byteCount: range.count) }
+            for (buffer, range) in blocks {
+                file[range].withUnsafeBytes { buffer.contents().copyMemory(from: $0.baseAddress!, byteCount: range.count) }
             }
         }
         return LayerMesh(key: key, chunks: contents.chunks, buffers: buffers)
     }
-
-#if !targetEnvironment(simulator)
-    /// The blocks loaded from the file by the device's IO queue, in one
-    /// command buffer. False when the file could not be opened, the load
-    /// ended in error, or the queue did not answer in time.
-    private static func load(_ blocks: [Range<Int>],
-                             into buffers: [MTLBuffer?],
-                             from fileURL: URL,
-                             device: MTLDevice,
-                             queue: MTLIOCommandQueue) async -> Bool {
-        guard let fileHandle = try? device.makeIOFileHandle(url: fileURL) else {
-            return false
-        }
-        let commandBuffer = queue.makeCommandBuffer()
-        for (range, buffer) in zip(blocks, buffers) {
-            guard let buffer else { continue }
-            commandBuffer.load(buffer,
-                               offset: 0,
-                               size: range.count,
-                               sourceHandle: fileHandle,
-                               sourceHandleOffset: range.lowerBound)
-        }
-        let completed: Bool? = await CallbackTimeout.await(seconds: fileLoadTimeout) { complete in
-            commandBuffer.addCompletedHandler { completedBuffer in
-                complete(completedBuffer.status == .complete)
-            }
-            commandBuffer.commit()
-        }
-        if completed == nil {
-            // Best effort: the ordinary read that follows writes the same
-            // bytes a late answer would.
-            commandBuffer.tryCancel()
-        }
-        return completed == true
-    }
-#endif
 }
 
 /// Holds the layers of the app's data on the GPU for the frames. A layer
@@ -151,7 +103,8 @@ final class LayerMesh: @unchecked Sendable {
 /// (`releaseUndrawn`). The state is serialized by a queue: the frames read
 /// it on the main thread, the builds write it from theirs.
 final class LayerMeshStore: @unchecked Sendable {
-    private let device: MTLDevice
+    private let device: any GPUDevice
+    private let fileLoader: LayerMesh.FileLoader?
     private let queue = DispatchQueue(label: "ImmersiveMap.LayerMeshStore")
     private var meshes: [String: LayerMesh] = [:]
     /// The key each layer is being prepared for, from the disk or from
@@ -165,8 +118,11 @@ final class LayerMeshStore: @unchecked Sendable {
     private weak var library: LayerSourceLibrary?
     weak var eventSink: RenderFrameEventSink?
 
-    init(device: MTLDevice) {
+    /// `fileLoader` is the platform's fast path for a mesh on disk
+    /// (`LayerMesh.FileLoader`), none where it has no such path.
+    init(device: any GPUDevice, fileLoader: LayerMesh.FileLoader? = nil) {
         self.device = device
+        self.fileLoader = fileLoader
     }
 
     deinit {
@@ -287,11 +243,12 @@ final class LayerMeshStore: @unchecked Sendable {
                          identity: LayerSourceIdentity,
                          cache: LayerMeshDiskCache?) {
         let device = device
+        let fileLoader = fileLoader
         Task.detached(priority: .userInitiated) { [weak self] in
             var mesh: LayerMesh?
             if let cache, let name = cache.entryName(identity: identity, key: key),
                let meshFile = cache.existingFile(named: name) {
-                mesh = await LayerMesh.load(key: key, fileURL: meshFile, device: device)
+                mesh = await LayerMesh.load(key: key, fileURL: meshFile, device: device, fileLoader: fileLoader)
                 if mesh == nil {
                     // Not a mesh of this version, or cut short: it is
                     // written anew by the build that follows.

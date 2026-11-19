@@ -1,12 +1,12 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
+import ImmersiveMapGPU
+
 //
 //  DebugOverlayRenderSubsystem.swift
 //  ImmersiveMap
 //
-
-import Metal
 
 final class DebugOverlayRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
     let name: String = "DebugOverlay"
@@ -37,7 +37,7 @@ final class DebugOverlayRenderSubsystem: RenderSubsystem, RenderPassAvailability
 
     func prepareGPU(frameContext: FrameContext, resourceRegistry: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .debugOverlay else { return }
         RendererDebugOverlayDrawer.draw(renderEncoder: encoder,
                                         frameContext: frameContext,
@@ -50,4 +50,26 @@ final class DebugOverlayRenderSubsystem: RenderSubsystem, RenderPassAvailability
     func handleMemoryWarning() {}
 
     func evict() {}
+}
+
+enum RenderDebugOverlayPolicy {
+    static func shouldEncode(_ settings: ImmersiveMapSettings.DebugSettings,
+                             controls: DebugOverlayControlSnapshot) -> Bool {
+        guard settings.enableDebugPanel else {
+            return false
+        }
+        guard controls.axesEnabled
+            || controls.tileLayersEnabled
+            || controls.tileGridEnabled
+            || controls.roadLabelTilesEnabled
+            || controls.baseLabelBoundsEnabled
+            || controls.roadLabelBoundsEnabled else {
+            return false
+        }
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
 }

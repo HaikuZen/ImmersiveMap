@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Source of per-frame scene time (`FrameContext.time`/`deltaTime`) and the
 /// wall date stamped into `FrameContextServices.now` (sun position).

@@ -1,0 +1,66 @@
+# The engine's files that build on Apple's platforms alone, one path a line,
+# relative to Sources/ImmersiveMap: the files that import an Apple framework
+# outside a `canImport` guard, the shader and resource folders, UI/, the
+# host of each Apple platform, and the files of Pins/ whose shapes, badges
+# and drawing are still Core Graphics' and Metal's, with the files that need
+# them. The portable package leaves them out and
+# compiles every other file of the engine. PortableEngineLayoutTests holds
+# this list to the sources' own imports, so a file that gains or loses an
+# Apple import changes it here, in the same change, where a review sees it.
+Globe/Shaders
+Horizon/Shaders
+Labels/POI/PoiSpriteAtlas.swift
+Labels/Shaders
+Layers/LayerMesh+Metal.swift
+Layers/Shaders
+Pins/PinImageFactory.swift
+Pins/PinImageLoader.swift
+Pins/Resources/PinSDFResource+Metal.swift
+Pins/Resources/pin_sdf.json
+Pins/Resources/pin_sdf.png
+Pins/Shaders/PinBeam.metal
+Pins/Shaders/PinBeam.wgsl
+Pins/Shaders/PinCommon.h
+Pins/Shaders/PinCommon.wgsl
+Pins/Shaders/PinRender.metal
+Pins/Shaders/PinRender.wgsl
+Pins/Textures/PinShapeDistanceField+CoreGraphics.swift
+Pins/Textures/PinTextureRasterizer+CoreGraphics.swift
+Render/Bootstrap/RendererBootstrap.swift
+Render/Bootstrap/SharedRenderResources.swift
+Render/Core/Context/FrameContext+Metal.swift
+Render/Core/Contracts/FrameRenderTarget+Metal.swift
+Render/Core/RenderHost+Metal.swift
+Render/Core/Resources/RenderMetalContext.swift
+Render/Debug/Shaders
+Render/Export/OffscreenTextureImageReadback.swift
+Render/Export/RenderFrameOffscreenRequest.swift
+Render/Export/VideoExportPixelBufferTextureCache.swift
+Render/Metal/Buffers/DynamicMetalBuffer.swift
+Render/Metal/Buffers/FrameSlottedDynamicMetalBuffer.swift
+Render/PostProcessing/Shaders
+Render/RenderFrameEngine+Metal.swift
+Render/Shaders
+SceneModels/ModelTiles/ModelTileMesh+Metal.swift
+SceneModels/SceneModelAssetLoader.swift
+SceneModels/Shaders
+Shadows/Shaders
+Shadows/ShadowCascadeAtlas+Metal.swift
+Starfield/Shaders
+Text/Resources
+Text/Shaders
+Tile/Buffers/TileBufferView+Metal.swift
+Tile/Buffers/TileBuffers+Metal.swift
+Tile/Overview/Resources
+Tile/Relief/Lifts/GroundRelief+Metal.swift
+Tile/Relief/Shaders
+Tile/Relief/Store/GroundReliefTile+Metal.swift
+Tile/Shaders
+Tile/Store/MTLIOPreparedTileGeometryTransport.swift
+Tile/Store/MetalTileFactory+Metal.swift
+Tile/Trees/Resources
+Tile/Trees/TreeModelMesh+Metal.swift
+UI
+Utils/MetalIOCommandQueues.swift
+Utils/PlatformGraphics.swift
+VideoExport/VideoExportAssetWriter.swift

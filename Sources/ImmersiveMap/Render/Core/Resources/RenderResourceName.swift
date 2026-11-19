@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 enum RenderResourceName: String {
     case tileVertexBuffer = "TileVertexBuffer"

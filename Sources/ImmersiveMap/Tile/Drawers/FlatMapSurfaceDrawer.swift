@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 import simd
 
 /// A source of the flat ground draw: a tile at one of the world's wrap
@@ -70,7 +70,14 @@ enum FlatMapSurfaceDrawer {
     ///   pass, the depth and the priority tested and nothing written.
     /// - Parameter part: the targets' ground, the stand-ins' ground, or
     ///   what lies on the ground.
-    static func draw(renderEncoder: MTLRenderCommandEncoder,
+    /// - Parameter shadowUniform: the ground shadow's uniform this frame,
+    ///   `.disabled` when the shadow pass did not run
+    ///   (`GroundShadowMaskBinding`).
+    /// - Parameter groundShadowMask: the plane's shadow mask the flat
+    ///   classes read, or its lit fallback.
+    /// - Parameter shadowCascades: the shadow map the relief's variants
+    ///   sample at their raised points, or its depth fallback.
+    static func draw(renderEncoder: any GPURenderEncoder,
                      cameraUniform: CameraUniform,
                      cpuCameraMatrix: matrix_float4x4,
                      cameraZoom: Double,
@@ -78,11 +85,13 @@ enum FlatMapSurfaceDrawer {
                      drawableSizePx: SIMD2<Float>,
                      placeTilesContext: PlaceTilesContext,
                      flatRenderState: FlatRenderState,
-                     groundShadowMask: GroundShadowMaskBinding,
+                     shadowUniform: ShadowUniform,
+                     groundShadowMask: any GPUTexture,
+                     shadowCascades: any GPUTexture,
                      tilePipeline: TilePipeline,
-                     groundOwnerState: MTLDepthStencilState,
-                     tileStencilTestState: MTLDepthStencilState,
-                     roadRankState: MTLDepthStencilState,
+                     groundOwnerState: any GPUDepthStencilState,
+                     tileStencilTestState: any GPUDepthStencilState,
+                     roadRankState: any GPUDepthStencilState,
                      part: Part,
                      isWireframeEnabled: Bool,
                      groundRelief: GroundReliefFrame? = nil,
@@ -99,8 +108,7 @@ enum FlatMapSurfaceDrawer {
         if isWireframeEnabled {
             renderEncoder.setTriangleFillMode(.lines)
         }
-        var cameraUniformValue = cameraUniform
-        var overviewFadeUniform = TileOverviewFadeUniform(
+        let overviewFadeUniform = TileOverviewFadeUniform(
             pixelsPerPoint: pixelsPerPoint,
             cameraZoom: Float(cameraZoom),
             viewportSizePx: drawableSizePx,
@@ -111,25 +119,18 @@ enum FlatMapSurfaceDrawer {
             pointWidthReferenceDepth: pointWidthReferenceDepth ?? screenCentreGroundDepth(cameraMatrix: cpuCameraMatrix),
             cameraMatrix: cpuCameraMatrix
         )
-        var shadowUniformValue = groundShadowMask.uniform
-        renderEncoder.setVertexBytes(&cameraUniformValue, length: MemoryLayout<CameraUniform>.stride, index: 1)
+        renderEncoder.setVertexValue(cameraUniform, index: 1)
         // The vertex stage folds the zoom fade into the colour's alpha, so
         // it reads the same uniform (Tile.metal, buffer 8).
-        renderEncoder.setVertexBytes(&overviewFadeUniform,
-                                     length: MemoryLayout<TileOverviewFadeUniform>.stride,
-                                     index: 8)
-        renderEncoder.setFragmentBytes(&overviewFadeUniform,
-                                       length: MemoryLayout<TileOverviewFadeUniform>.stride,
-                                       index: 0)
-        renderEncoder.setFragmentBytes(&shadowUniformValue,
-                                       length: MemoryLayout<ShadowUniform>.stride,
-                                       index: 3)
+        renderEncoder.setVertexValue(overviewFadeUniform, index: 8)
+        renderEncoder.setFragmentValue(overviewFadeUniform, index: 0)
+        renderEncoder.setFragmentValue(shadowUniform, index: 3)
         // The flat ground pipeline reads the per-pixel ground shadow mask
         // (fragment texture 1) instead of sampling the cascades per layer.
-        renderEncoder.setFragmentTexture(groundShadowMask.texture, index: 1)
+        renderEncoder.setFragmentTexture(groundShadowMask, index: 1)
         // The relief's variants sample the cascades at their raised points
         // (Tile.metal, kSamplesShadowCascades), not the plane's mask.
-        renderEncoder.setFragmentTexture(groundShadowMask.cascades, index: 0)
+        renderEncoder.setFragmentTexture(shadowCascades, index: 0)
 
         // Unique SOURCES, not placements: a tile placed in several slots
         // draws once at full extent, and the tile-priority stencil, which
@@ -228,7 +229,7 @@ enum FlatMapSurfaceDrawer {
         func clearDepthBias() {
             if depthBiased {
                 depthBiased = false
-                renderEncoder.setDepthBias(0, slopeScale: 0, clamp: 0)
+                renderEncoder.setDepthBias(.none)
             }
         }
         func selectPipeline(_ pipeline: GroundPipeline, for source: Source) {
@@ -236,7 +237,7 @@ enum FlatMapSurfaceDrawer {
             let biased = relief != nil && pipeline != .opaqueFills
             if biased != depthBiased {
                 depthBiased = biased
-                renderEncoder.setDepthBias(biased ? -1 : 0, slopeScale: biased ? -1 : 0, clamp: 0)
+                renderEncoder.setDepthBias(biased ? GPUDepthBias(constant: -1, slopeScale: -1, clamp: 0) : .none)
             }
             guard let relief, let groundRelief else {
                 selectPipeline(pipeline)
@@ -368,15 +369,15 @@ enum FlatMapSurfaceDrawer {
         func drawRoad(_ roadDraw: (source: Int, layer: TileBuffers.GeometryLayer, band: Int, pass: RoadLayerPass),
                       pipeline: GroundPipeline,
                       indexRange: Range<Int>,
-                      primitiveType: MTLPrimitiveType = .triangle) {
+                      primitiveType: GPUPrimitiveTopology = .triangle) {
             let source = linedSources[roadDraw.source]
             selectPipeline(pipeline, for: source)
             if pipeline == .roadBlended {
                 // The blended road variant's alpha scale (Tile.metal,
                 // buffer 11): one for a body, the edge lines' share for
                 // them.
-                var alphaScale: Float = primitiveType == .line ? roadEdgeLineAlpha : 1
-                renderEncoder.setFragmentBytes(&alphaScale, length: MemoryLayout<Float>.stride, index: 11)
+                let alphaScale: Float = primitiveType == .line ? roadEdgeLineAlpha : 1
+                renderEncoder.setFragmentValue(alphaScale, index: 11)
             }
             drawFlatGeometryLayer(renderEncoder: renderEncoder,
                                   buffers: roadDraw.layer,
@@ -456,7 +457,7 @@ enum FlatMapSurfaceDrawer {
     /// by at the tile's latitude, worked out here once for the tile, the
     /// frame's datum (`GroundReliefFrame.datumMetres`) and the frame's
     /// strength.
-    private static func drawFlatGeometryLayer(renderEncoder: MTLRenderCommandEncoder,
+    private static func drawFlatGeometryLayer(renderEncoder: any GPURenderEncoder,
                                               buffers: TileBuffers.GeometryLayer,
                                               tile: Tile,
                                               worldWrap: Int8,
@@ -469,7 +470,7 @@ enum FlatMapSurfaceDrawer {
                                               rankStep: Float = GlobeSurfaceDepthRank.layerDepthStep,
                                               runFilter: ((GroundStyleRun) -> Bool)? = nil,
                                               indexRange: Range<Int>? = nil,
-                                              primitiveType: MTLPrimitiveType = .triangle) {
+                                              primitiveType: GPUPrimitiveTopology = .triangle) {
         let originAndSize = ImmersiveMapProjection.flatTileOriginAndSize(x: tile.x,
                                                                          y: tile.y,
                                                                          z: tile.z,
@@ -501,51 +502,48 @@ enum FlatMapSurfaceDrawer {
               let styleZoomFade = buffers.styleZoomFade,
               let lineStyles = buffers.lineStyles else { return }
 
-        renderEncoder.setVertexBuffer(vertices.buffer, offset: vertices.offset, index: 0)
-        renderEncoder.setVertexBuffer(styles.buffer, offset: styles.offset, index: 2)
-        renderEncoder.setVertexBuffer(styleZoomFade.buffer, offset: styleZoomFade.offset, index: 4)
-        renderEncoder.setVertexBuffer(lineStyles.buffer, offset: lineStyles.offset, index: 5)
+        renderEncoder.setVertexBuffer(vertices.gpuBuffer, offset: vertices.offset, index: 0)
+        renderEncoder.setVertexBuffer(styles.gpuBuffer, offset: styles.offset, index: 2)
+        renderEncoder.setVertexBuffer(styleZoomFade.gpuBuffer, offset: styleZoomFade.offset, index: 4)
+        renderEncoder.setVertexBuffer(lineStyles.gpuBuffer, offset: lineStyles.offset, index: 5)
         // The lines-class fragment resolves the style by index (the fills
         // fragment never reads these slots).
-        renderEncoder.setFragmentBuffer(styles.buffer, offset: styles.offset, index: 5)
-        renderEncoder.setFragmentBuffer(styleZoomFade.buffer, offset: styleZoomFade.offset, index: 6)
-        renderEncoder.setFragmentBuffer(lineStyles.buffer, offset: lineStyles.offset, index: 7)
+        renderEncoder.setFragmentBuffer(styles.gpuBuffer, offset: styles.offset, index: 5)
+        renderEncoder.setFragmentBuffer(styleZoomFade.gpuBuffer, offset: styleZoomFade.offset, index: 6)
+        renderEncoder.setFragmentBuffer(lineStyles.gpuBuffer, offset: lineStyles.offset, index: 7)
         // The group's place in the rank-depth band (Tile.metal, buffer 7).
-        var depthBand = FlatDepthBand(offset: bandOffset, rankStep: rankStep)
-        renderEncoder.setVertexBytes(&depthBand, length: MemoryLayout<FlatDepthBand>.stride, index: 7)
+        renderEncoder.setVertexValue(FlatDepthBand(offset: bandOffset, rankStep: rankStep), index: 7)
 
         // Anchors point-dashed patterns to the geometry: the scale depends on
         // the source tile's world size and the viewport, never on the live
         // camera, so dashes hold still under camera motion.
-        var lineDashUniform = LineDashUniform(
+        let lineDashUniform = LineDashUniform(
             unitsPerPoint: pixelsPerPoint * LineDashNominalScale.unitsPerPixel(
                 sourceTileWorldSize: originAndSize.z,
                 drawableHeightPx: drawableHeightPx
             )
         )
-        renderEncoder.setFragmentBytes(&lineDashUniform,
-                                       length: MemoryLayout<LineDashUniform>.stride,
-                                       index: 4)
+        renderEncoder.setFragmentValue(lineDashUniform, index: 4)
 
-        var modelMatrix = Matrix.translationMatrix(
+        let modelMatrix = Matrix.translationMatrix(
             x: originAndSize.x,
             y: originAndSize.y,
             z: 0
         ) * Matrix.scaleMatrix(sx: scale, sy: scale, sz: 1)
-        renderEncoder.setVertexBytes(&modelMatrix, length: MemoryLayout<matrix_float4x4>.stride, index: 3)
+        renderEncoder.setVertexValue(modelMatrix, index: 3)
 
-        let indexByteWidth = buffers.indexType == .uint16 ? 2 : 4
+        let indexByteWidth = buffers.gpuIndexType.byteCount
         // The tile-priority stencil value, the source's zoom
         // (TileSourceStencilPriority): every pass tests equal to it,
         // against the planner's marks. No slot clip: a stand-in draws at
         // full extent and paints the ground marked for it.
-        renderEncoder.setStencilReferenceValue(stencilReference)
+        renderEncoder.setStencilReference(stencilReference)
         for span in visibleSpans {
-            renderEncoder.drawIndexedPrimitives(type: primitiveType,
-                                                indexCount: span.count,
-                                                indexType: buffers.indexType,
-                                                indexBuffer: indices.buffer,
-                                                indexBufferOffset: indices.offset + span.start * indexByteWidth)
+            renderEncoder.drawIndexed(primitiveType,
+                                      indexCount: span.count,
+                                      indexType: buffers.gpuIndexType,
+                                      indexBuffer: indices.gpuBuffer,
+                                      indexBufferOffset: indices.offset + span.start * indexByteWidth)
         }
     }
 

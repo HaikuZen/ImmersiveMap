@@ -28,21 +28,21 @@ final class SharedRenderResourcesTests: XCTestCase {
         // The heavyweight resources must be the very same objects.
         XCTAssertTrue(first.textRenderer === second.textRenderer,
                       "Text atlases and glyph tables must not be rebuilt per view")
-        XCTAssertTrue(first.poiSpriteAtlas === second.poiSpriteAtlas)
+        XCTAssertTrue(first.poiSpriteTexture === second.poiSpriteTexture)
         XCTAssertTrue(first.tilePipeline === second.tilePipeline)
         XCTAssertTrue(first.globeVectorSurfacePipeline === second.globeVectorSurfacePipeline)
         XCTAssertTrue(first.extrudedTilePipeline === second.extrudedTilePipeline)
         XCTAssertTrue(first.sceneModelPipeline === second.sceneModelPipeline)
         XCTAssertTrue(first.shadowFallbackTexture === second.shadowFallbackTexture)
         XCTAssertTrue(first.extrudedDepthState === second.extrudedDepthState)
-        XCTAssertTrue(first.metalContext.library === second.metalContext.library)
+        // The one device, which carries the one shader library.
+        XCTAssertTrue(first.gpuDevice === second.gpuDevice)
 
         // Mutable state must stay per view.
         XCTAssertFalse(first.tileRenderStore === second.tileRenderStore)
         XCTAssertFalse(first.baseLabelCache === second.baseLabelCache)
-        XCTAssertFalse(first.pinsRenderer === second.pinsRenderer)
         XCTAssertFalse(first.starfieldRenderer === second.starfieldRenderer)
-        XCTAssertFalse(first.metalContext.commandQueue === second.metalContext.commandQueue)
+        XCTAssertFalse(first.gpuCommandQueue === second.gpuCommandQueue)
     }
 
     private final class StubPinSource: PinRenderSource {
@@ -63,16 +63,19 @@ final class SharedRenderResourcesTests: XCTestCase {
         // the transport: with the shipped settings this reaches the hosted
         // tile service before a frame is asked for.
         let settings = FixtureTiles.tilelessSettings()
-        return try RenderPersistentContext(layer: CAMetalLayer(),
-                                           pinSource: StubPinSource(),
-                                           annotationSource: StubAnnotationSource(),
-                                           sceneModelSource: StubSceneModelSource(),
-                                           layerSource: FixedLayerRenderSource(),
-                                           styleRuntime: MapStyleRuntime(settings: settings),
-                                           config: settings,
-                                           eventSink: VideoExportRenderEventSink(),
-                                           tileTraceRecorder: TileTraceRecorder(),
-                                           baseLabelTraceRecorder: BaseLabelTraceRecorder())
+        let shared = try SharedRenderResources.shared(sampleCount: settings.postProcessing.multisampleCount)
+        return RenderPersistentContext(host: .metal(layer: CAMetalLayer(),
+                                                    shared: shared,
+                                                    pinSource: StubPinSource(),
+                                                    config: settings),
+                                       annotationSource: StubAnnotationSource(),
+                                       sceneModelSource: StubSceneModelSource(),
+                                       layerSource: FixedLayerRenderSource(),
+                                       styleRuntime: MapStyleRuntime(settings: settings),
+                                       config: settings,
+                                       eventSink: VideoExportRenderEventSink(),
+                                       tileTraceRecorder: TileTraceRecorder(),
+                                       baseLabelTraceRecorder: BaseLabelTraceRecorder())
     }
 
     private func skipUnlessMetalAvailable() throws {

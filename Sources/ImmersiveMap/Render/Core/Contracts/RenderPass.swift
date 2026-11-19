@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 enum RenderLayer: String, CaseIterable {
     /// The casters of the shadow map's near window, in its own depth-only

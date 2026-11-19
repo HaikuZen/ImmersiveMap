@@ -1,7 +1,8 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 import ModelTileFormat
 import simd
 
@@ -44,11 +45,11 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
 
     private let store: ModelTileStore?
     private let pipeline: ModelTilePipeline
-    private let extrudedDepthState: MTLDepthStencilState
-    private let surfaceMaskState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
-    private let shadowMapTextureProvider: () -> MTLTexture?
-    private let shadowFallbackTexture: MTLTexture
+    private let extrudedDepthState: any GPUDepthStencilState
+    private let surfaceMaskState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
+    private let shadowMapTextureProvider: () -> (any GPUTexture)?
+    private let shadowFallbackTexture: any GPUTexture
     private var drawItems: [ModelTileDrawItem] = []
     private var shadowCasterItems: [ModelTileDrawItem] = []
     /// `ModelArchiveSettings.minimumZoom`: the models draw from it, each
@@ -63,11 +64,11 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
     /// does nothing.
     init(store: ModelTileStore?,
          pipeline: ModelTilePipeline,
-         extrudedDepthState: MTLDepthStencilState,
-         surfaceMaskState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
-         shadowMapTextureProvider: @escaping () -> MTLTexture?,
-         shadowFallbackTexture: MTLTexture,
+         extrudedDepthState: any GPUDepthStencilState,
+         surfaceMaskState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState,
+         shadowMapTextureProvider: @escaping () -> (any GPUTexture)?,
+         shadowFallbackTexture: any GPUTexture,
          minimumZoom: Double = 0,
          riseSeconds: TimeInterval = 0) {
         self.store = store
@@ -235,7 +236,7 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
 
     func prepareGPU(frameContext _: FrameContext, resourceRegistry _: RenderResourceRegistry) {}
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         switch layer {
         case .sceneModels:
             guard drawItems.isEmpty == false else { return }
@@ -249,7 +250,10 @@ final class ModelTileRenderSubsystem: RenderSubsystem, RenderPassAvailabilityPro
             let depthBias = frameContext.services.settings.modelArchive.depthBias(atZoom: frameContext.planningZoom)
             ModelTileDrawer.draw(renderEncoder: encoder,
                                  cameraUniform: frameContext.cameraUniform,
-                                 shadowBinding: shadowBinding,
+                                 shadowUniform: shadowBinding.uniform,
+                                 // The render core's shadow map or its
+                                 // fallback, both in the shadow map's format.
+                                 shadowMap: shadowBinding.texture,
                                  items: drawItems,
                                  depthBias: depthBias,
                                  pipeline: pipeline,

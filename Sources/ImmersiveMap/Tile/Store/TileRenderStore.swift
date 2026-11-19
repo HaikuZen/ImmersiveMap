@@ -1,13 +1,23 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import MetalKit
+import ImmersiveMapGPU
+import PortableFoundation
+
+/// A backend's tile geometry kept in files and loaded straight into GPU
+/// memory: the transport that writes the file entries and the loader that
+/// reads them, which go together (Metal's IO queue,
+/// `TileFileGeometry.metal(device:compressionEnabled:)`). Without it the
+/// tiles are cached inline.
+struct TileFileGeometry {
+    let transport: any PreparedTileGeometryTransporting
+    let load: MetalTileFactory.FileBlobLoader
+}
 
 /// Thread-safe (`@unchecked Sendable`): references are assigned during wiring
 /// before loads start, `workingSet` is internally synchronized and mutated
 /// only through main-actor hops.
-final class TileRenderStore: @unchecked Sendable {
+final class TileRenderStore: TileMaterializing, @unchecked Sendable {
     struct TileRequestResult {
         let readyTilesCount: Int
         let requestedTilesCount: Int
@@ -23,61 +33,28 @@ final class TileRenderStore: @unchecked Sendable {
 
     init(
         styleRuntime: MapStyleRuntime,
-        metalDevice: MTLDevice,
+        device: any GPUDevice,
+        fileGeometry: TileFileGeometry?,
         textRenderer: TextRenderer,
         config: ImmersiveMapSettings,
         tileTraceRecorder: TileTraceRecorder,
         tileLoadingStatusReporter: TileLoadingStatusReporter?
     ) {
         self.tileTraceRecorder = tileTraceRecorder
-        let parseOptions = TileParseOptions(settings: config)
-        let preparedTileCacheIdentity = PreparedTileCacheIdentity(
-            preparedFormatVersion: PreparedTileDiskCaching.preparedFormatVersion,
-            styleRevision: styleRuntime.preparedTileStyleRevision,
-            tileSourceRevision: PreparedTileCacheIdentity.tileSourceRevision(for: config.tiles.network),
-            textRevision: textRenderer.preparedTileTextRevision,
-            labelLanguage: config.labels.language,
-            labelFallbackPolicy: config.labels.fallbackPolicy,
-            capitalMaximumZoom: UInt32(max(0, config.labels.settlementVisibility.capitalMaximumZoom)),
-            cityMaximumZoom: UInt32(max(0, config.labels.settlementVisibility.cityMaximumZoom)),
-            smallSettlementMaximumZoom: UInt32(max(0, config.labels.settlementVisibility.smallSettlementMaximumZoom)),
-            landmarkMinimumZoom: UInt32(max(0, config.labels.landmarks.minimumZoom)),
-            addTestBorders: config.tiles.parsing.addTestBorders,
-            labelsEnabled: config.labels.isEnabled,
-            groundFlatteningFromTileZoom: parseOptions.groundFlatteningFromTileZoom,
-            groundFlatteningGrid: parseOptions.groundFlatteningGrid,
-            groundFlatteningGridByTileZoomKey: parseOptions.groundFlatteningGridByTileZoomKey,
-            groundReliefEnabled: parseOptions.groundReliefEnabled,
-            buildingMinimumSourceZoom: parseOptions.buildingMinimumSourceZoom,
-            buildingDeepestSourceZoom: parseOptions.buildingDeepestSourceZoom,
-            overviewTilesEnabled: config.tiles.overview.isEnabled,
-            treeMinimumSourceZoom: parseOptions.treeMinimumSourceZoom,
-            treeMaximumPerTile: parseOptions.treeMaximumPerTile
-        )
-        let labelDecisions = TileLabelDecisions(style: styleRuntime.style,
-                                                glyphCoverage: textRenderer.glyphCoverage,
-                                                language: config.labels.language,
-                                                fallbackPolicy: config.labels.fallbackPolicy)
-        let tileParser = TileMvtParser(mapStyle: styleRuntime,
-                                       labelDecisions: labelDecisions,
-                                       options: parseOptions)
-        let textLabelsBuilder = TileTextLabelsBuilder(textRenderer: textRenderer)
-        let roadLabelsBuilder = TileRoadLabelsBuilder(textRenderer: textRenderer)
-        self.preparedDataBuilder = TilePreparedDataBuilder(tileParser: tileParser,
-                                                           textLabelsBuilder: textLabelsBuilder,
-                                                           roadLabelsBuilder: roadLabelsBuilder,
-                                                           surfaceLabelsBuilder: TileSurfaceLabelsBuilder(textRenderer: textRenderer))
-        self.metalTileFactory = MetalTileFactory(metalDevice: metalDevice)
+        let preparedTileCacheIdentity = PreparedTileCacheIdentity(settings: config,
+                                                                  styleRuntime: styleRuntime,
+                                                                  textLayout: textRenderer.layout)
+        self.preparedDataBuilder = TilePreparedDataBuilder(settings: config,
+                                                           styleRuntime: styleRuntime,
+                                                           textLayout: textRenderer.layout)
+        self.metalTileFactory = MetalTileFactory(device: device, fileBlobLoader: fileGeometry?.load)
         workingSet = TileWorkingSetStore(tileTraceRecorder: tileTraceRecorder)
-        // The factory owns the MTLIO capability decision: the transport that
-        // writes file entries is selected only when the queue that loads them
-        // actually exists, so a queue-creation failure degrades to inline
-        // entries instead of a cache no hit can read.
+        // File entries are written only with the loader that reads them
+        // (`TileFileGeometry`), so a backend without one, or a queue that
+        // could not be made, degrades to inline entries instead of a cache
+        // no hit can read.
         let geometryTransport: any PreparedTileGeometryTransporting =
-            metalTileFactory.loadsFileBlobs
-                ? MTLIOPreparedTileGeometryTransport(
-                    compressionEnabled: config.tiles.cache.preparedDiskCompressionEnabled)
-                : InlinePreparedTileGeometryTransport()
+            fileGeometry?.transport ?? InlinePreparedTileGeometryTransport()
         mapNeedsTile = ImmersiveMapNeedsTile(tileRenderStore: self,
                                              config: config,
                                              preparedTileCacheIdentity: preparedTileCacheIdentity,

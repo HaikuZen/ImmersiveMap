@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// Appends little-endian values to a growing byte buffer: how a tile's
 /// header, tables and blocks are written.

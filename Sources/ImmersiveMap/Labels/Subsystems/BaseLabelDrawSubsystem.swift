@@ -6,25 +6,27 @@
 //  ImmersiveMap
 //
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
 
 final class BaseLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
     let name: String = "BaseLabelDraw"
 
     private let textRenderer: TextRenderer
-    private let poiSpriteAtlas: PoiSpriteAtlas
-    private let labelDepthState: MTLDepthStencilState
-    private let depthDisabledState: MTLDepthStencilState
+    /// The POI icons' atlas texture (`PoiSpriteAtlas`, drawn on Apple's
+    /// platforms).
+    private let poiSpriteTexture: any GPUTexture
+    private let labelDepthState: any GPUDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
 
     private(set) var hasRenderableLabels: Bool = false
 
     init(textRenderer: TextRenderer,
-         poiSpriteAtlas: PoiSpriteAtlas,
-         labelDepthState: MTLDepthStencilState,
-         depthDisabledState: MTLDepthStencilState,
-         metalDevice _: MTLDevice) {
+         poiSpriteTexture: any GPUTexture,
+         labelDepthState: any GPUDepthStencilState,
+         depthDisabledState: any GPUDepthStencilState) {
         self.textRenderer = textRenderer
-        self.poiSpriteAtlas = poiSpriteAtlas
+        self.poiSpriteTexture = poiSpriteTexture
         self.labelDepthState = labelDepthState
         self.depthDisabledState = depthDisabledState
     }
@@ -44,7 +46,7 @@ final class BaseLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
         }
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .labels else {
             return
         }
@@ -73,7 +75,7 @@ final class BaseLabelDrawSubsystem: RenderSubsystem, RenderPassAvailabilityProvi
                                            screenMatrix: frameContext.cameraMatrices.screen,
                                            screenScale: frameContext.screenScale,
                                            textRenderer: textRenderer,
-                                           poiSpriteAtlas: poiSpriteAtlas,
+                                           poiSpriteTexture: poiSpriteTexture,
                                            screenPositionsBuffer: screenPositionsBuffer,
                                            labelRuntimeMetaBuffer: labelRuntimeMetaBuffer,
                                            baseLabelsDrawBatches: baseLabelState.baseLabelsDrawBatches,

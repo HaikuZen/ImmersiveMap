@@ -7,42 +7,28 @@
 //    to avoid affecting map depth precision. Tuned via ImmersiveMapSettings.scene.starfield.
 //  - Space itself is the world pass's clear color (ImmersiveMapSettings.scene.space), not a draw.
 
-import MetalKit
+import ImmersiveMapGPU
+import PortableFoundation
 import simd
 
 final class StarfieldRenderer {
-    private struct StarVertex {
-        let position: SIMD3<Float>
-        let size: Float
-        let brightness: Float
-        let temperature: Float
-        let twinklePhase: Float
-        let halo: Float
-    }
-
-    private struct StarfieldParams {
-        let rotation: matrix_float4x4
-        let radiusScale: Float
-        let padding: SIMD3<Float>
-    }
-
     private let pipeline: StarfieldPipeline
     /// Nil when the model is empty (`starCount == 0`) or the buffer allocation failed:
     /// the star pass is then skipped, space (the pass clear color) still shows.
-    private let verticesBuffer: MTLBuffer?
+    private let verticesBuffer: (any GPUBuffer)?
     private let verticesCount: Int
     private let config: ImmersiveMapSettings.StarfieldSettings
     private var cachedAspect: Float?
     private var cachedProjection: matrix_float4x4?
 
-    init(metalDevice: MTLDevice,
+    init(device: any GPUDevice,
          pipeline: StarfieldPipeline,
          config: ImmersiveMapSettings.StarfieldSettings) {
         self.pipeline = pipeline
         self.config = config
 
         let stars = StarfieldModel.makeStars(config: config)
-        let buffer = Self.makeVerticesBuffer(metalDevice: metalDevice, stars: stars)
+        let buffer = Self.makeVerticesBuffer(device: device, stars: stars)
         verticesBuffer = buffer
         verticesCount = buffer == nil ? 0 : stars.count
     }
@@ -54,23 +40,22 @@ final class StarfieldRenderer {
     /// pass instead of force unwrapping and crashing.
     ///
     /// Internal rather than private so the empty case is covered by a behavioral test.
-    static func makeVerticesBuffer(metalDevice: MTLDevice,
-                                   stars: [StarfieldModel.Star]) -> MTLBuffer? {
+    static func makeVerticesBuffer(device: any GPUDevice,
+                                   stars: [StarfieldModel.Star]) -> (any GPUBuffer)? {
         guard !stars.isEmpty else { return nil }
 
         let vertices = stars.map { star in
-            StarVertex(position: star.position,
-                       size: star.size,
-                       brightness: star.brightness,
-                       temperature: star.temperature,
-                       twinklePhase: star.twinklePhase,
-                       halo: star.halo)
+            StarfieldStarVertex(position: star.position,
+                                size: star.size,
+                                brightness: star.brightness,
+                                temperature: star.temperature,
+                                twinklePhase: star.twinklePhase,
+                                halo: star.halo)
         }
-        return metalDevice.makeBuffer(bytes: vertices,
-                                      length: MemoryLayout<StarVertex>.stride * vertices.count)
+        return device.makeBuffer(vertices, storage: .shared)
     }
 
-    func draw(renderEncoder: MTLRenderCommandEncoder,
+    func draw(renderEncoder: any GPURenderEncoder,
               globe: GlobeUniform,
               cameraView: matrix_float4x4,
               cameraEye: SIMD3<Float>,
@@ -91,7 +76,7 @@ final class StarfieldRenderer {
             return
         }
         let starCameraMatrix = starProjection * cameraView
-        var starCameraUniform = CameraUniform(matrix: starCameraMatrix,
+        let starCameraUniform = CameraUniform(matrix: starCameraMatrix,
                                               eye: cameraEye,
                                               padding: 0)
         // The pan rotation, once per frame on the CPU, in the row-vector
@@ -101,18 +86,24 @@ final class StarfieldRenderer {
             panLatitude: globe.panY * Float(ImmersiveMapProjection.maxMercatorLatitude),
             panLongitude: globe.panX * Float.pi
         )
-        var globeData = globe
-        var params = StarfieldParams(rotation: rotation,
-                                     radiusScale: config.radiusScale,
-                                     padding: SIMD3<Float>(repeating: 0))
-        var time = nowTime
+        let params = StarfieldParamsUniform(rotation: rotation,
+                                            radiusScale: config.radiusScale,
+                                            padding: SIMD3<Float>(repeating: 0))
 
         pipeline.selectStarsPipeline(renderEncoder: renderEncoder)
         renderEncoder.setVertexBuffer(verticesBuffer, offset: 0, index: 0)
-        renderEncoder.setVertexBytes(&starCameraUniform, length: MemoryLayout<CameraUniform>.stride, index: 1)
-        renderEncoder.setVertexBytes(&globeData, length: MemoryLayout<GlobeUniform>.stride, index: 2)
-        renderEncoder.setVertexBytes(&params, length: MemoryLayout<StarfieldParams>.stride, index: 3)
-        renderEncoder.setFragmentBytes(&time, length: MemoryLayout<Float>.stride, index: 0)
-        renderEncoder.drawPrimitives(type: .point, vertexStart: 0, vertexCount: verticesCount)
+        renderEncoder.setVertexValue(starCameraUniform, index: 1)
+        renderEncoder.setVertexValue(globe, index: 2)
+        renderEncoder.setVertexValue(params, index: 3)
+        renderEncoder.setFragmentValue(nowTime, index: 0)
+        if pipeline.drawsQuads {
+            // Six vertices a star, the star by the instance: the quad a point
+            // sprite of its size covers.
+            renderEncoder.setVertexValue(StarfieldQuadUniform(viewportSizePx: SIMD2(Float(drawSize.width), Float(drawSize.height))),
+                                         index: 4)
+            renderEncoder.draw(.triangle, vertexStart: 0, vertexCount: 6, instanceCount: verticesCount, baseInstance: 0)
+        } else {
+            renderEncoder.draw(.point, vertexStart: 0, vertexCount: verticesCount)
+        }
     }
 }

@@ -1,40 +1,55 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
+import PortableFoundation
+#if canImport(CoreGraphics)
 import CoreGraphics
-import Foundation
+#endif
 
 public struct PinImageSource: Sendable {
-    private enum Storage {
-        case cgImage(CGImage)
-        case remote(URL, placeholder: CGImage?)
+    private enum Storage: Sendable {
+        case image(PinImage)
+        case remote(URL, placeholder: PinImage?)
     }
 
     private let storage: Storage
 
     public var remoteURL: URL? {
         switch storage {
-        case .cgImage:
+        case .image:
             return nil
         case .remote(let url, placeholder: _):
             return url
         }
     }
 
-    var initialImage: CGImage {
+    var initialImage: PinImage {
         switch storage {
-        case .cgImage(let image):
+        case .image(let image):
             return image
         case .remote(_, let placeholder):
-            return placeholder ?? PinImageLoader.defaultPlaceholderCGImage
+            return placeholder ?? PinImage.defaultPlaceholder
         }
     }
 
-    public static func cgImage(_ image: CGImage) -> PinImageSource {
-        PinImageSource(storage: .cgImage(image))
+    /// A picture the app already has.
+    public static func image(_ image: PinImage) -> PinImageSource {
+        PinImageSource(storage: .image(image))
     }
 
-    public static func remote(_ url: URL, placeholder: CGImage? = nil) -> PinImageSource {
+    /// A picture loaded from `url`, with `placeholder` (or the built-in one)
+    /// shown until it loads.
+    public static func remote(_ url: URL, placeholder: PinImage? = nil) -> PinImageSource {
         PinImageSource(storage: .remote(url, placeholder: placeholder))
     }
+
+    #if canImport(CoreGraphics)
+    public static func cgImage(_ image: CGImage) -> PinImageSource {
+        .image(PinImage(cgImage: image))
+    }
+
+    public static func remote(_ url: URL, placeholder: CGImage?) -> PinImageSource {
+        .remote(url, placeholder: placeholder.map { PinImage(cgImage: $0) })
+    }
+    #endif
 }

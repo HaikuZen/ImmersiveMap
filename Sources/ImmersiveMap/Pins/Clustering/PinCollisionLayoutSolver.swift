@@ -6,8 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 import simd
 
 /// Pin projection onto the screen before collision resolution.

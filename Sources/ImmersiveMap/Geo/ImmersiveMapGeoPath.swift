@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// A trajectory over the globe: waypoints joined by great-circle arcs, plus an
 /// altitude profile above the map surface.

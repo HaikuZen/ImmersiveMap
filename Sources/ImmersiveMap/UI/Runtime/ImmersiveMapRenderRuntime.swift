@@ -1,6 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
+import PortableFoundation
 import QuartzCore
 
 /// Owns the render-loop runtime state of a single map view.

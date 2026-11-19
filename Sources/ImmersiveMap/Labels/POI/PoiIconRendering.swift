@@ -16,6 +16,9 @@ struct PoiIconStyleUniform: Equatable {
     /// (`FrameContextServices.labelOpacity`). Applied to the composite, so
     /// the icon never shows the plate through it.
     var opacity: Float
+    /// The gap to the stride, which the colours align to 16, named: Swift would leave its bytes as whatever
+    /// the stack held, and they would go to the GPU with the constant data.
+    var _gap0: Float = 0, _gap1: Float = 0, _gap2: Float = 0
 
     init(backgroundColor: SIMD4<Float> = SIMD4<Float>(1.0, 1.0, 1.0, 1.0),
          iconColor: SIMD4<Float> = SIMD4<Float>(1.0, 1.0, 1.0, 1.0),

@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// Uniform hash grid over screen positions: the broad phase for the collision

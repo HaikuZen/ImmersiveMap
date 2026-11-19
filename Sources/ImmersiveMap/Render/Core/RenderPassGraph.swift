@@ -1,8 +1,8 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
-import QuartzCore
+import ImmersiveMapGPU
+import PortableFoundation
 
 final class RenderPassGraph {
     static func isWorldLayer(_ layer: RenderLayer) -> Bool {
@@ -71,20 +71,19 @@ final class RenderPassGraph {
 
         func makeRenderPassDescriptor(frameContext: FrameContext,
                                       attachments: FrameAttachmentStore,
-                                      target _: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
+                                      target _: FrameRenderTarget?) -> GPURenderPassDescriptor? {
             guard let shadowState = ShadowPassGateResolver.resolve(frameContext: frameContext),
                   shadowState.slots.contains(slot),
                   let shadowMapTexture = attachments.ensureShadowMapTexture(resolution: shadowState.mapResolution) else {
                 return nil
             }
 
-            let descriptor = MTLRenderPassDescriptor()
-            descriptor.depthAttachment.texture = shadowMapTexture
-            descriptor.depthAttachment.slice = slot.rawValue
-            descriptor.depthAttachment.loadAction = .clear
-            descriptor.depthAttachment.storeAction = .store
-            descriptor.depthAttachment.clearDepth = 1.0
-            return descriptor
+            var depth = GPUDepthStencilAttachment(texture: shadowMapTexture)
+            depth.slice = slot.rawValue
+            depth.load = .clear
+            depth.store = .store
+            depth.clearDepth = 1.0
+            return GPURenderPassDescriptor(colorAttachments: [], depthStencilAttachment: depth)
         }
     }
 
@@ -94,33 +93,32 @@ final class RenderPassGraph {
     private final class GroundShadowMaskDescriptorProvider: RenderPassDescriptorProvider {
         func makeRenderPassDescriptor(frameContext: FrameContext,
                                       attachments: FrameAttachmentStore,
-                                      target _: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
+                                      target _: FrameRenderTarget?) -> GPURenderPassDescriptor? {
             guard frameContext.renderSurfaceMode == .flat,
                   ShadowPassGateResolver.resolve(frameContext: frameContext) != nil,
                   let maskTexture = attachments.ensureGroundShadowMaskTexture(drawSize: frameContext.drawSize) else {
                 return nil
             }
 
-            let descriptor = MTLRenderPassDescriptor()
-            descriptor.colorAttachments[0].texture = maskTexture
-            descriptor.colorAttachments[0].loadAction = .dontCare
-            descriptor.colorAttachments[0].storeAction = .store
-            return descriptor
+            var color = GPUColorAttachment(texture: maskTexture)
+            color.load = .dontCare
+            color.store = .store
+            return GPURenderPassDescriptor(colorAttachments: [color])
         }
     }
 
     private final class WorldDescriptorProvider: RenderPassDescriptorProvider {
-        private let clearColor: MTLClearColor
-        private let depthTexture: MTLTexture?
+        private let clearColor: GPUClearColor
+        private let depthTexture: (any GPUTexture)?
         /// Where the world's depth is kept for the label pass: the depth
         /// texture itself (stored) with one sample, a resolve target with
         /// several; nil drops it when the pass ends, as always.
-        private let sceneDepthTexture: MTLTexture?
+        private let sceneDepthTexture: (any GPUTexture)?
         private let outputPlan: RenderFrameOutputPlan
 
-        init(clearColor: MTLClearColor,
-             depthTexture: MTLTexture?,
-             sceneDepthTexture: MTLTexture? = nil,
+        init(clearColor: GPUClearColor,
+             depthTexture: (any GPUTexture)?,
+             sceneDepthTexture: (any GPUTexture)? = nil,
              outputPlan: RenderFrameOutputPlan) {
             self.clearColor = clearColor
             self.depthTexture = depthTexture
@@ -130,63 +128,58 @@ final class RenderPassGraph {
 
         func makeRenderPassDescriptor(frameContext: FrameContext,
                                       attachments: FrameAttachmentStore,
-                                      target: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
-            guard let target else {
+                                      target: FrameRenderTarget?) -> GPURenderPassDescriptor? {
+            guard let targetTexture = target?.texture else {
                 return nil
             }
 
-            let outputTexture: MTLTexture?
+            let outputTexture: (any GPUTexture)?
             switch outputPlan.worldColorDestination {
             case .drawable:
-                outputTexture = target.texture
+                outputTexture = targetTexture
             case .postProcessingInput:
-                outputTexture = attachments.ensurePostProcessingInputTexture(
-                    drawSize: frameContext.drawSize,
-                    pixelFormat: target.texture.pixelFormat
-                )
+                outputTexture = attachments.ensurePostProcessingInputTexture(drawSize: frameContext.drawSize,
+                                                                             pixelFormat: targetTexture.format)
             }
             guard let outputTexture else { return nil }
 
-            let descriptor = MTLRenderPassDescriptor()
+            var color: GPUColorAttachment
             if outputPlan.usesMultisampleResolve {
-                guard let colorTexture = attachments.ensureColorTexture(
-                    drawSize: frameContext.drawSize,
-                    pixelFormat: target.texture.pixelFormat
-                ) else {
+                guard let colorTexture = attachments.ensureColorTexture(drawSize: frameContext.drawSize,
+                                                                        pixelFormat: targetTexture.format) else {
                     return nil
                 }
-                descriptor.colorAttachments[0].texture = colorTexture
-                descriptor.colorAttachments[0].resolveTexture = outputTexture
-                descriptor.colorAttachments[0].storeAction = .multisampleResolve
+                color = GPUColorAttachment(texture: colorTexture)
+                color.resolveTexture = outputTexture
+                color.store = .multisampleResolve
             } else {
-                descriptor.colorAttachments[0].texture = outputTexture
-                descriptor.colorAttachments[0].storeAction = .store
+                color = GPUColorAttachment(texture: outputTexture)
+                color.store = .store
             }
-            descriptor.colorAttachments[0].loadAction = .clear
-            descriptor.colorAttachments[0].clearColor = clearColor
+            color.load = .clear
+            color.clearColor = clearColor
+            var descriptor = GPURenderPassDescriptor(colorAttachments: [color])
             if let depthTexture {
-                descriptor.depthAttachment.texture = depthTexture
-                descriptor.depthAttachment.loadAction = .clear
-                descriptor.depthAttachment.storeAction = .dontCare
-                descriptor.depthAttachment.clearDepth = 1.0
+                // The stencil half of the texture carries the sphere's
+                // tile-priority marks and the flat map's surface bits
+                // (TileSourceStencilPriority): cleared to 0, never stored
+                // where the depth is dropped or resolved.
+                var depth = GPUDepthStencilAttachment(texture: depthTexture)
+                depth.load = .clear
+                depth.store = .dontCare
+                depth.clearDepth = 1.0
+                depth.clearStencil = 0
                 if let sceneDepthTexture {
                     if sceneDepthTexture === depthTexture {
-                        descriptor.depthAttachment.storeAction = .store
+                        depth.store = .store
                     } else {
                         // One sample serves: a road name is cut at a
                         // building's edge to the pixel, not the sample.
-                        descriptor.depthAttachment.resolveTexture = sceneDepthTexture
-                        descriptor.depthAttachment.depthResolveFilter = .sample0
-                        descriptor.depthAttachment.storeAction = .multisampleResolve
+                        depth.resolveTexture = sceneDepthTexture
+                        depth.store = .multisampleResolve
                     }
                 }
-                // The stencil half of the texture carries the sphere's
-                // tile-priority marks and the flat map's surface bits
-                // (TileSourceStencilPriority): cleared to 0, never stored.
-                descriptor.stencilAttachment.texture = depthTexture
-                descriptor.stencilAttachment.loadAction = .clear
-                descriptor.stencilAttachment.storeAction = .dontCare
-                descriptor.stencilAttachment.clearStencil = 0
+                descriptor.depthStencilAttachment = depth
             }
             return descriptor
         }
@@ -195,44 +188,39 @@ final class RenderPassGraph {
     private final class PostProcessingDescriptorProvider: RenderPassDescriptorProvider {
         func makeRenderPassDescriptor(frameContext _: FrameContext,
                                       attachments _: FrameAttachmentStore,
-                                      target: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
-            guard let target else {
+                                      target: FrameRenderTarget?) -> GPURenderPassDescriptor? {
+            guard let targetTexture = target?.texture else {
                 return nil
             }
 
-            let descriptor = MTLRenderPassDescriptor()
-            descriptor.colorAttachments[0].texture = target.texture
-            descriptor.colorAttachments[0].loadAction = .dontCare
-            descriptor.colorAttachments[0].storeAction = .store
-            return descriptor
+            var color = GPUColorAttachment(texture: targetTexture)
+            color.load = .dontCare
+            color.store = .store
+            return GPURenderPassDescriptor(colorAttachments: [color])
         }
     }
 
     private final class OverlayDescriptorProvider: RenderPassDescriptorProvider {
         func makeRenderPassDescriptor(frameContext: FrameContext,
                                       attachments: FrameAttachmentStore,
-                                      target: FrameRenderTarget?) -> MTLRenderPassDescriptor? {
-            guard let target,
+                                      target: FrameRenderTarget?) -> GPURenderPassDescriptor? {
+            guard let targetTexture = target?.texture,
                   let depthTexture = attachments.ensureOverlayDepthTexture(drawSize: frameContext.drawSize) else {
                 return nil
             }
 
-            let descriptor = MTLRenderPassDescriptor()
-            descriptor.colorAttachments[0].texture = target.texture
-            descriptor.colorAttachments[0].loadAction = .load
-            descriptor.colorAttachments[0].storeAction = .store
-            descriptor.depthAttachment.texture = depthTexture
-            descriptor.depthAttachment.loadAction = .clear
-            descriptor.depthAttachment.storeAction = .dontCare
-            descriptor.depthAttachment.clearDepth = 1.0
+            var color = GPUColorAttachment(texture: targetTexture)
+            color.load = .load
+            color.store = .store
             // The pipelines of the overlay layers are shared with the world
             // pass (where the overlay merges on model-free frames), so the
             // two passes must agree on the depth-stencil format.
-            descriptor.stencilAttachment.texture = depthTexture
-            descriptor.stencilAttachment.loadAction = .clear
-            descriptor.stencilAttachment.storeAction = .dontCare
-            descriptor.stencilAttachment.clearStencil = 0
-            return descriptor
+            var depth = GPUDepthStencilAttachment(texture: depthTexture)
+            depth.load = .clear
+            depth.store = .dontCare
+            depth.clearDepth = 1.0
+            depth.clearStencil = 0
+            return GPURenderPassDescriptor(colorAttachments: [color], depthStencilAttachment: depth)
         }
     }
 
@@ -251,13 +239,13 @@ final class RenderPassGraph {
         if let depthTexture {
             resourceRegistry.setTexture(depthTexture, named: .depthTexture)
         }
-        var sceneDepthTexture: MTLTexture?
+        var sceneDepthTexture: (any GPUTexture)?
         if keepsSceneDepth {
             sceneDepthTexture = attachments.sampleCount > 1
                 ? attachments.ensureSceneDepthResolveTexture(drawSize: frameContext.drawSize)
                 : depthTexture
         }
-        frameContext.sharedState.sceneDepthTexture = sceneDepthTexture
+        frameContext.sharedState.gpuSceneDepthTexture = sceneDepthTexture
 
         let clearColor = RenderFrameClearColor.make(transition: frameContext.transition,
                                                     settings: settings,

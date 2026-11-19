@@ -6,14 +6,14 @@
 //  ImmersiveMap
 //
 
-import Metal
+import ImmersiveMapGPU
 
 final class PinRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider {
     let name: String = "Pins"
 
     private let pinsRenderer: PinsRenderer
     private let pinSource: PinRenderSource
-    private let depthDisabledState: MTLDepthStencilState
+    private let depthDisabledState: any GPUDepthStencilState
 
     var hasRenderablePins: Bool {
         pinsRenderer.hasRenderablePins
@@ -21,7 +21,7 @@ final class PinRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider 
 
     init(pinsRenderer: PinsRenderer,
          pinSource: PinRenderSource,
-         depthDisabledState: MTLDepthStencilState) {
+         depthDisabledState: any GPUDepthStencilState) {
         self.pinsRenderer = pinsRenderer
         self.pinSource = pinSource
         self.depthDisabledState = depthDisabledState
@@ -39,23 +39,17 @@ final class PinRenderSubsystem: RenderSubsystem, RenderPassAvailabilityProvider 
     }
 
     func prepareGPU(frameContext: FrameContext, resourceRegistry _: RenderResourceRegistry) {
-        guard let commandBuffer = frameContext.commandBuffer else {
-            frameContext.services.diagnostics.recordSkipReason(.missingCommandBuffer)
-            return
-        }
-
         pinsRenderer.compute(drawSize: frameContext.drawSize,
-                                cameraUniform: frameContext.cameraUniform,
-                                resolvedPresentation: frameContext.resolvedPresentation,
-                                time: frameContext.time,
-                                commandBuffer: commandBuffer,
-                                frameSlotIndex: frameContext.frameSlotIndex)
+                             cameraUniform: frameContext.cameraUniform,
+                             resolvedPresentation: frameContext.resolvedPresentation,
+                             time: frameContext.time,
+                             frameSlotIndex: frameContext.frameSlotIndex)
         frameContext.sharedState.pinState.hasActiveAnimations = pinsRenderer.hasActiveAnimations
         frameContext.sharedState.selectionPickData.append(
             pinsRenderer.selectionSnapshot.withFrameIndex(frameContext.frameIndex))
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         guard layer == .pins else { return }
         encoder.setDepthStencilState(depthDisabledState)
         RendererPinDrawer.drawPins(renderEncoder: encoder,

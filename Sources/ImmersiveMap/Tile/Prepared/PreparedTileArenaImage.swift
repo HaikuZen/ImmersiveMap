@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// How a prepared tile's geometry blob is stored on disk.
 enum PreparedTileGeometryBlobTransport: Equatable, Sendable {

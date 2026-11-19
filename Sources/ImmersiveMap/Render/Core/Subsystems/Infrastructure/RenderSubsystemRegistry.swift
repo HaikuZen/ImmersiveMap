@@ -6,8 +6,11 @@
 //  ImmersiveMap
 //
 
-import Metal
+import ImmersiveMapGPU
+import PortableFoundation
+#if canImport(QuartzCore)
 import QuartzCore
+#endif
 
 final class RenderSubsystemRegistry {
     private let subsystems: [any RenderSubsystem]
@@ -36,7 +39,7 @@ final class RenderSubsystemRegistry {
         }
     }
 
-    func encode(layer: RenderLayer, encoder: MTLRenderCommandEncoder, frameContext: FrameContext) {
+    func encode(layer: RenderLayer, encoder: any GPURenderEncoder, frameContext: FrameContext) {
         for subsystem in subsystems {
             subsystem.encode(layer: layer, encoder: encoder, frameContext: frameContext)
         }

@@ -1,9 +1,11 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 import simd
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// The shape of the frame every pin of a map is drawn in: the outline, the
 /// fill under the picture and the cut of the picture itself all follow it.
@@ -20,15 +22,28 @@ import simd
 /// with a beam, whatever its shape is. The circle is the largest one that
 /// fits the shape's picture area.
 public struct PinShape: Equatable, Sendable {
-    enum Outline: Equatable, @unchecked Sendable {
+    enum Outline: Equatable, Sendable {
         /// The engine's own bubble, from the distance field in its resources.
         case bubble
         /// The parts of the shape, filled one over another.
-        case paths([CGPath])
+        case paths([PinShapePath])
         /// A picture of the shape: light and opaque where the pin is.
-        case mask(CGImage)
+        case mask(PinImage)
         /// No frame: the picture's own alpha is the shape.
         case picture
+
+        static func == (lhs: Outline, rhs: Outline) -> Bool {
+            switch (lhs, rhs) {
+            case (.bubble, .bubble), (.picture, .picture):
+                return true
+            case (.paths(let left), .paths(let right)):
+                return left == right
+            case (.mask(let left), .mask(let right)):
+                return left.isSamePicture(as: right)
+            default:
+                return false
+            }
+        }
     }
 
     let outline: Outline
@@ -70,10 +85,7 @@ public struct PinShape: Equatable, Sendable {
         let bodyHeight = tail ? 1.0 - tailHeight : 1.0
         let body = CGRect(x: 0.0, y: 0.0, width: 1.0, height: bodyHeight)
         let radius = min(max(cornerRadius, 0.0), 0.5) * min(body.width, body.height)
-        var parts = [CGPath(roundedRect: body,
-                            cornerWidth: radius,
-                            cornerHeight: radius,
-                            transform: nil)]
+        var parts = [PinShapePath.roundedRect(body, radius: radius)]
         guard tail else {
             return PinShape(outline: .paths(parts),
                             anchor: CGPoint(x: 0.5, y: 0.5),
@@ -83,17 +95,17 @@ public struct PinShape: Equatable, Sendable {
         // A wedge from inside the body down to the tip. It is as wide as
         // `tailHalfWidth` where it crosses the body's lower edge.
         let wedgeHalfWidth = tailHalfWidth * (tailHeight + tailDepth) / tailHeight
-        let wedge = CGMutablePath()
-        wedge.move(to: CGPoint(x: 0.5 - wedgeHalfWidth, y: bodyHeight - tailDepth))
-        wedge.addLine(to: CGPoint(x: 0.5 + wedgeHalfWidth, y: bodyHeight - tailDepth))
-        wedge.addLine(to: CGPoint(x: 0.5, y: 1.0))
-        wedge.closeSubpath()
-        parts.append(wedge)
+        parts.append(PinShapePath.polygon([
+            CGPoint(x: 0.5 - wedgeHalfWidth, y: bodyHeight - tailDepth),
+            CGPoint(x: 0.5 + wedgeHalfWidth, y: bodyHeight - tailDepth),
+            CGPoint(x: 0.5, y: 1.0)
+        ]))
         return PinShape(outline: .paths(parts),
                         anchor: CGPoint(x: 0.5, y: 1.0),
                         pictureArea: body)
     }
 
+#if canImport(CoreGraphics)
     /// A shape of the app's own.
     ///
     /// - Parameters:
@@ -108,17 +120,11 @@ public struct PinShape: Equatable, Sendable {
     public static func path(_ path: CGPath,
                             anchor: CGPoint = CGPoint(x: 0.5, y: 1.0),
                             pictureArea: CGRect? = nil) -> PinShape {
-        let unit = CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0)
-        let bounds = path.boundingBoxOfPath
-        var area = (pictureArea ?? bounds).intersection(unit)
-        if area.isNull || area.width <= 0.0 || area.height <= 0.0 {
-            area = unit
-        }
-        return PinShape(outline: .paths([path]),
-                        anchor: CGPoint(x: min(max(anchor.x, 0.0), 1.0),
-                                        y: min(max(anchor.y, 0.0), 1.0)),
-                        pictureArea: area)
+        PinShape(outline: .paths([PinShapePath(path)]),
+                 anchor: clampedToUnit(anchor),
+                 pictureArea: areaInUnit(pictureArea ?? path.boundingBoxOfPath))
     }
+#endif
 
     /// A shape taken from a picture of it, a PNG drawn in any editor: the
     /// pin is where the picture is light and opaque, and is not where it is
@@ -133,19 +139,23 @@ public struct PinShape: Equatable, Sendable {
     ///   - pictureArea: The rectangle of that square the pin's picture is
     ///     laid into. The whole square by default. Give it when the shape
     ///     has a part the picture should not reach, a pointer for example.
+    public static func mask(_ mask: PinImage,
+                            anchor: CGPoint = CGPoint(x: 0.5, y: 1.0),
+                            pictureArea: CGRect? = nil) -> PinShape {
+        PinShape(outline: .mask(mask),
+                 anchor: clampedToUnit(anchor),
+                 pictureArea: areaInUnit(pictureArea ?? CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0)))
+    }
+
+#if canImport(CoreGraphics)
+    /// A shape taken from a `CGImage` of it, as `mask(_:anchor:pictureArea:)`
+    /// takes a `PinImage`.
     public static func mask(_ mask: CGImage,
                             anchor: CGPoint = CGPoint(x: 0.5, y: 1.0),
                             pictureArea: CGRect? = nil) -> PinShape {
-        let unit = CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0)
-        var area = (pictureArea ?? unit).intersection(unit)
-        if area.isNull || area.width <= 0.0 || area.height <= 0.0 {
-            area = unit
-        }
-        return PinShape(outline: .mask(mask),
-                        anchor: CGPoint(x: min(max(anchor.x, 0.0), 1.0),
-                                        y: min(max(anchor.y, 0.0), 1.0)),
-                        pictureArea: area)
+        self.mask(PinImage(cgImage: mask), anchor: anchor, pictureArea: pictureArea)
     }
+#endif
 
     /// No frame: the pin is its picture alone, cut by the picture's own
     /// alpha, with no outline and no fill.
@@ -155,9 +165,27 @@ public struct PinShape: Equatable, Sendable {
     ///   corner. The center by default.
     public static func picture(anchor: CGPoint = CGPoint(x: 0.5, y: 0.5)) -> PinShape {
         PinShape(outline: .picture,
-                 anchor: CGPoint(x: min(max(anchor.x, 0.0), 1.0),
-                                 y: min(max(anchor.y, 0.0), 1.0)),
+                 anchor: clampedToUnit(anchor),
                  pictureArea: CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0))
+    }
+
+    private static func clampedToUnit(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: min(max(point.x, 0.0), 1.0),
+                y: min(max(point.y, 0.0), 1.0))
+    }
+
+    /// `area` cut to the unit square, or the whole square when nothing of
+    /// it is left.
+    private static func areaInUnit(_ area: CGRect) -> CGRect {
+        let area = area.standardized
+        let minX = max(area.minX, 0.0)
+        let minY = max(area.minY, 0.0)
+        let maxX = min(area.maxX, 1.0)
+        let maxY = min(area.maxY, 1.0)
+        guard area.isNull == false, maxX > minX, maxY > minY else {
+            return CGRect(x: 0.0, y: 0.0, width: 1.0, height: 1.0)
+        }
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
     var isFrameless: Bool {

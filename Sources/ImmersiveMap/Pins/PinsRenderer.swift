@@ -1,9 +1,9 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import Metal
-import QuartzCore
+import ImmersiveMapGPU
+import os
+import PortableFoundation
 import simd
 
 enum PinDrawPass: Equatable {
@@ -16,13 +16,15 @@ private enum PinInstanceFlags {
 }
 
 final class PinsRenderer {
+    private static let logger = Logger(subsystem: "ImmersiveMap", category: "Pins")
+
     private let config: ImmersiveMapSettings.PinSettings
     private let pinPipeline: PinPipeline
     private let beamPipeline: PinBeamPipeline
     private let countBadgePipeline: PinCountBadgePipeline
     private let pinAtlasResource: LazyPinRenderResource<PinTextureAtlas>
     private let countBadgeAtlasResource: LazyPinRenderResource<PinCountBadgeAtlas>
-    private let shapeTextureResource: LazyPinRenderResource<MTLTexture?>
+    private let shapeTextureResource: LazyPinRenderResource<(any GPUTexture)?>
     private let pinStyle: PinStyle
     private let countBadgeStyle: PinCountBadgeStyle
     private let beamStyle: PinBeamStyleGPU
@@ -31,11 +33,11 @@ final class PinsRenderer {
     private let collisionLayoutSolver = PinCollisionLayoutSolver()
     private let visibilityFadeStateStore = PinVisibilityFadeStateStore()
 
-    private let instanceBufferStore: FrameSlottedDynamicMetalBuffer<PinInstanceGPU>
-    private let screenPointBufferStore: FrameSlottedDynamicMetalBuffer<ScreenPointOutput>
-    private let countBadgeInstanceBufferStore: FrameSlottedDynamicMetalBuffer<PinCountBadgeInstanceGPU>
-    private let beamAnchorBufferStore: FrameSlottedDynamicMetalBuffer<ScreenPointOutput>
-    private let beamOffsetBufferStore: FrameSlottedDynamicMetalBuffer<PinOffset>
+    private let instanceBufferStore: GPUFrameSlottedBuffer<PinInstanceGPU>
+    private let screenPointBufferStore: GPUFrameSlottedBuffer<ScreenPointOutput>
+    private let countBadgeInstanceBufferStore: GPUFrameSlottedBuffer<PinCountBadgeInstanceGPU>
+    private let beamAnchorBufferStore: GPUFrameSlottedBuffer<ScreenPointOutput>
+    private let beamOffsetBufferStore: GPUFrameSlottedBuffer<PinOffset>
     private let presentationStateStore: PinPresentationStateStore
     private var instances: [PinInstanceGPU] = []
     private var countBadgeInstances: [PinCountBadgeInstanceGPU] = []
@@ -68,70 +70,73 @@ final class PinsRenderer {
         let countBadgePipeline: PinCountBadgePipeline
         let pinSDF: PinSDFResource
 
-        /// `resourceBundle` holds the bubble's distance field
-        /// (`ImmersiveMapResourceBundle`).
-        static func make(metalDevice: MTLDevice,
-                         pixelFormat: MTLPixelFormat,
-                         library: MTLLibrary,
-                         resourceBundle: Bundle,
+        /// The pipelines on `device`, with the bubble's distance field
+        /// already loaded (`PinSDFResource`, by Metal's texture loader on
+        /// Apple's platforms, by the engine's PNG decoder elsewhere).
+        static func make(device: any GPUDevice,
+                         pixelFormat: GPUPixelFormat,
+                         pinSDF: PinSDFResource,
                          sampleCount: Int = 1) -> SharedResources {
             SharedResources(
-                pinPipeline: PinPipeline(metalDevice: metalDevice,
-                                               pixelFormat: pixelFormat,
-                                               library: library,
-                                               sampleCount: sampleCount),
-                beamPipeline: PinBeamPipeline(metalDevice: metalDevice,
-                                                 pixelFormat: pixelFormat,
-                                                 library: library,
-                                                 sampleCount: sampleCount),
-                countBadgePipeline: PinCountBadgePipeline(metalDevice: metalDevice,
-                                                             pixelFormat: pixelFormat,
-                                                             library: library,
-                                                             sampleCount: sampleCount),
-                pinSDF: try! PinSDFResource(device: metalDevice, bundle: resourceBundle)
+                pinPipeline: PinPipeline(device: device,
+                                         pixelFormat: pixelFormat,
+                                         sampleCount: sampleCount),
+                beamPipeline: PinBeamPipeline(device: device,
+                                              pixelFormat: pixelFormat,
+                                              sampleCount: sampleCount),
+                countBadgePipeline: PinCountBadgePipeline(device: device,
+                                                          pixelFormat: pixelFormat,
+                                                          sampleCount: sampleCount),
+                pinSDF: pinSDF
             )
         }
     }
 
-    init(metalDevice: MTLDevice,
+    init(device: any GPUDevice,
          sharedResources: SharedResources,
          config: ImmersiveMapSettings.PinSettings) {
         self.config = config
         self.pinPipeline = sharedResources.pinPipeline
         self.beamPipeline = sharedResources.beamPipeline
         self.countBadgePipeline = sharedResources.countBadgePipeline
-        self.instanceBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                  slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                  options: [.storageModeShared])
-        self.screenPointBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                     slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                     options: [.storageModeShared])
-        self.countBadgeInstanceBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                            slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                            options: [.storageModeShared])
-        self.beamAnchorBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                    slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                    options: [.storageModeShared])
-        self.beamOffsetBufferStore = FrameSlottedDynamicMetalBuffer(metalDevice: metalDevice,
-                                                                    slotsCount: InFlightFramePool.inFlightFramesCount,
-                                                                    options: [.storageModeShared])
+        self.instanceBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                     slotsCount: InFlightFramePool.inFlightFramesCount)
+        self.screenPointBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                     slotsCount: InFlightFramePool.inFlightFramesCount)
+        self.countBadgeInstanceBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                     slotsCount: InFlightFramePool.inFlightFramesCount)
+        self.beamAnchorBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                     slotsCount: InFlightFramePool.inFlightFramesCount)
+        self.beamOffsetBufferStore = GPUFrameSlottedBuffer(device: device,
+                                                     slotsCount: InFlightFramePool.inFlightFramesCount)
         self.presentationStateStore = PinPresentationStateStore()
         self.pinAtlasResource = LazyPinRenderResource {
-            PinTextureAtlas(device: metalDevice,
+            PinTextureAtlas(device: device,
                                atlasSize: config.atlasSizePx,
                                cellSize: config.size.rawValue,
                                pagesMax: config.atlasPagesMax)
         }
         // The built-in bubble has its distance field in the resources. Any
         // other shape's is baked when the first pin is drawn, so a map
-        // without pins never pays for it.
-        let shape = config.shape
+        // without pins never pays for it. A shape whose field cannot be
+        // baked here (a path where the host has no drawer) is drawn as the
+        // bubble, and one whose bake fails as a plain square.
+        var shape = config.shape
+        if PinShapeDistanceField.canBake(shape) == false {
+            Self.logger.warning("ImmersiveMap: the pins' shape cannot be drawn without the host's drawer (PinPictureHost). The pins are drawn as the bubble.")
+            shape = .bubble
+        }
         let pinSDF = sharedResources.pinSDF
         let isBuiltInBubble = shape.outline == .bubble
         self.shapeTextureResource = LazyPinRenderResource {
-            isBuiltInBubble
-                ? pinSDF.texture
-                : PinShapeDistanceField.makeTexture(device: metalDevice, shape: shape)
+            if isBuiltInBubble {
+                return pinSDF.texture
+            }
+            if let texture = PinShapeDistanceField.makeTexture(device: device, shape: shape) {
+                return texture
+            }
+            Self.logger.warning("ImmersiveMap: the pins' shape gave no distance field. The pins are drawn as squares.")
+            return PinShapeDistanceField.makeTexture(device: device, shape: .picture())
         }
         let pinSizePx = Float(config.size.rawValue) * config.sizeScale
         let pinStyle = PinStyle(sizePx: pinSizePx,
@@ -156,7 +161,7 @@ final class PinsRenderer {
                                                          bodyCenterOffsetPx: pinStyle.bodyCenterOffsetPx)
         self.countBadgeAtlasResource = LazyPinRenderResource {
             PinCountBadgeAtlas(
-                device: metalDevice,
+                device: device,
                 badgePixelSize: max(1, Int(countBadgeStyle.sizePx.x.rounded()))
             )
         }
@@ -337,7 +342,7 @@ final class PinsRenderer {
         upload(values: beamOffsets, to: beamOffsetBufferStore.buffer(for: frameSlotIndex))
     }
 
-    private func upload<T>(values: [T], to buffer: MTLBuffer) {
+    private func upload<T>(values: [T], to buffer: any GPUBuffer) {
         guard values.isEmpty == false else { return }
         let bytesCount = values.count * MemoryLayout<T>.stride
         values.withUnsafeBytes { bytes in
@@ -350,7 +355,6 @@ final class PinsRenderer {
                  cameraUniform: CameraUniform,
                  resolvedPresentation: ResolvedPresentationState,
                  time: TimeInterval,
-                 commandBuffer: MTLCommandBuffer,
                  frameSlotIndex: Int) {
         // The presented list is taken straight from the store and not retained
         // between frames: the store updates its cache in place, and retaining it
@@ -383,69 +387,33 @@ final class PinsRenderer {
         selectionSnapshot = selectionProjector.makeSnapshot(pinItems: layout.pinItems,
                                                             drawSize: drawSize,
                                                             pinStyle: pinStyle)
-
-        guard pinCount > 0 else {
-            return
-        }
-        _ = commandBuffer
     }
 
-    func drawPins(renderEncoder: MTLRenderCommandEncoder,
-                     screenMatrix: matrix_float4x4,
-                     time: Float,
-                     frameSlotIndex: Int) {
+    func drawPins(renderEncoder: any GPURenderEncoder,
+                  screenMatrix: matrix_float4x4,
+                  time: Float,
+                  frameSlotIndex: Int) {
         guard pinCount > 0 else { return }
-        var matrix = screenMatrix
-        var style = pinStyle.gpu
-        let passes = Self.drawPassSequence(hasVisibleCountBadges: hasVisibleCountBadges)
-
-        if hasVisibleBeams {
-            drawBeams(renderEncoder: renderEncoder,
-                      matrix: &matrix,
-                      frameSlotIndex: frameSlotIndex)
-        }
-
-        for pass in passes {
-            switch pass {
-            case .pinBody:
-                pinPipeline.selectPipeline(renderEncoder: renderEncoder)
-                renderEncoder.setVertexBytes(&matrix, length: MemoryLayout<matrix_float4x4>.stride, index: 0)
-                renderEncoder.setVertexBuffer(screenPointBufferStore.buffer(for: frameSlotIndex), offset: 0, index: 1)
-                renderEncoder.setVertexBuffer(instanceBufferStore.buffer(for: frameSlotIndex), offset: 0, index: 2)
-                renderEncoder.setVertexBytes(&style, length: MemoryLayout<PinStyleGPU>.stride, index: 3)
-                renderEncoder.setFragmentBytes(&style, length: MemoryLayout<PinStyleGPU>.stride, index: 0)
-                renderEncoder.setFragmentTexture(pinAtlasResource.value.textureArray, index: 0)
-                renderEncoder.setFragmentTexture(shapeTextureResource.value, index: 1)
-                renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: pinCount)
-            case .countBadge:
-                countBadgePipeline.selectPipeline(renderEncoder: renderEncoder)
-                var countStyle = countBadgeStyle.gpu
-                renderEncoder.setVertexBytes(&matrix, length: MemoryLayout<matrix_float4x4>.stride, index: 0)
-                renderEncoder.setVertexBuffer(screenPointBufferStore.buffer(for: frameSlotIndex), offset: 0, index: 1)
-                renderEncoder.setVertexBuffer(countBadgeInstanceBufferStore.buffer(for: frameSlotIndex), offset: 0, index: 2)
-                renderEncoder.setVertexBytes(&countStyle, length: MemoryLayout<PinCountBadgeStyleGPU>.stride, index: 3)
-                renderEncoder.setFragmentTexture(countBadgeAtlasResource.value.texture, index: 0)
-                renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: pinCount)
-            }
-        }
+        let pinAtlas = pinAtlasResource.value.textureArray
+        let shapeField = shapeTextureResource.value
+        let frame = PinDrawing.Frame(screenPoints: screenPointBufferStore.buffer(for: frameSlotIndex),
+                                     instances: instanceBufferStore.buffer(for: frameSlotIndex),
+                                     countBadgeInstances: countBadgeInstanceBufferStore.buffer(for: frameSlotIndex),
+                                     beamAnchors: beamAnchorBufferStore.buffer(for: frameSlotIndex),
+                                     beamOffsets: beamOffsetBufferStore.buffer(for: frameSlotIndex),
+                                     pinCount: pinCount,
+                                     drawsBeams: hasVisibleBeams,
+                                     drawsCountBadges: hasVisibleCountBadges)
+        PinDrawing.draw(encoder: renderEncoder,
+                        pipelines: PinDrawing.Pipelines(pin: pinPipeline, countBadge: countBadgePipeline, beam: beamPipeline),
+                        frame: frame,
+                        styles: PinDrawing.Styles(pin: pinStyle.gpu,
+                                                  countBadge: countBadgeStyle.gpu,
+                                                  beam: beamStyle,
+                                                  beamColor: config.beamColor),
+                        screenMatrix: screenMatrix,
+                        pinAtlas: pinAtlas,
+                        shapeField: shapeField,
+                        countBadgeAtlas: { self.countBadgeAtlasResource.value.texture })
     }
-
-    /// Beams are drawn before the bubbles: from the true geo point to the
-    /// displaced pin, one instance per pin.
-    private func drawBeams(renderEncoder: MTLRenderCommandEncoder,
-                           matrix: inout matrix_float4x4,
-                           frameSlotIndex: Int) {
-        var beamStyle = beamStyle
-        var beamColor = config.beamColor
-
-        beamPipeline.selectBeamPipeline(renderEncoder: renderEncoder)
-        renderEncoder.setVertexBytes(&matrix, length: MemoryLayout<matrix_float4x4>.stride, index: 0)
-        renderEncoder.setVertexBuffer(beamAnchorBufferStore.buffer(for: frameSlotIndex), offset: 0, index: 1)
-        renderEncoder.setVertexBuffer(beamOffsetBufferStore.buffer(for: frameSlotIndex), offset: 0, index: 2)
-        renderEncoder.setVertexBytes(&beamStyle, length: MemoryLayout<PinBeamStyleGPU>.stride, index: 3)
-        renderEncoder.setFragmentBytes(&beamColor, length: MemoryLayout<SIMD4<Float>>.stride, index: 0)
-        renderEncoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: pinCount)
-
-    }
-
 }

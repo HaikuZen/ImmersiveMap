@@ -46,7 +46,7 @@ var body: some View {
 }
 ```
 
-- **The picture.** A `CGImage`, or `.remote(url, placeholder:)`, which the map downloads and shows the placeholder until then.
+- **The picture.** A `PinImage`, the map's own picture type, made from a `CGImage` (`PinImage(cgImage:)`) or from pixels. A pin also takes a `CGImage`, `UIImage` or `NSImage` directly. Or `.remote(url, placeholder:)`, which the map downloads and shows the placeholder until then. `pin.image` gives the `PinImage` back, and `pin.image.cgImage` the `CGImage`. Pins handed the same picture share one place in the map's memory, so reuse it for pins that look alike.
 - **Look.** `borderColor`, `screenSizeScale`, and `drawPriority`, where a higher priority draws on top.
 - **Changes.** `add`, `upsert`, `set`, `move(id:to:)`, `update(id:image:borderColor:isSelected:)`, `remove(ids:)` and `clear()`. The controller is thread-safe, so you can update it from any thread.
 - **Groups.** `merge(ids:...)` shows several pins as one, with a counter and their pictures in turn, and `unmerge(mergedID:)` splits them again.

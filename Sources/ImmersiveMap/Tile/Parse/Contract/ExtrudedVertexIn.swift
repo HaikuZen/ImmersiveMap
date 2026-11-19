@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import simd
 
 /// GPU vertex of the building extrusion mesh: 12 bytes.
@@ -14,21 +14,27 @@ import simd
 /// renormalized in the shader; buildings carry no per-vertex surface id
 /// (no shader ever read the one the 48-byte layout stored).
 ///
-/// The layout is mirrored by `VertexIn` in `TileExtruded.metal` and by
-/// the vertex descriptor in `ExtrudedTilePipeline`. The last two bytes
-/// are the building's ordinal in its tile (`buildingOrdinal`), which the
-/// ground relief lifts the building by: every vertex of a building reads
-/// one lift, so the building stands level on a slope.
+/// The layout is mirrored by `VertexIn` in `TileExtruded.metal` and
+/// `TileExtruded.wgsl` and by the vertex layout in `ExtrudedTilePipeline`.
+/// The normal and the style come first and the position after them, so
+/// every attribute starts where WebGPU allows one, at a multiple of four
+/// or of its own size: WebGPU reads the normal as four bytes (the style its
+/// fourth) and the position as four 16-bit values (the ordinal its
+/// fourth), neither of which the shader reads. The last two bytes are the
+/// building's ordinal in its tile (`buildingOrdinal`), which the ground
+/// relief lifts the building by: every vertex of a building reads one
+/// lift, so the building stands level on a slope. A change to the order is
+/// a prepared-cache format change.
 struct ExtrudedVertexIn {
     static let positionScale: Float = 4
 
-    let positionX: Int16
-    let positionY: Int16
-    let positionZ: Int16
     let normalX: Int8
     let normalY: Int8
     let normalZ: Int8
     let styleIndex: UInt8
+    let positionX: Int16
+    let positionY: Int16
+    let positionZ: Int16
     /// The volume's place in its tile's `buildingAnchors`
     /// (`DrawingExtrudedBytes`): the lift the relief gives the volume is
     /// looked up by it. The stride is a multiple of four with it, which

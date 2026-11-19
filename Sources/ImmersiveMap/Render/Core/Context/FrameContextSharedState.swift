@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Metal
+import ImmersiveMapGPU
 
 struct BaseLabelState {
     nonisolated(unsafe) static let empty = BaseLabelState(labelInputsCount: 0,
@@ -16,8 +16,8 @@ struct BaseLabelState {
                                       hasActiveFadeAnimations: false)
 
     var labelInputsCount: Int
-    var labelRuntimeMetaBuffer: MTLBuffer?
-    var screenPositionsBuffer: MTLBuffer?
+    var labelRuntimeMetaBuffer: (any GPUBuffer)?
+    var screenPositionsBuffer: (any GPUBuffer)?
     var baseLabelsDrawBatches: [BaseLabelDrawBatch]
     var hasActiveFadeAnimations: Bool
 }
@@ -53,7 +53,7 @@ struct RoadLabelState {
     var instanceCount: Int
     var glyphCount: Int
     var activeRoadLabelTiles: [VisibleTile]
-    var runtimeMetaBuffer: MTLBuffer?
+    var runtimeMetaBuffer: (any GPUBuffer)?
     var drawLabels: [DrawRoadLabels]
     var hasActiveFadeAnimations: Bool
 }
@@ -196,5 +196,5 @@ final class FrameContextSharedState {
     /// the pass plan when it was kept, nil otherwise. Only the buildings and
     /// the models write real depth in it; the ground writes a band at the
     /// far plane, farther than anything real.
-    var sceneDepthTexture: MTLTexture?
+    var gpuSceneDepthTexture: (any GPUTexture)?
 }

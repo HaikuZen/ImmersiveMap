@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 
 /// The sources an app registered with a layers controller, and the ones
 /// that are read. A source costs nothing until its shapes are needed: to

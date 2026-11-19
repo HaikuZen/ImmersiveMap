@@ -6,7 +6,7 @@
 //  ImmersiveMap
 //
 
-import Foundation
+import PortableFoundation
 
 /// Shared tile-index allocator for a tile-tracked rebuild frame.
 /// Keeps projection tiles and provides stable indices by `VisibleTile`.

@@ -6,8 +6,7 @@
 //  ImmersiveMap
 //
 
-import CoreGraphics
-import Foundation
+import PortableFoundation
 
 /// An object of the map the app or a tap selected: the feature it belongs
 /// to and its id within that feature.

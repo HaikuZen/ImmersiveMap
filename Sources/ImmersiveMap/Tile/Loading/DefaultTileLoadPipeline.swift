@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
+import PortableFoundation
 import os
 
 final class DefaultTileLoadPipeline: TileLoadPipeline {
@@ -20,9 +20,12 @@ final class DefaultTileLoadPipeline: TileLoadPipeline {
     // archive's source revision, nil when nothing is reported.
     private let archiveDepths: (depths: TileArchiveDepths, sourceRevision: UInt64)?
     private let archiveDepthCheck = OSAllocatedUnfairLock(initialState: false)
-    private weak var tileRenderStore: TileRenderStore?
+    private weak var tileRenderStore: (any TileMaterializing)?
+    // The host's preparation of a tile off the loader's thread, and the
+    // identity its entries must carry: nil when nothing is prepared there.
+    private let offThread: (prepare: OffThreadTilePreparation.Prepare, identity: PreparedTileCacheIdentity)?
 
-    convenience init(tileRenderStore: TileRenderStore,
+    convenience init(tileRenderStore: any TileMaterializing,
                      config: ImmersiveMapSettings,
                      preparedTileCacheIdentity: PreparedTileCacheIdentity,
                      geometryTransport: any PreparedTileGeometryTransporting) {
@@ -36,15 +39,18 @@ final class DefaultTileLoadPipeline: TileLoadPipeline {
                   archiveVersion: TileArchiveVersion(sourceRevision: preparedTileCacheIdentity.tileSourceRevision,
                                                      clearsRemembered: config.tiles.cache.clearDiskCachesOnLaunch),
                   overviewTileSource: config.tiles.overview.isEnabled ? OverviewTileSource.bundled() : nil,
-                  archiveDepths: (.shared, preparedTileCacheIdentity.tileSourceRevision))
+                  archiveDepths: (.shared, preparedTileCacheIdentity.tileSourceRevision),
+                  offThread: OffThreadTilePreparation.prepare.map { ($0, preparedTileCacheIdentity) })
     }
 
-    init(tileRenderStore: TileRenderStore?,
+    init(tileRenderStore: (any TileMaterializing)?,
          preparedTileDiskCaching: PreparedTileDiskCaching?,
          tileDownloader: TileDownloader,
          archiveVersion: TileArchiveVersion? = nil,
          overviewTileSource: OverviewTileSource? = nil,
-         archiveDepths: (depths: TileArchiveDepths, sourceRevision: UInt64)? = nil) {
+         archiveDepths: (depths: TileArchiveDepths, sourceRevision: UInt64)? = nil,
+         offThread: (prepare: OffThreadTilePreparation.Prepare, identity: PreparedTileCacheIdentity)? = nil) {
+        self.offThread = offThread
         self.archiveVersion = archiveVersion
         self.overviewTileSource = overviewTileSource
         self.archiveDepths = archiveDepths
@@ -157,6 +163,36 @@ final class DefaultTileLoadPipeline: TileLoadPipeline {
             return nil
         }
         return await tileRenderStore.prepareTile(tile: tile, data: data)
+    }
+
+    /// The host's preparation (`OffThreadTilePreparation.prepare` when the
+    /// pipeline was made), its entry read under this pipeline's identity. An entry of another
+    /// identity or one that does not read is dropped, and the loader parses
+    /// the bytes itself.
+    func prepareOffThread(tile: Tile, data: Data) async -> PreparedTileDiskCacheHit? {
+        guard let offThread else {
+            return nil
+        }
+        guard let framed = await offThread.prepare(tile.x, tile.y, tile.z, data) else {
+            OffThreadTilePreparation.note(.failed)
+            return nil
+        }
+        // Prepared under another identity (a worker of other settings):
+        // the loader parses the tile itself.
+        guard let entry = OffThreadTilePreparation.entry(of: framed, identity: offThread.identity) else {
+            OffThreadTilePreparation.note(.refused)
+            return nil
+        }
+        do {
+            // An inline entry names no file: the URL is never read.
+            return try PreparedTileDiskCodec.decode(data: entry,
+                                                    expectedTile: tile,
+                                                    cacheIdentity: offThread.identity,
+                                                    blobFileURL: URL(fileURLWithPath: "/"))
+        } catch {
+            OffThreadTilePreparation.note(.refused)
+            return nil
+        }
     }
 
     func materialize(preparedTile: PreparedTileCPU,

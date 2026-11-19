@@ -68,19 +68,27 @@ final class TileMaximumZoomLevelSettingsTests: XCTestCase {
         let revision: UInt64 = 0xABC
         XCTAssertNil(depths.maximumZoom(sourceRevision: revision), "Never read")
 
-        let posted = expectation(forNotification: TileArchiveDepths.didChange, object: nil)
+        let posted = expectation(description: "The change is told")
+        let observation = TileArchiveDepths.observeChanges { changed in
+            if changed == revision {
+                posted.fulfill()
+            }
+        }
         depths.observe(maximumZoom: 14, sourceRevision: revision)
         wait(for: [posted], timeout: 2)
+        withExtendedLifetime(observation) {}
         XCTAssertEqual(depths.maximumZoom(sourceRevision: revision), 14)
 
         let nextStart = TileArchiveDepths(baseCachesDirectory: caches)
         XCTAssertEqual(nextStart.maximumZoom(sourceRevision: revision), 14, "Read back from disk")
         XCTAssertNil(nextStart.maximumZoom(sourceRevision: 0xDEF), "Another archive")
 
-        let unchanged = expectation(forNotification: TileArchiveDepths.didChange, object: nil)
+        let unchanged = expectation(description: "An unchanged depth is not told")
         unchanged.isInverted = true
+        let unchangedObservation = TileArchiveDepths.observeChanges { _ in unchanged.fulfill() }
         nextStart.observe(maximumZoom: 14, sourceRevision: revision)
         wait(for: [unchanged], timeout: 0.3)
+        withExtendedLifetime(unchangedObservation) {}
     }
 
     /// The settings a map is built from carry the depth kept for their

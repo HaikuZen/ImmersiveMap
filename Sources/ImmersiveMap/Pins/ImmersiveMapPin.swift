@@ -1,9 +1,11 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Foundation
-import CoreGraphics
+import PortableFoundation
 import simd
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -29,7 +31,9 @@ public struct PinCountBadge: Equatable, Hashable, Sendable {
 public struct ImmersiveMapPin: Sendable {
     public let id: UInt64
     public var coordinate: GeoCoordinate
-    public var image: CGImage
+    /// The picture the pin shows now: its own, or while a remote one loads,
+    /// the placeholder.
+    public var image: PinImage
     public var imageSource: PinImageSource
     public var countBadge: PinCountBadge?
     public var borderColor: SIMD4<Float>?
@@ -40,7 +44,7 @@ public struct ImmersiveMapPin: Sendable {
 
     public init(id: UInt64,
                 coordinate: GeoCoordinate,
-                image: CGImage,
+                image: PinImage,
                 countBadge: PinCountBadge? = nil,
                 borderColor: SIMD4<Float>? = nil,
                 screenSizeScale: Float = 1.0,
@@ -50,7 +54,7 @@ public struct ImmersiveMapPin: Sendable {
         self.id = id
         self.coordinate = coordinate
         self.image = image
-        self.imageSource = .cgImage(image)
+        self.imageSource = .image(image)
         self.countBadge = countBadge
         self.borderColor = borderColor
         self.screenSizeScale = screenSizeScale
@@ -88,7 +92,7 @@ public struct ImmersiveMapPin: Sendable {
                 latitude: Double,
                 longitude: Double,
                 imageURL: URL,
-                placeholder: CGImage? = nil,
+                placeholder: PinImage? = nil,
                 borderColor: SIMD4<Float>? = nil,
                 screenSizeScale: Float = 1.0,
                 isSelected: Bool = false,
@@ -106,12 +110,12 @@ public struct ImmersiveMapPin: Sendable {
 
     /// Convenience pin builder with a ready (local) image.
     ///
-    /// Symmetric to the network initializer, but takes an already rendered
-    /// `CGImage` - e.g. the result of `PinImageFactory.number(_:)`.
+    /// Symmetric to the network initializer, but takes a picture already
+    /// made.
     public init(id: UInt64,
                 latitude: Double,
                 longitude: Double,
-                image: CGImage,
+                image: PinImage,
                 borderColor: SIMD4<Float>? = nil,
                 screenSizeScale: Float = 1.0,
                 isSelected: Bool = false,
@@ -126,6 +130,76 @@ public struct ImmersiveMapPin: Sendable {
                   drawPriority: drawPriority,
                   clusterPolicy: clusterPolicy)
     }
+
+#if canImport(CoreGraphics)
+    /// A pin showing a `CGImage`. Pins handed the same `CGImage` share one
+    /// cell of the atlas.
+    public init(id: UInt64,
+                coordinate: GeoCoordinate,
+                image: CGImage,
+                countBadge: PinCountBadge? = nil,
+                borderColor: SIMD4<Float>? = nil,
+                screenSizeScale: Float = 1.0,
+                isSelected: Bool = false,
+                drawPriority: Int = 0,
+                clusterPolicy: PinClusterPolicy = .none) {
+        self.init(id: id,
+                  coordinate: coordinate,
+                  image: PinImage(cgImage: image),
+                  countBadge: countBadge,
+                  borderColor: borderColor,
+                  screenSizeScale: screenSizeScale,
+                  isSelected: isSelected,
+                  drawPriority: drawPriority,
+                  clusterPolicy: clusterPolicy)
+    }
+
+    /// Convenience pin builder with a ready `CGImage`, for example the
+    /// result of `PinImageFactory.number(_:)`.
+    public init(id: UInt64,
+                latitude: Double,
+                longitude: Double,
+                image: CGImage,
+                borderColor: SIMD4<Float>? = nil,
+                screenSizeScale: Float = 1.0,
+                isSelected: Bool = false,
+                drawPriority: Int = 0,
+                clusterPolicy: PinClusterPolicy = .none) {
+        self.init(id: id,
+                  latitude: latitude,
+                  longitude: longitude,
+                  image: PinImage(cgImage: image),
+                  borderColor: borderColor,
+                  screenSizeScale: screenSizeScale,
+                  isSelected: isSelected,
+                  drawPriority: drawPriority,
+                  clusterPolicy: clusterPolicy)
+    }
+
+    /// Convenience pin builder with a network-loaded image and a `CGImage`
+    /// shown until it loads.
+    public init(id: UInt64,
+                latitude: Double,
+                longitude: Double,
+                imageURL: URL,
+                placeholder: CGImage?,
+                borderColor: SIMD4<Float>? = nil,
+                screenSizeScale: Float = 1.0,
+                isSelected: Bool = false,
+                drawPriority: Int = 0,
+                clusterPolicy: PinClusterPolicy = .none) {
+        self.init(id: id,
+                  latitude: latitude,
+                  longitude: longitude,
+                  imageURL: imageURL,
+                  placeholder: placeholder.map { PinImage(cgImage: $0) },
+                  borderColor: borderColor,
+                  screenSizeScale: screenSizeScale,
+                  isSelected: isSelected,
+                  drawPriority: drawPriority,
+                  clusterPolicy: clusterPolicy)
+    }
+#endif
 
 #if canImport(UIKit)
     public init(id: UInt64,

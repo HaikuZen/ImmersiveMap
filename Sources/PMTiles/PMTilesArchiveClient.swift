@@ -1,7 +1,14 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
+import PortableFoundation
+// Outside Apple's platforms `URLSession` is in a module of its own, and what
+// the two fetchers at the end of the file take from Foundation is not in
+// FoundationEssentials.
+#if canImport(FoundationNetworking)
 import Foundation
+import FoundationNetworking
+#endif
 
 /// Reads tiles out of one PMTiles archive over HTTP range requests, or
 /// straight from disk when the archive URL is a file URL (an archive shipped
@@ -83,6 +90,11 @@ package final class PMTilesArchiveClient: @unchecked Sendable {
     private var leafDirectories = PMTilesDirectoryCache(costLimit: PMTilesArchiveClient.leafCacheCostLimit)
     private var leafTasks: [UInt64: Task<PMTilesDirectory, Error>] = [:]
 
+    // A platform with neither Apple's Foundation nor FoundationNetworking has
+    // no `URLSession` (WebAssembly). There the client is made with the
+    // initializer below, over a fetcher the host gives it, and the two
+    // fetchers of this file, the session's and the file's, are not built.
+    #if canImport(Darwin) || canImport(FoundationNetworking)
     package init(archiveURL: URL,
                  requestHeaders: [String: String],
                  session: URLSession,
@@ -97,8 +109,75 @@ package final class PMTilesArchiveClient: @unchecked Sendable {
                                          session: session)
     }
 
-    /// The test seam: a fetcher in place of the session. Not a protocol, a
-    /// function, so the tile source stays one URL plus headers.
+    #else
+    /// What a client fetches with where there is no `URLSession` and the
+    /// host gave no fetcher of its own: every request fails, as with no
+    /// network.
+    package struct NoNetwork: Error {}
+
+    package static let noNetwork: RangeFetcher = { _, _ in throw NoNetwork() }
+
+    /// Makes the fetcher of an archive over HTTP where there is no
+    /// `URLSession` (the browser's `fetch`, through the page). The host sets
+    /// it once, before it makes the map, and the clients made after that read
+    /// through it. Nil: no network.
+    nonisolated(unsafe) package static var hostFetcherMaker: (@Sendable (_ archiveURL: URL, _ requestHeaders: [String: String]) -> RangeFetcher)?
+
+    /// What a client reads its archive with where there is no `URLSession`:
+    /// a file on disk directly, anything else through the host's fetcher.
+    package static func hostFetcher(archiveURL: URL, requestHeaders: [String: String]) -> RangeFetcher {
+        if archiveURL.isFileURL {
+            return makeWholeFileFetcher(archiveURL: archiveURL)
+        }
+        return hostFetcherMaker?(archiveURL, requestHeaders) ?? noNetwork
+    }
+
+    /// The file fetcher without `FileHandle`, which FoundationEssentials
+    /// lacks: the file is read whole on the first request and kept, and each
+    /// range is answered from it, as `makeFileFetcher` answers (a 206 with
+    /// no ETag, a range past the end short). Meant for the small archives a
+    /// program ships with it (the overview's).
+    private static func makeWholeFileFetcher(archiveURL: URL) -> RangeFetcher {
+        let contents = WholeFile(url: archiveURL)
+        return { range, _ in
+            let data = try contents.data()
+            let lower = Int(min(range.lowerBound, UInt64(data.count)))
+            let upper = Int(min(range.upperBound, UInt64(data.count)))
+            return RangeResponse(statusCode: 206, body: data.subdata(in: lower ..< upper))
+        }
+    }
+
+    /// The file's bytes, read on first use. `@unchecked Sendable`: the one
+    /// mutable field is behind the lock.
+    private final class WholeFile: @unchecked Sendable {
+        private let url: URL
+        private let lock = NSLock()
+        private var contents: Data?
+
+        init(url: URL) {
+            self.url = url
+        }
+
+        func data() throws -> Data {
+            lock.lock()
+            defer { lock.unlock() }
+            if let contents {
+                return contents
+            }
+            do {
+                let read = try Data(contentsOf: url)
+                contents = read
+                return read
+            } catch {
+                throw Failure.network(String(describing: error))
+            }
+        }
+    }
+    #endif
+
+    /// The test seam, and the way in for a platform without `URLSession`: a
+    /// fetcher in place of the session. Not a protocol, a function, so the
+    /// tile source stays one URL plus headers.
     package init(archiveURL: URL,
                  requestHeaders: [String: String],
                  tileType: PMTilesTileType = .mvt,
@@ -349,6 +428,7 @@ package final class PMTilesArchiveClient: @unchecked Sendable {
         return UInt64(startText)
     }
 
+    #if canImport(Darwin) || canImport(FoundationNetworking)
     /// Reads the range from the file and answers it as a 206 without an
     /// ETag, the shape an HTTP server gives, so the rest of the client does
     /// not know the difference. A range past the end comes back short, as
@@ -380,7 +460,10 @@ package final class PMTilesArchiveClient: @unchecked Sendable {
                                               session: URLSession) -> RangeFetcher {
         { range, ifMatchETag in
             var request = URLRequest(url: archiveURL)
+            // Only Apple's `URLRequest` has the flag.
+            #if canImport(Darwin)
             request.assumesHTTP3Capable = true
+            #endif
             // Range responses are not cached by URLCache, and the header
             // fetch must see the live ETag, so the cache is bypassed.
             request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -410,4 +493,5 @@ package final class PMTilesArchiveClient: @unchecked Sendable {
             return RangeResponse(statusCode: httpResponse.statusCode, headers: headers, body: data)
         }
     }
+    #endif
 }

@@ -1,7 +1,7 @@
 // Copyright (c) 2025-2026 Artem Bobkin.
 // SPDX-License-Identifier: MIT
 
-import Metal
+import ImmersiveMapGPU
 
 /// Runtime graph of render subsystems, shared frame resources, and pass availability providers.
 final class RenderGraph {
@@ -38,7 +38,7 @@ final class RenderGraph {
     }
 
     func encode(layer: RenderLayer,
-                encoder: MTLRenderCommandEncoder,
+                encoder: any GPURenderEncoder,
                 frameContext: FrameContext) {
         registry.encode(layer: layer,
                         encoder: encoder,
